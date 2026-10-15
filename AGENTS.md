@@ -10,6 +10,7 @@ FLVX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 | `go-gost/` | Forwarding agent (forked GOST) | `main.go` |
 | `go-gost/x/` | Protocol handlers/dialers/listeners (own module) | — |
 | `vite-frontend/` | React dashboard (shadcn bridge + Tailwind v4) | `src/App.tsx` |
+| `doc/` | User docs (VitePress, deployed to GitHub Pages) | `.vitepress/config.mts` |
 
 `go-gost/go.mod` uses `replace github.com/go-gost/x => ./x`.
 
@@ -29,6 +30,9 @@ FLVX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 
 # Agent
 (cd go-gost && go run .)
+
+# Docs
+(cd doc && npm ci && npm run dev)            # npm run build -> doc/.vitepress/dist
 ```
 
 ## Conventions

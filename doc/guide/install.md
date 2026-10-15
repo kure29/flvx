@@ -1,16 +1,16 @@
-# 安装部署指南
+# 安装部署
 
-本文档介绍如何部署 FLVX 面板端及节点端。
+面板端管理所有节点、隧道和入站；节点端（agent）装在中转机和落地机上，负责转发和运行内核。
 
-## 一、面板端部署
+## 面板端
 
 面板端负责管理用户、节点和转发规则。
 
-### 1. 环境要求
+### 环境要求
 - 操作系统：Linux (推荐 Debian 10+ / Ubuntu 20.04+)
 - 必须安装 Docker 和 Docker Compose
 
-### 2. 一键安装脚本
+### 一键安装
 
 使用以下命令即可快速安装面板：
 
@@ -24,7 +24,7 @@ curl -L https://github.com/kure29/flvx/releases/latest/download/panel_install.sh
 
 脚本会自动检测系统是否支持 IPv6，并自动配置 Docker 的 IPv6 支持。
 
-### 3. 访问面板
+### 访问面板
 
 安装完成后，访问：
 `http://<服务器IP>:<前端端口>` (默认: `http://<服务器IP>:6366`)
@@ -33,9 +33,11 @@ curl -L https://github.com/kure29/flvx/releases/latest/download/panel_install.sh
 - 用户名: `admin_user`
 - 密码: `admin_user`
 
-> ⚠️ **注意**: 首次登录后，请务必在“个人中心”或“设置”中修改默认密码！
+::: warning
+首次登录后请立即在“我的 / 个人资料”里修改默认密码。
+:::
 
-### 4. 维护命令
+### 维护菜单
 
 再次运行 `./panel_install.sh` 脚本可以看到管理菜单：
 1. 安装面板
@@ -44,19 +46,18 @@ curl -L https://github.com/kure29/flvx/releases/latest/download/panel_install.sh
 4. 迁移到 PostgreSQL
 5. 退出
 
----
 
-## 二、节点端部署
+## 节点端
 
 节点端运行在实际进行流量转发的服务器上，需要连接到面板端进行管理。
 
-### 1. 获取接入密钥
-1. 登录面板端。
-2. 进入 **节点管理 (Node)** 页面。
-3. 点击 **添加节点**。
-4. 获取该节点的 **接入密钥 (Secret)**。
+### 用面板生成的命令安装（推荐）
 
-### 2. 一键安装脚本
+1. **网站配置** 里填好“面板后端地址”，节点通过它连接面板（通常是 `http://面板IP:6365`，或反向代理后的地址）
+2. **节点** 页新建节点，点击 **安装**，安装命令会复制到剪贴板（复制失败时会弹出命令框）
+3. 到节点服务器上以 root 执行
+
+### 手动安装
 
 在节点服务器上运行：
 
@@ -74,7 +75,7 @@ wget -O install.sh https://github.com/kure29/flvx/releases/latest/download/insta
 
 **安装过程中会提示输入：**
 - **服务器地址**: 面板端的通信地址（通常是 `http://<面板IP>:<后端端口>`，例如 `http://1.2.3.4:6365`）。
-- **密钥**: 刚才在面板中获取的节点密钥。
+- **密钥**: 节点页里该节点的密钥。
 
 或者直接使用带参数的命令（适用于自动化部署）：
 
@@ -83,19 +84,18 @@ wget -O install.sh https://github.com/kure29/flvx/releases/latest/download/insta
 ./install.sh -a "http://1.2.3.4:6365" -s "your_node_secret"
 ```
 
-### 3. 验证安装
+### 验证安装
 安装完成后，服务会自动启动。
 - systemd 查看状态: `systemctl status flux_agent`
 - Alpine/OpenRC 查看状态: `rc-service flux_agent status`
 - 回到面板 **节点管理** 页面，该节点状态应显示为 **在线**。
 
----
 
-## 三、Caddy 反向代理（可选）
+## 反向代理（可选）
 
 如果需要通过域名访问面板并自动获取 HTTPS 证书，可以使用 Caddy 作为反向代理。
 
-### 1. 安装 Caddy
+### 安装 Caddy
 
 ```bash
 # Debian / Ubuntu
@@ -108,7 +108,7 @@ sudo apt install caddy
 
 其他系统请参考 [Caddy 官方安装文档](https://caddyserver.com/docs/install)。
 
-### 2. 配置 Caddyfile
+### 配置 Caddyfile
 
 编辑 Caddy 配置文件：
 
@@ -120,7 +120,7 @@ sudo nano /etc/caddy/Caddyfile
 
 将 `panel.example.com` 替换为你自己的域名：
 
-```caddyfile
+```txt
 panel.example.com {
     reverse_proxy localhost:6366
 }
@@ -128,13 +128,13 @@ panel.example.com {
 
 Caddy 会自动为域名申请和续期 HTTPS 证书，无需额外配置。
 
-### 3. 重启 Caddy
+### 重启 Caddy
 
 ```bash
 sudo systemctl restart caddy
 ```
 
-### 4. 注意事项
+### 注意事项
 
 - 确保域名已正确解析到服务器 IP。
 - 确保服务器防火墙放行了 **80** 和 **443** 端口（Caddy 自动申请证书需要）。
@@ -142,3 +142,5 @@ sudo systemctl restart caddy
   ```
   FRONTEND_PORT=127.0.0.1:6366
   ```
+
+升级见 [升级](./upgrade.md)。

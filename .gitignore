@@ -276,3 +276,8 @@ go-backend/gost.db-shm
 .gitignore
 go-backend/gost.db-wal
 go-backend/cmd/paneld/paneld
+
+# VitePress docs
+doc/node_modules/
+doc/.vitepress/dist/
+doc/.vitepress/cache/
