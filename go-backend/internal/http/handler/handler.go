@@ -231,6 +231,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/subscription/source/delete", h.remoteSourceDelete)
 	mux.HandleFunc("/api/v1/subscription/preview", h.subscriptionPreview)
 	mux.HandleFunc("/api/v1/inbound/toggle", h.inboundToggle)
+	mux.HandleFunc("/api/v1/inbound/split", h.inboundSplitSave)
 	mux.HandleFunc("/api/v1/inbound/reset-traffic", h.inboundResetTraffic)
 	mux.HandleFunc("/api/v1/inbound/regenerate", h.inboundRegenerate)
 	mux.HandleFunc("/api/v1/inbound/share", h.inboundShare)

@@ -193,6 +193,7 @@ func (m *Manager) Apply(req ApplyRequest) (State, error) {
 		m.setErr(inst, err)
 		return m.state(req.Type, false), err
 	}
+	prevFiles := readFiles(runDir, req.Files)
 	for _, f := range req.Files {
 		if err := writeFileAtomic(filepath.Join(runDir, f.Name), []byte(f.Content), 0o600); err != nil {
 			m.setErr(inst, err)
@@ -208,6 +209,7 @@ func (m *Manager) Apply(req ApplyRequest) (State, error) {
 			running = false
 		}
 	}
+	prev := prevApply{req: inst.req, binDir: inst.binDir, bins: inst.bins, version: inst.version, files: prevFiles}
 	inst.req = req
 	inst.binDir = binDir
 	inst.bins = bins
@@ -230,15 +232,70 @@ func (m *Manager) Apply(req ApplyRequest) (State, error) {
 		time.Sleep(startupProbeIn)
 	}
 
+	var failure error
+	if req.Enabled && !m.state(req.Type, false).Running {
+		failed := lastLines(inst.logs, 5)
+		failure = fmt.Errorf("内核启动失败: %s", failed)
+		if running && prev.req.Enabled {
+			// It ran before this change: keep the node serving on the
+			// previous config instead of leaving it down.
+			m.rollback(inst, runDir, prev)
+			if m.state(req.Type, false).Running {
+				failure = fmt.Errorf("新配置无法启动，已恢复上一次的配置: %s", failed)
+				m.setErr(inst, failure)
+			}
+		}
+	}
+
 	m.persist()
 	if err := m.nft.sync(m.allPorts(), m.allUserMarks()); err != nil {
 		inst.logs.add("[flvx] 流量计数规则同步失败: " + err.Error())
 	}
-	st := m.state(req.Type, false)
-	if req.Enabled && !st.Running {
-		return st, fmt.Errorf("内核启动失败: %s", lastLines(inst.logs, 5))
+	return m.state(req.Type, false), failure
+}
+
+// prevApply is what an instance ran before an apply, to go back to when the
+// new config does not start.
+type prevApply struct {
+	req     ApplyRequest
+	binDir  string
+	bins    map[string]string
+	version string
+	files   map[string][]byte
+}
+
+func (m *Manager) rollback(inst *instance, runDir string, prev prevApply) {
+	for name, content := range prev.files {
+		path := filepath.Join(runDir, name)
+		if content == nil {
+			_ = os.Remove(path)
+		} else {
+			_ = writeFileAtomic(path, content, 0o600)
+		}
 	}
-	return st, nil
+	m.mu.Lock()
+	inst.req = prev.req
+	inst.binDir = prev.binDir
+	inst.bins = prev.bins
+	inst.version = prev.version
+	m.mu.Unlock()
+	m.stopProcesses(inst)
+	m.startProcesses(inst)
+	time.Sleep(startupProbeIn)
+}
+
+// readFiles returns the current contents of the files an apply is about to
+// overwrite; nil marks a file that does not exist yet.
+func readFiles(dir string, files []File) map[string][]byte {
+	out := make(map[string][]byte, len(files))
+	for _, f := range files {
+		b, err := os.ReadFile(filepath.Join(dir, f.Name))
+		if err != nil {
+			b = nil
+		}
+		out[f.Name] = b
+	}
+	return out
 }
 
 func expandArgs(args []string, runDir, binDir string) []string {

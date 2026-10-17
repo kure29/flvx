@@ -25,7 +25,7 @@ import {
   uuidProtocols,
   visionAllowed,
 } from "./presets";
-import { SplitRulesEditor } from "./split-rules";
+import { DROP_NOTICE, savedDespiteDrop } from "./save-recovery";
 
 import { createInbound, updateInbound } from "@/api";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -46,7 +46,7 @@ interface Props {
   caps: KernelCapabilitiesApiData | null;
   nodes: NodeApiItem[];
   kernels: KernelApiItem[];
-  /** All inbounds, offered as chained outbounds. */
+  /** All inbounds, to confirm a save whose answer was lost. */
   inbounds: InboundApiItem[];
   initial: InboundForm;
   onSaved: () => void;
@@ -276,6 +276,19 @@ export function InboundFormModal({
         : await createInbound(payload);
 
       if (res.code !== 0) {
+        const prev = inbounds.find((i) => i.id === form.id);
+
+        if (
+          isEdit &&
+          prev &&
+          (await savedDespiteDrop(res, prev.id, prev.updatedTime))
+        ) {
+          toast.success(DROP_NOTICE, { duration: 6000 });
+          onOpenChange(false);
+          onSaved();
+
+          return;
+        }
         toast.error(res.msg || "保存失败");
 
         return;
@@ -293,14 +306,6 @@ export function InboundFormModal({
   };
 
   const nodeOptions = eligibleNodes(nodes);
-  // Any other inbound can carry this one's traffic; the backend rejects
-  // loops and protocols the kernel cannot dial.
-  const outboundOptions = inbounds.filter((i) => i.id !== form.id);
-  const outboundMissing =
-    form.outboundId !== "" &&
-    !outboundOptions.some((i) => String(i.id) === form.outboundId);
-  const outboundLabel = (i: InboundApiItem) =>
-    `${i.name} · ${i.external ? "导入" : i.nodeName || "节点"}`;
 
   return (
     <Modal
@@ -849,62 +854,6 @@ export function InboundFormModal({
                           onChange={(e) => set("alpn", e.target.value)}
                         />
                       )}
-                  </div>
-                )}
-
-                {form.kernelType !== "snell" && (
-                  <div className="space-y-3 rounded-xl border border-divider p-3">
-                    <div>
-                      <p className="text-sm font-medium">分流</p>
-                      <p className="text-xs text-default-500">
-                        规则从上到下匹配，先命中先生效；都不命中的流量走默认出口
-                      </p>
-                    </div>
-                    <Select
-                      description={
-                        outboundMissing
-                          ? "原出站节点已被删除，该入站的流量会被丢弃，请重新选择"
-                          : "直连：从本节点出去；选节点：再经该节点出去（链式代理，落地 IP 变为它的 IP）"
-                      }
-                      label="默认出口"
-                      selectedKeys={[form.outboundId || "direct"]}
-                      onSelectionChange={(keys) => {
-                        const key = String(Array.from(keys)[0] ?? "direct");
-
-                        set("outboundId", key === "direct" ? "" : key);
-                      }}
-                    >
-                      {[
-                        <SelectItem key="direct" textValue="直连">
-                          直连
-                        </SelectItem>,
-                        ...(outboundMissing
-                          ? [
-                              <SelectItem
-                                key={form.outboundId}
-                                textValue="已删除的节点"
-                              >
-                                已删除的节点
-                              </SelectItem>,
-                            ]
-                          : []),
-                        ...outboundOptions.map((i) => (
-                          <SelectItem
-                            key={String(i.id)}
-                            textValue={outboundLabel(i)}
-                          >
-                            {outboundLabel(i)}
-                          </SelectItem>
-                        )),
-                      ]}
-                    </Select>
-                    <SplitRulesEditor
-                      categories={caps?.splitCategories ?? []}
-                      rules={form.splitRules}
-                      targetLabel={outboundLabel}
-                      targets={outboundOptions}
-                      onChange={(splitRules) => set("splitRules", splitRules)}
-                    />
                   </div>
                 )}
 

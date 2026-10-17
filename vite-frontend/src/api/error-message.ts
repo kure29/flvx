@@ -21,6 +21,9 @@ interface BatchResultPayload {
 
 const MAX_BATCH_FAILURES_IN_TOAST = 3;
 
+/** The request got no answer: the connection dropped or never came up. */
+export const NETWORK_LOST = "网络连接中断";
+
 export const isUnauthorizedError = (error: unknown): boolean => {
   return axios.isAxiosError(error) && error.response?.status === 401;
 };
@@ -30,6 +33,9 @@ export const extractApiErrorMessage = (
   fallback = "网络请求失败",
 ): string => {
   if (axios.isAxiosError(error)) {
+    if (!error.response && error.code === "ERR_NETWORK") {
+      return NETWORK_LOST;
+    }
     const payload = error.response?.data as ErrorPayload | undefined;
 
     return payload?.msg || payload?.message || error.message || fallback;
