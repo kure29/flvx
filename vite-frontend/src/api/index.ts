@@ -51,7 +51,6 @@ import type {
   InboundApiItem,
   InboundProbe,
   InboundMutationPayload,
-  SplitRule,
   InboundShareEntry,
   InboundRelayApiItem,
   SubInfoApiData,
@@ -791,11 +790,6 @@ export const probeInbounds = (ids: number[] = []) =>
     { ids },
     { timeout: 60000 },
   );
-export const updateInboundSplit = (data: {
-  id: number;
-  outboundId: number;
-  splitRules: SplitRule[];
-}) => Network.post("/inbound/split", data);
 export const toggleInbound = (id: number, enabled: boolean) =>
   Network.post("/inbound/toggle", { id, enabled });
 export const resetInboundTraffic = (id: number) =>

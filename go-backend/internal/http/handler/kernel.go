@@ -709,7 +709,21 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		return
 	}
 	prevTargets := outboundTargets(row)
-	if err := h.setInboundRouting(&row, k.KernelType, req.OutboundID, req.SplitRules); err != nil {
+	row.OutboundID = req.OutboundID
+	if req.OutboundID < 0 {
+		row.OutboundID = 0
+	}
+	split, err := kernel.NormalizeSplitRules(req.SplitRules)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
+	row.SplitRules = ""
+	if len(split) > 0 {
+		raw, _ := json.Marshal(split)
+		row.SplitRules = string(raw)
+	}
+	if err := h.validateChain(row, k.KernelType); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
@@ -768,7 +782,9 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 	if update {
 		warnings = append(warnings, h.applyChainReferrers(row.ID)...)
 	}
-	warnings = append(warnings, h.applyChangedTargets(prevTargets, row)...)
+	for _, id := range changedTargets(prevTargets, outboundTargets(row)) {
+		warnings = append(warnings, h.applyWhitelistedTarget(id)...)
+	}
 	if len(warnings) > 0 {
 		response.WriteJSON(w, response.R{Code: 0, Msg: "已保存，但" + strings.Join(warnings, "；"), TS: now, Data: map[string]interface{}{"id": row.ID}})
 		return

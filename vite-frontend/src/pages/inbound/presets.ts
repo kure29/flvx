@@ -400,32 +400,15 @@ export function formFromItem(item: InboundApiItem): InboundForm {
     relayWhitelist: item.relayWhitelist,
     whitelistExtra: item.whitelistExtra,
     outboundId: item.outboundId ? String(item.outboundId) : "",
-    splitRules: splitFormFromItem(item),
+    splitRules: (item.splitRules ?? []).map((r) => ({
+      categories: r.categories ?? [],
+      domains: (r.domains ?? []).join(", "),
+      ips: (r.ips ?? []).join(", "),
+      action: r.action,
+      outboundId: r.outboundId ? String(r.outboundId) : "",
+    })),
     enabled: item.enabled,
   };
-}
-
-/** An inbound's 分流 rules as edited. */
-export function splitFormFromItem(item: InboundApiItem): SplitRuleForm[] {
-  return (item.splitRules ?? []).map((r) => ({
-    categories: r.categories ?? [],
-    domains: (r.domains ?? []).join(", "),
-    ips: (r.ips ?? []).join(", "),
-    action: r.action,
-    outboundId: r.outboundId ? String(r.outboundId) : "",
-  }));
-}
-
-export function splitPayload(
-  rules: SplitRuleForm[],
-): InboundMutationPayload["splitRules"] {
-  return rules.map((r) => ({
-    categories: r.categories,
-    domains: splitList(r.domains),
-    ips: splitList(r.ips),
-    action: r.action,
-    outboundId: r.action === "proxy" ? Number(r.outboundId) || 0 : undefined,
-  }));
 }
 
 export const uuidProtocols = ["vless", "vmess", "tuic"];
@@ -537,7 +520,13 @@ export function toPayload(form: InboundForm): InboundMutationPayload {
     relayWhitelist: form.relayWhitelist,
     whitelistExtra: form.relayWhitelist ? form.whitelistExtra.trim() : "",
     outboundId: Number(form.outboundId) || 0,
-    splitRules: splitPayload(form.splitRules),
+    splitRules: form.splitRules.map((r) => ({
+      categories: r.categories,
+      domains: splitList(r.domains),
+      ips: splitList(r.ips),
+      action: r.action,
+      outboundId: r.action === "proxy" ? Number(r.outboundId) || 0 : undefined,
+    })),
     enabled: form.enabled,
   };
 }

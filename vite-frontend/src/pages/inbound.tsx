@@ -34,7 +34,6 @@ import { SearchBar } from "@/components/search-bar";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { ActionSheet } from "@/pages/inbound/action-sheet";
-import { SplitModal } from "@/pages/inbound/split-modal";
 import {
   EXTERNAL_LABEL,
   ExternalEditModal,
@@ -234,7 +233,6 @@ export default function InboundPage() {
   const [details, setDetails] = useState<InboundApiItem | null>(null);
   const [sharing, setSharing] = useState<InboundApiItem | null>(null);
   const [relaying, setRelaying] = useState<InboundApiItem | null>(null);
-  const [splitting, setSplitting] = useState<InboundApiItem | null>(null);
   const [confirm, setConfirm] = useState<{
     action: ConfirmAction;
     item: InboundApiItem;
@@ -1207,16 +1205,6 @@ export default function InboundPage() {
                     color: "secondary" as const,
                     onPress: () => setRelaying(sheetItem),
                   },
-                  ...(sheetItem.kernelType === "snell"
-                    ? []
-                    : [
-                        {
-                          key: "split",
-                          label: "分流",
-                          color: "success" as const,
-                          onPress: () => setSplitting(sheetItem),
-                        },
-                      ]),
                   {
                     key: "details",
                     label: "参数",
@@ -1309,13 +1297,6 @@ export default function InboundPage() {
       </ActionSheet>
 
       <ShareModal item={sharing} onClose={() => setSharing(null)} />
-      <SplitModal
-        categories={caps?.splitCategories ?? []}
-        inbounds={inbounds}
-        item={splitting}
-        onClose={() => setSplitting(null)}
-        onSaved={() => loadData(false)}
-      />
       <ImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}

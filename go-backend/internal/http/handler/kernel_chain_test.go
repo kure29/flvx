@@ -1,15 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"go-backend/internal/http/response"
 	"go-backend/internal/kernel"
 	"go-backend/internal/store/model"
 	"go-backend/internal/store/repo"
@@ -178,51 +174,3 @@ func TestInboundSplitTargets(t *testing.T) {
 }
 
 func jsonID(id int64) string { return strconv.FormatInt(id, 10) }
-
-func TestInboundSplitSave(t *testing.T) {
-	r, err := repo.Open(t.TempDir() + "/split-save.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = r.Close() })
-	h := New(r, "unit-test-secret")
-
-	node := seedRelayTargetNode(t, r, "front", "198.51.100.1")
-	box := seedChainKernel(t, r, node, kernel.TypeSingbox)
-	target := seedChainInbound(t, r, box, "unlock", kernel.Inbound{Protocol: kernel.ProtocolTrojan, Port: 443,
-		Security: kernel.Security{Type: kernel.SecurityTLS, SNI: "u.example.com"}}, 0)
-	entry := seedChainInbound(t, r, box, "entry", kernel.Inbound{Protocol: kernel.ProtocolShadowsocks, Port: 8388}, 0)
-	name := entry.Name
-
-	save := func(body string) response.R {
-		rec := httptest.NewRecorder()
-		h.inboundSplitSave(rec, httptest.NewRequest(http.MethodPost, "/api/v1/inbound/split", strings.NewReader(body)))
-		var out response.R
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
-			t.Fatal(err)
-		}
-		return out
-	}
-
-	out := save(`{"id":` + jsonID(entry.ID) + `,"outboundId":0,"splitRules":[{"categories":["openai"],"action":"proxy","outboundId":` + jsonID(target.ID) + `}]}`)
-	if out.Code != 0 {
-		t.Fatalf("save: %+v", out)
-	}
-	got, _ := r.GetNodeInbound(entry.ID)
-	if !strings.Contains(got.SplitRules, `"openai"`) || got.Name != name || got.UpdatedTime == 0 {
-		t.Fatalf("only the routing changes: %+v", got)
-	}
-
-	if out := save(`{"id":` + jsonID(entry.ID) + `,"splitRules":[{"categories":["openai"],"action":"proxy"}]}`); out.Code == 0 {
-		t.Fatal("a proxy rule needs a target")
-	}
-	if out := save(`{"id":` + jsonID(entry.ID) + `,"outboundId":` + jsonID(entry.ID) + `}`); out.Code == 0 {
-		t.Fatal("an inbound cannot exit through itself")
-	}
-	if out := save(`{"id":` + jsonID(entry.ID) + `,"splitRules":[]}`); out.Code != 0 {
-		t.Fatalf("clearing: %+v", out)
-	}
-	if got, _ := r.GetNodeInbound(entry.ID); got.SplitRules != "" {
-		t.Fatalf("rules not cleared: %q", got.SplitRules)
-	}
-}

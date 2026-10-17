@@ -6,11 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"strings"
-	"time"
 
-	"go-backend/internal/http/response"
 	"go-backend/internal/kernel"
 	"go-backend/internal/store/model"
 )
@@ -321,80 +318,4 @@ func changedTargets(before, after []int64) []int64 {
 		}
 	}
 	return out
-}
-
-// setInboundRouting sets an inbound's default exit and 分流 rules and checks
-// that its kernel can reach every target.
-func (h *Handler) setInboundRouting(row *model.NodeInbound, kernelType string, outboundID int64, rules []kernel.SplitRule) error {
-	if outboundID < 0 {
-		outboundID = 0
-	}
-	split, err := kernel.NormalizeSplitRules(rules)
-	if err != nil {
-		return err
-	}
-	row.OutboundID = outboundID
-	row.SplitRules = ""
-	if len(split) > 0 {
-		raw, _ := json.Marshal(split)
-		row.SplitRules = string(raw)
-	}
-	return h.validateChain(*row, kernelType)
-}
-
-// applyChangedTargets re-applies the whitelists of targets the inbound
-// started or stopped using.
-func (h *Handler) applyChangedTargets(prevTargets []int64, row model.NodeInbound) []string {
-	var warnings []string
-	for _, id := range changedTargets(prevTargets, outboundTargets(row)) {
-		warnings = append(warnings, h.applyWhitelistedTarget(id)...)
-	}
-	return warnings
-}
-
-// inboundSplitSave saves only an inbound's default exit and 分流 rules.
-func (h *Handler) inboundSplitSave(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		response.WriteJSON(w, response.ErrDefault("请求失败"))
-		return
-	}
-	var req struct {
-		ID         int64              `json:"id"`
-		OutboundID int64              `json:"outboundId"`
-		SplitRules []kernel.SplitRule `json:"splitRules"`
-	}
-	if err := decodeJSON(r.Body, &req); err != nil {
-		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
-		return
-	}
-	row, err := h.repo.GetNodeInbound(req.ID)
-	if err != nil || row == nil || isExternalInbound(row) {
-		response.WriteJSON(w, response.ErrDefault("节点服务不存在"))
-		return
-	}
-	k, err := h.repo.GetNodeKernel(row.KernelID)
-	if err != nil || k == nil {
-		response.WriteJSON(w, response.ErrDefault("内核不存在"))
-		return
-	}
-	prevTargets := outboundTargets(*row)
-	if err := h.setInboundRouting(row, k.KernelType, req.OutboundID, req.SplitRules); err != nil {
-		response.WriteJSON(w, response.ErrDefault(err.Error()))
-		return
-	}
-	row.UpdatedTime = time.Now().UnixMilli()
-	if err := h.repo.SaveNodeInbound(row); err != nil {
-		response.WriteJSON(w, response.Err(-2, err.Error()))
-		return
-	}
-	var warnings []string
-	if err := h.applyKernel(k.ID, false); err != nil {
-		warnings = append(warnings, "下发到节点失败: "+err.Error())
-	}
-	warnings = append(warnings, h.applyChangedTargets(prevTargets, *row)...)
-	if len(warnings) > 0 {
-		response.WriteJSON(w, response.R{Code: 0, Msg: "已保存，但" + strings.Join(warnings, "；"), TS: row.UpdatedTime})
-		return
-	}
-	response.WriteJSON(w, response.OKEmpty())
 }

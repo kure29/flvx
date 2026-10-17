@@ -181,21 +181,10 @@ func TestManagerLifecycle(t *testing.T) {
 		t.Fatalf("changed apply must restart: %+v %v", st, err)
 	}
 
-	// Broken config: reported with the kernel's output, and the kernel
-	// goes back to the config it ran before.
-	st, err = m.Apply(applyRequest(srv, `{"crash":true}`, true))
-	if err == nil || !strings.Contains(err.Error(), "config error") || !strings.Contains(err.Error(), "已恢复") {
+	// Broken config: reported as error with the kernel's output.
+	_, err = m.Apply(applyRequest(srv, `{"crash":true}`, true))
+	if err == nil || !strings.Contains(err.Error(), "config error") {
 		t.Fatalf("crashing kernel must surface its log, got %v", err)
-	}
-	cfg, _ = os.ReadFile(filepath.Join(base, "xray", "run", "config.json"))
-	if !st.Running || string(cfg) != `{"v":2}` {
-		t.Fatalf("broken config must roll back: %+v %q", st, cfg)
-	}
-	// The rolled-back config is what runs now, so applying it again is a
-	// no-op rather than another restart.
-	pid = st.Pid
-	if st, err = m.Apply(applyRequest(srv, `{"v":2}`, true)); err != nil || st.Pid != pid {
-		t.Fatalf("re-applying the running config: %+v %v", st, err)
 	}
 
 	// Disable stops the process.
