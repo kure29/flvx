@@ -675,6 +675,11 @@ export interface SubPipeline {
   /** Routing rules, DNS and the picked service groups (Mihomo / sing-box / Surge). */
   rules: boolean;
   ruleGroups: string[];
+  /** Nodes picked for the chain, by their name before the pipeline. */
+  chainLandingNames: string[];
+  chainRelayNames: string[];
+  /** JavaScript `function operator(nodes)` run after the other steps. */
+  script: string;
 }
 export interface SubRuleGroup {
   key: string;
@@ -783,10 +788,12 @@ export const deleteRemoteSource = (id: number, keepNodes: boolean) =>
 export const resetSubscriptionTraffic = (id: number) =>
   Network.post<SubscriptionItem>("/subscription/reset-traffic", { id });
 export const previewSubscription = (data: SubscriptionDraft) =>
-  Network.post<{ items: SubPreviewItem[]; total: number; dropped: number }>(
-    "/subscription/preview",
-    data,
-  );
+  Network.post<{
+    items: SubPreviewItem[];
+    total: number;
+    dropped: number;
+    scriptError: string;
+  }>("/subscription/preview", data);
 
 export const testNotify = (data: {
   telegramToken: string;

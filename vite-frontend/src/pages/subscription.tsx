@@ -43,7 +43,11 @@ import {
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
 import { SUB_CLIENTS } from "@/pages/subscription/clients";
-import { Segmented, ToggleRow } from "@/pages/subscription/controls";
+import {
+  EditorTabs,
+  Segmented,
+  ToggleRow,
+} from "@/pages/subscription/controls";
 
 const modalBase =
   "!w-[calc(100%-32px)] !mx-auto sm:!w-full rounded-2xl overflow-hidden";
@@ -75,7 +79,24 @@ const EMPTY_PIPELINE: SubPipeline = {
   chainRelay: "",
   rules: false,
   ruleGroups: [],
+  chainLandingNames: [],
+  chainRelayNames: [],
+  script: "",
 };
+
+const SCRIPT_EXAMPLE = `// 对处理后的节点再做一遍筛选、改名、排序，返回新的节点数组
+// 每个节点：name 名称（可改）、original 原名、server、port、
+// protocol 协议、region 地区（如 "🇭🇰 香港"）、line（"direct" 直连 / "relay" 中转）
+function operator(nodes) {
+  return nodes
+    .filter((n) => !/过期|剩余/.test(n.name))
+    .map((n) => {
+      n.name = n.name.replace("IEPL", "专线");
+      return n;
+    })
+    .sort((a, b) => a.region.localeCompare(b.region));
+}
+`;
 
 function toDateInput(ms: number): string {
   if (!ms) return "";
@@ -250,7 +271,9 @@ function Section({
   );
 }
 
-type EditorPage = "basic" | "nodes" | "naming" | "rules" | "preview";
+type EditorPage = "basic" | "nodes" | "naming" | "rules" | "chain" | "preview";
+
+type ChainRole = "" | "landing" | "relay";
 
 /** Names the filters a pipeline turns on, e.g. "地区 2 个、去重". */
 function filterSummary(o: SubPipeline): string {
@@ -358,7 +381,11 @@ function Editor({
     items: SubPreviewItem[];
     total: number;
     dropped: number;
+    scriptError: string;
   } | null>(null);
+  // Nodes to pick the chain from; loaded when the chain page opens and kept
+  // while roles are picked (picking changes options, which drops preview).
+  const [chainNodes, setChainNodes] = useState<SubPreviewItem[] | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [page, setPage] = useState<EditorPage>("basic");
   const o = draft.options;
@@ -401,10 +428,44 @@ function Editor({
         return;
       }
       setPreview(res.data);
+      if (page === "chain") setChainNodes(res.data.items);
     } finally {
       setPreviewing(false);
     }
   };
+
+  // The preview and the chain page load by themselves when opened.
+  useEffect(() => {
+    if (page === "preview" && !preview && !previewing) void runPreview();
+    if (page === "chain" && !chainNodes && !previewing) void runPreview();
+  }, [page, preview, chainNodes]);
+
+  const chainRole = (original: string): ChainRole =>
+    o.chainLandingNames.includes(original)
+      ? "landing"
+      : o.chainRelayNames.includes(original)
+        ? "relay"
+        : "";
+  const setChainRole = (original: string, role: ChainRole) => {
+    const without = (list: string[]) => list.filter((n) => n !== original);
+
+    setOpts({
+      chainLandingNames:
+        role === "landing"
+          ? [...without(o.chainLandingNames), original]
+          : without(o.chainLandingNames),
+      chainRelayNames:
+        role === "relay"
+          ? [...without(o.chainRelayNames), original]
+          : without(o.chainRelayNames),
+      // Picking replaces the older name expressions.
+      chainLanding: "",
+      chainRelay: "",
+    });
+  };
+  const chainOn =
+    (o.chainLandingNames.length > 0 && o.chainRelayNames.length > 0) ||
+    Boolean(o.chainLanding && o.chainRelay);
 
   const pickList = (title: string, list: InboundApiItem[]) =>
     list.length > 0 && (
@@ -444,14 +505,19 @@ function Editor({
       </ModalHeader>
       {/* A steady height, so switching pages doesn't resize the dialog. */}
       <ModalBody className="min-h-[min(65vh,34rem)] space-y-4">
-        <div className="sticky top-0 z-10 -mx-1 bg-content1 px-1 pb-1">
-          <Segmented
-            options={[
-              ["basic", "基本"],
-              ["nodes", "节点"],
-              ["naming", "命名"],
-              ["rules", "规则"],
-              ["preview", "预览"],
+        <div className="sticky top-0 z-10 -mx-1 bg-content1 px-1 pt-1">
+          <EditorTabs
+            tabs={[
+              { key: "basic", label: "基本" },
+              { key: "nodes", label: "节点" },
+              { key: "naming", label: "命名" },
+              { key: "rules", label: "规则", badge: o.rules ? "开" : "" },
+              { key: "chain", label: "链式代理", badge: chainOn ? "开" : "" },
+              {
+                key: "preview",
+                label: "预览",
+                badge: preview ? preview.items.length : "",
+              },
             ]}
             value={page}
             onChange={setPage}
@@ -685,6 +751,45 @@ function Editor({
                 onChange={(dedupe) => setOpts({ dedupe })}
               />
             </Section>
+            <Section
+              hint="在上面的筛选、改名、排序之后运行，可以写任意 JS 来筛选、改名、排序；只取回节点顺序和名称"
+              summary={o.script ? "已设置" : "未设置"}
+              title="JS 脚本"
+            >
+              <Textarea
+                classNames={{ input: "font-mono text-xs" }}
+                minRows={6}
+                placeholder={"function operator(nodes) {\n  return nodes;\n}"}
+                value={o.script}
+                variant="bordered"
+                onChange={(e) => setOpts({ script: e.target.value })}
+              />
+              <div className="flex flex-wrap gap-2">
+                {!o.script && (
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={() => setOpts({ script: SCRIPT_EXAMPLE })}
+                  >
+                    插入示例
+                  </Button>
+                )}
+                {o.script && (
+                  <Button
+                    color="primary"
+                    isLoading={previewing}
+                    size="sm"
+                    variant="flat"
+                    onPress={async () => {
+                      await runPreview();
+                      setPage("preview");
+                    }}
+                  >
+                    试运行并预览
+                  </Button>
+                )}
+              </div>
+            </Section>
           </div>
         )}
 
@@ -794,31 +899,111 @@ function Editor({
                 </div>
               )}
             </Section>
-            <Section
-              collapsible
-              defaultOpen={Boolean(o.chainLanding || o.chainRelay)}
-              hint="客户端先连中转节点，再经它连落地节点，网站看到的是落地节点的 IP。落地节点会挂到「中转节点」组上，在「落地节点」里选出口、在「中转节点」里选中转。两项都填且都匹配到节点才生效；通用分享链接（Base64）无法表达链式"
-              summary={o.chainLanding && o.chainRelay ? "已开启" : "未开启"}
-              title="链式代理"
-            >
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Input
-                  description="多个关键词用 | 分隔，或 /正则/"
-                  label="落地节点"
-                  placeholder="例如 美国|家宽"
-                  value={o.chainLanding}
-                  variant="bordered"
-                  onChange={(e) => setOpts({ chainLanding: e.target.value })}
-                />
-                <Input
-                  description="同时匹配两项的节点算作落地"
-                  label="中转节点"
-                  placeholder="例如 香港|IEPL"
-                  value={o.chainRelay}
-                  variant="bordered"
-                  onChange={(e) => setOpts({ chainRelay: e.target.value })}
-                />
+          </div>
+        )}
+
+        {page === "chain" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/30 dark:bg-primary-900/20">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                链式代理
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${chainOn ? "bg-success-100 text-success-700 dark:bg-success-500/20" : "bg-default-100 text-default-500"}`}
+                >
+                  {chainOn ? "已开启" : "未开启"}
+                </span>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                {["客户端", "中转节点", "落地节点", "网站"].map((s, i) => (
+                  <span key={s} className="flex items-center gap-2">
+                    {i > 0 && <span className="text-default-400">→</span>}
+                    <span
+                      className={`rounded-lg px-2 py-1 ${s === "中转节点" ? "bg-secondary-100 text-secondary-700 dark:bg-secondary-500/20" : s === "落地节点" ? "bg-warning-100 text-warning-700 dark:bg-warning-500/20" : "bg-content1 text-default-600"}`}
+                    >
+                      {s}
+                    </span>
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-default-500">
+                网站看到的是落地节点的
+                IP。客户端里会多出「落地节点」「中转节点」两个组，分别选出口和中转。落地和中转都至少选一个才生效；通用分享链接（Base64）无法表达链式
+              </p>
+            </div>
+
+            {o.chainLanding && o.chainRelay && (
+              <p className="rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-700 dark:bg-warning-500/10">
+                现在用的是旧的关键词方式（落地：{o.chainLanding}，中转：
+                {o.chainRelay}）。在下面勾选节点后会改用勾选的节点
+              </p>
+            )}
+
+            <Section
+              hint="按节点设置角色；用的是处理前的原名，改名不影响"
+              summary={`落地 ${o.chainLandingNames.length} 个 · 中转 ${o.chainRelayNames.length} 个`}
+              title="选择节点"
+            >
+              {!chainNodes ? (
+                <p className="py-6 text-center text-xs text-default-500">
+                  正在加载节点…
+                </p>
+              ) : chainNodes.length === 0 ? (
+                <p className="py-6 text-center text-xs text-default-500">
+                  订阅里还没有节点
+                </p>
+              ) : (
+                <div className="max-h-80 divide-y divide-divider overflow-y-auto rounded-xl border border-divider">
+                  {chainNodes.map((n, i) => {
+                    const role = chainRole(n.original);
+
+                    return (
+                      <div
+                        key={`${n.original}-${i}`}
+                        className="flex items-center gap-3 px-3 py-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm">{n.original}</div>
+                          <div className="truncate text-xs text-default-400">
+                            {[
+                              n.region,
+                              n.protocol,
+                              n.line === "relay" ? "中转线路" : "直连",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          {(
+                            [
+                              ["", "不用"],
+                              ["landing", "落地"],
+                              ["relay", "中转"],
+                            ] as Array<[ChainRole, string]>
+                          ).map(([r, label]) => (
+                            <button
+                              key={r}
+                              className={`rounded-lg border px-2 py-1 text-xs transition-colors ${
+                                role === r
+                                  ? r === "landing"
+                                    ? "border-warning bg-warning-50 text-warning-700 dark:bg-warning-500/20"
+                                    : r === "relay"
+                                      ? "border-secondary bg-secondary-50 text-secondary-700 dark:bg-secondary-500/20"
+                                      : "border-default-400 bg-default-100 text-default-700"
+                                  : "border-default-200 text-default-500 hover:border-default-400 dark:border-default-100"
+                              }`}
+                              type="button"
+                              onClick={() => setChainRole(n.original, r)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </Section>
           </div>
         )}
@@ -826,21 +1011,30 @@ function Editor({
         {page === "preview" && (
           <div className="space-y-4">
             <Section title="预览">
-              <Button
-                className="w-full"
-                isLoading={previewing}
-                variant="flat"
-                onPress={runPreview}
-              >
-                看看结果
-              </Button>
+              {previewing && !preview && (
+                <p className="py-6 text-center text-xs text-default-500">
+                  正在生成…
+                </p>
+              )}
+              {preview?.scriptError && (
+                <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger dark:bg-danger-500/10">
+                  {preview.scriptError}；订阅会先不经过脚本输出
+                </p>
+              )}
               {preview && (
                 <>
                   <p className="text-xs text-default-500">
                     共 {preview.items.length} 个节点
                     {preview.dropped > 0 && `，过滤掉 ${preview.dropped} 个`}
+                    <button
+                      className="ml-2 text-primary"
+                      type="button"
+                      onClick={runPreview}
+                    >
+                      刷新
+                    </button>
                   </p>
-                  <div className="max-h-64 overflow-y-auto rounded-xl border border-divider">
+                  <div className="max-h-96 overflow-y-auto rounded-xl border border-divider">
                     {preview.items.length === 0 ? (
                       <p className="p-3 text-xs text-default-500">没有节点</p>
                     ) : (

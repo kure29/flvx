@@ -19,17 +19,16 @@ const (
 // both is a landing node: it must not relay for itself. Nothing is tagged
 // unless both sides match a node.
 func markChain(endpoints []Endpoint, opts SubOptions) {
-	landing, _ := ParseMatcher(opts.ChainLanding)
-	relay, _ := ParseMatcher(opts.ChainRelay)
-	if landing == nil || relay == nil {
+	isLanding, isRelay := chainMatchers(opts)
+	if isLanding == nil || isRelay == nil {
 		return
 	}
 	for i := range endpoints {
 		e := &endpoints[i]
 		switch {
-		case landing.match(e.Name) || landing.match(e.Original):
+		case isLanding(*e):
 			e.ChainRole = ChainRoleLanding
-		case relay.match(e.Name) || relay.match(e.Original):
+		case isRelay(*e):
 			e.ChainRole = ChainRoleRelay
 		}
 	}
@@ -38,6 +37,26 @@ func markChain(endpoints []Endpoint, opts SubOptions) {
 			endpoints[i].ChainRole = ""
 		}
 	}
+}
+
+// chainMatchers tell landing and relay nodes apart: by the picked names
+// when there are any, else by the name expressions. Nil when unset.
+func chainMatchers(opts SubOptions) (func(Endpoint) bool, func(Endpoint) bool) {
+	if len(opts.ChainLandingNames) > 0 || len(opts.ChainRelayNames) > 0 {
+		landing, relay := toSet(opts.ChainLandingNames), toSet(opts.ChainRelayNames)
+		if len(landing) == 0 || len(relay) == 0 {
+			return nil, nil
+		}
+		return func(e Endpoint) bool { return landing[e.Original] },
+			func(e Endpoint) bool { return relay[e.Original] }
+	}
+	landing, _ := ParseMatcher(opts.ChainLanding)
+	relay, _ := ParseMatcher(opts.ChainRelay)
+	if landing == nil || relay == nil {
+		return nil, nil
+	}
+	return func(e Endpoint) bool { return landing.match(e.Name) || landing.match(e.Original) },
+		func(e Endpoint) bool { return relay.match(e.Name) || relay.match(e.Original) }
 }
 
 // chainGroups returns the landing and relay names among the endpoints a

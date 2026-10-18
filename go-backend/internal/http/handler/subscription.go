@@ -43,6 +43,11 @@ type subPipeline struct {
 	ChainRelay   string   `json:"chainRelay"`
 	Rules        bool     `json:"rules"`
 	RuleGroups   []string `json:"ruleGroups"`
+	// ChainLandingNames / ChainRelayNames are the nodes picked for the
+	// chain, by their name before the pipeline.
+	ChainLandingNames []string `json:"chainLandingNames"`
+	ChainRelayNames   []string `json:"chainRelayNames"`
+	Script            string   `json:"script"`
 }
 
 func (p subPipeline) options() kernel.SubOptions {
@@ -51,6 +56,7 @@ func (p subPipeline) options() kernel.SubOptions {
 		Rename: p.Rename, AddFlag: p.AddFlag, Prefix: p.Prefix, Dedupe: p.Dedupe, Sort: p.Sort,
 		RegionGroups: p.RegionGroups, ChainLanding: p.ChainLanding, ChainRelay: p.ChainRelay,
 		Rules: p.Rules, RuleGroups: p.RuleGroups,
+		ChainLandingNames: p.ChainLandingNames, ChainRelayNames: p.ChainRelayNames, Script: p.Script,
 	}
 }
 
@@ -80,6 +86,14 @@ func (p *subPipeline) normalize() error {
 		p.Protocols = []string{}
 	}
 	p.RuleGroups = kernel.NormalizeRuleGroups(p.RuleGroups)
+	var err error
+	if p.ChainLandingNames, err = normalizeNames(p.ChainLandingNames); err != nil {
+		return err
+	}
+	if p.ChainRelayNames, err = normalizeNames(p.ChainRelayNames); err != nil {
+		return err
+	}
+	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
 	return p.options().Validate()
 }
 
@@ -95,7 +109,35 @@ func parsePipeline(raw string) subPipeline {
 	if p.RuleGroups == nil {
 		p.RuleGroups = []string{}
 	}
+	if p.ChainLandingNames == nil {
+		p.ChainLandingNames = []string{}
+	}
+	if p.ChainRelayNames == nil {
+		p.ChainRelayNames = []string{}
+	}
 	return p
+}
+
+// normalizeNames trims and dedupes picked node names; a node picked as
+// both landing and relay counts as landing (see markChain).
+func normalizeNames(names []string) ([]string, error) {
+	if len(names) > 1000 {
+		return nil, errText("选的节点太多")
+	}
+	out := []string{}
+	seen := map[string]bool{}
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" || seen[n] {
+			continue
+		}
+		if len([]rune(n)) > 200 {
+			return nil, errText("节点名称太长")
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out, nil
 }
 
 type errText string
@@ -720,10 +762,15 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 		items = append(items, subPreviewItem{Name: e.Name, Original: e.Original, Region: kernel.RegionOf(e.Name),
 			Protocol: kernel.EndpointProtocol(e), Line: line, Chain: e.ChainRole})
 	}
+	scriptError := ""
+	if err := kernel.SubScriptError(source, req.Options.options()); err != nil {
+		scriptError = err.Error()
+	}
 	response.WriteJSON(w, response.OK(map[string]interface{}{
-		"items":   items,
-		"total":   len(source),
-		"dropped": len(source) - len(items),
+		"items":       items,
+		"total":       len(source),
+		"dropped":     len(source) - len(items),
+		"scriptError": scriptError,
 	}))
 }
 

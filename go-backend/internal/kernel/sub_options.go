@@ -8,8 +8,8 @@ import (
 )
 
 // SubOptions is a subscription's processing pipeline. The steps run in a
-// fixed order: filter → rename → flag → prefix → dedupe → sort; region
-// groups are added when the profile is rendered.
+// fixed order: filter → rename → flag → prefix → dedupe → sort → script;
+// region groups are added when the profile is rendered.
 type SubOptions struct {
 	// Lines keeps "relay" or "direct" endpoints only; "" keeps both.
 	Lines string
@@ -34,10 +34,16 @@ type SubOptions struct {
 	Sort string
 	// RegionGroups adds one auto-select group per detected region.
 	RegionGroups bool
-	// ChainLanding / ChainRelay match names (like Include): landing nodes
-	// are dialed through the relay group (see markChain).
-	ChainLanding string
-	ChainRelay   string
+	// ChainLandingNames / ChainRelayNames pick nodes by their name before
+	// the pipeline (Endpoint.Original): landing nodes are dialed through
+	// the relay group (see markChain). ChainLanding / ChainRelay are the
+	// older name expressions (like Include), used when no names are picked.
+	ChainLandingNames []string
+	ChainRelayNames   []string
+	ChainLanding      string
+	ChainRelay        string
+	// Script is JavaScript run after the other steps (see sub_script.go).
+	Script string
 	// Rules adds routing rules, DNS and the service groups in RuleGroups
 	// (see sub_rules.go) to Mihomo, sing-box and Surge profiles; it implies
 	// RegionGroups there.
@@ -134,7 +140,7 @@ func (o SubOptions) Validate() error {
 	if _, err := ParseMatcher(o.ChainRelay); err != nil {
 		return fmt.Errorf("中转节点：%v", err)
 	}
-	return nil
+	return ValidateSubScript(o.Script)
 }
 
 // FilterEndpoints applies the filter step only.
@@ -248,8 +254,25 @@ func ApplySubOptions(endpoints []Endpoint, opts SubOptions) []Endpoint {
 	if opts.Sort == "name" {
 		sort.SliceStable(out, func(i, j int) bool { return NaturalLess(out[i].Name, out[j].Name) })
 	}
+	// A failing script leaves the nodes as the other steps made them; the
+	// editor shows the error (SubScriptError).
+	if scripted, err := ApplySubScript(out, opts.Script); err == nil {
+		out = scripted
+	}
 	markChain(out, opts)
 	return out
+}
+
+// SubScriptError is the error the subscription's script gives on these
+// endpoints, if any.
+func SubScriptError(endpoints []Endpoint, opts SubOptions) error {
+	if strings.TrimSpace(opts.Script) == "" {
+		return nil
+	}
+	script := opts.Script
+	opts.Script = ""
+	_, err := ApplySubScript(ApplySubOptions(endpoints, opts), script)
+	return err
 }
 
 // NaturalLess compares names with digit runs compared numerically, so
