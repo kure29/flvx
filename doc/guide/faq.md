@@ -17,6 +17,18 @@
 3. 检查节点端服务状态: `systemctl status flux_agent`。
 4. 查看节点端日志: `journalctl -u flux_agent -f`。
 
+### 部署或升级节点提示 “API rate limit exceeded”？
+
+面板要向 GitHub 查询最新版本号。不登录的查询每个 IP 每小时只有 60 次，VPS 的 IP 常常和别人共用，可能早就被用完。面板会把查询结果缓存 10 分钟，查询失败时用上次的结果，正式版还会改用不受这个限制的方式查询，所以一般不会再遇到。
+
+测试版或面板刚启动时仍可能出现，等一小时再试，或者给面板配一个 GitHub token：在 GitHub 的 Settings → Developer settings → Personal access tokens 新建一个 fine-grained token（只需公开仓库只读，不用勾任何权限），写进部署目录的 `.env`：
+
+```bash
+GITHUB_TOKEN=github_pat_xxx
+```
+
+然后 `docker compose up -d` 重建后端，限额变为每小时 5000 次。旧版 `docker-compose.yml` 需要在 `backend.environment` 里加上 `GITHUB_TOKEN: ${GITHUB_TOKEN:-}`。
+
 ### 只有 TCP 能通，UDP 不通？
 请检查服务器防火墙和安全组（AWS/阿里云/腾讯云等）是否同时放行了对应端口的 **TCP 和 UDP** 协议。
 

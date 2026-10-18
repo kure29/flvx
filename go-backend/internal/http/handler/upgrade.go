@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -118,13 +119,53 @@ func (h *Handler) buildGithubDownloadURL(version, filename string) string {
 	return base
 }
 
-func fetchGitHubReleases(perPage int) ([]githubRelease, error) {
-	if perPage <= 0 {
-		perPage = 20
+// Unauthenticated GitHub API calls are limited to 60 an hour per IP, which a
+// shared VPS address can use up on its own. Releases are cached, a stale copy
+// is served when the API refuses, and the latest stable tag can also be read
+// from the github.com "latest" redirect, which isn't rate limited. Setting
+// GITHUB_TOKEN raises the API limit to 5000 an hour.
+const releaseCacheTTL = 10 * time.Minute
+
+var (
+	releaseAPIBase  = githubAPIBase
+	releaseHTMLBase = githubHTMLBase
+
+	releaseCacheMu sync.Mutex
+	releaseCacheAt time.Time
+	releaseCache   []githubRelease
+)
+
+// fetchGitHubReleases returns the repository's 50 newest releases.
+func fetchGitHubReleases() ([]githubRelease, error) {
+	releaseCacheMu.Lock()
+	defer releaseCacheMu.Unlock()
+
+	if releaseCache != nil && time.Since(releaseCacheAt) < releaseCacheTTL {
+		return releaseCache, nil
+	}
+	releases, err := requestGitHubReleases()
+	if err != nil {
+		if releaseCache != nil {
+			return releaseCache, nil
+		}
+		return nil, err
+	}
+	releaseCache, releaseCacheAt = releases, time.Now()
+	return releases, nil
+}
+
+func requestGitHubReleases() ([]githubRelease, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/repos/%s/releases?per_page=50", releaseAPIBase, githubRepo), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("%s/repos/%s/releases?per_page=%d", githubAPIBase, githubRepo, perPage))
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("请求GitHub API失败: %v", err)
 	}
@@ -132,6 +173,9 @@ func fetchGitHubReleases(perPage int) ([]githubRelease, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		if resp.StatusCode == http.StatusTooManyRequests || strings.Contains(strings.ToLower(string(body)), "rate limit") {
+			return nil, fmt.Errorf("GitHub API 请求次数超限（未认证每个 IP 每小时 60 次），请稍后再试，或给面板设置环境变量 GITHUB_TOKEN")
+		}
 		return nil, fmt.Errorf("GitHub API返回 %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -143,10 +187,37 @@ func fetchGitHubReleases(perPage int) ([]githubRelease, error) {
 	return releases, nil
 }
 
+// latestStableFromRedirect reads the latest release's tag from where
+// github.com/<repo>/releases/latest redirects to (…/releases/tag/<tag>).
+func latestStableFromRedirect() (string, error) {
+	client := &http.Client{
+		Timeout:       15 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Head(fmt.Sprintf("%s/%s/releases/latest", releaseHTMLBase, githubRepo))
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+
+	location := resp.Header.Get("Location")
+	_, tag, found := strings.Cut(location, "/releases/tag/")
+	tag = strings.TrimSpace(tag)
+	if !found || tag == "" || releaseChannelFromTag(tag) != releaseChannelStable {
+		return "", fmt.Errorf("无法从 %q 读取版本号", location)
+	}
+	return tag, nil
+}
+
 func resolveLatestReleaseByChannel(channel string) (string, error) {
 	normalizedChannel := normalizeReleaseChannel(channel)
-	releases, err := fetchGitHubReleases(50)
+	releases, err := fetchGitHubReleases()
 	if err != nil {
+		if normalizedChannel == releaseChannelStable {
+			if tag, redirectErr := latestStableFromRedirect(); redirectErr == nil {
+				return tag, nil
+			}
+		}
 		return "", err
 	}
 
@@ -311,7 +382,7 @@ func (h *Handler) listReleases(w http.ResponseWriter, r *http.Request) {
 
 	channel := normalizeReleaseChannel(req.Channel)
 
-	releases, err := fetchGitHubReleases(50)
+	releases, err := fetchGitHubReleases()
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, fmt.Sprintf("获取版本列表失败: %v", err)))
 		return
