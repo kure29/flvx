@@ -391,7 +391,7 @@ func (e *systemUpgradeExecutor) replaceCompose(path string, data []byte) error {
 func (h *Handler) buildSystemUpgradeDownloadURL(version, filename string) string {
 	enabled, proxyURL := h.getGithubProxyConfig()
 	base := fmt.Sprintf("%s/%s/releases/download/%s/%s", strings.TrimRight(systemUpgradeReleaseBaseURL, "/"), githubRepo, version, filename)
-	if enabled {
+	if enabled && !isPanelGithubMirror(proxyURL) {
 		return fmt.Sprintf("%s/%s", proxyURL, base)
 	}
 	return base
@@ -404,7 +404,7 @@ func (h *Handler) fetchSystemUpgradeReleases(perPage int) ([]githubRelease, erro
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	url := fmt.Sprintf("%s/repos/%s/releases?per_page=%d", strings.TrimRight(systemUpgradeAPIBaseURL, "/"), githubRepo, perPage)
-	if enabled, proxyURL := h.getGithubProxyConfig(); enabled {
+	if enabled, proxyURL := h.getGithubProxyConfig(); enabled && !isPanelGithubMirror(proxyURL) {
 		url = fmt.Sprintf("%s/%s", proxyURL, url)
 	}
 

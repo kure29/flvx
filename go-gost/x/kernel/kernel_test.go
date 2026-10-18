@@ -587,3 +587,24 @@ func TestNftScriptUserMarks(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func TestResolveGitHubThroughPanelMirror(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		fmt.Fprintf(w, `{"tag_name":"v1.0.0","assets":[{"name":"tool-1.0.0","digest":"sha256:%s","browser_download_url":"https://github.com/o/r/releases/download/v1.0.0/tool-1.0.0"}]}`, strings.Repeat("a", 64))
+	}))
+	defer srv.Close()
+
+	mirror := srv.URL + "/api/v1/open_api/gh"
+	url, _, err := resolveGitHub(context.Background(), &GitHubRelease{Repo: "o/r", Asset: "tool-{VERSION}", Proxy: mirror}, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || paths[0] != "/api/v1/open_api/gh/https://api.github.com/repos/o/r/releases/latest" {
+		t.Fatalf("API looked up at %v", paths)
+	}
+	if url != mirror+"/https://github.com/o/r/releases/download/v1.0.0/tool-1.0.0" {
+		t.Fatalf("download url %s", url)
+	}
+}

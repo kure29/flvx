@@ -95,8 +95,14 @@ func resolveGitHub(ctx context.Context, g *GitHubRelease, arch string) (url, dig
 	if g.Tag != "" {
 		path = "tags/" + g.Tag
 	}
+	apiURL := fmt.Sprintf("%s/repos/%s/releases/%s", githubAPIBase, g.Repo, path)
+	// The panel's own mirror also answers API requests (public proxies may
+	// not), so nodes that can't reach GitHub look the release up there too.
+	if p := strings.TrimSuffix(strings.TrimSpace(g.Proxy), "/"); strings.HasSuffix(p, "/api/v1/open_api/gh") {
+		apiURL = p + "/" + apiURL
+	}
 	var body strings.Builder
-	if err := fetch(ctx, fmt.Sprintf("%s/repos/%s/releases/%s", githubAPIBase, g.Repo, path), 4<<20, &body); err != nil {
+	if err := fetch(ctx, apiURL, 4<<20, &body); err != nil {
 		return "", "", fmt.Errorf("查询 GitHub 发布信息失败: %v", err)
 	}
 	var rel githubReleaseJSON

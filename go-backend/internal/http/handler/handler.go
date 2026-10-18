@@ -242,6 +242,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/relay/create", h.inboundRelayCreate)
 	mux.HandleFunc("/api/v1/inbound/relay/delete", h.inboundRelayDelete)
 	mux.HandleFunc("/api/v1/open_api/sub/", h.openSubscription)
+	mux.HandleFunc(ghMirrorPath, h.githubMirror)
 	mux.HandleFunc("/api/v1/tunnel/list", h.tunnelList)
 	mux.HandleFunc("/api/v1/tunnel/create", h.tunnelCreate)
 	mux.HandleFunc("/api/v1/tunnel/get", h.tunnelGet)

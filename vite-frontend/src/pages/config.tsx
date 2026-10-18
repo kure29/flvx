@@ -189,14 +189,15 @@ const CONFIG_ITEMS: ConfigItem[] = [
   {
     key: "github_proxy_enabled",
     label: "开启 GitHub 加速",
-    description: "节点更新和安装脚本经代理下载，适合 GitHub 访问受限的地区",
+    description: "节点安装、升级和内核下载经代理，适合 GitHub 访问受限的地区",
     type: "switch",
   },
   {
     key: "github_proxy_url",
     label: "加速地址",
     placeholder: "https://gcode.hostcentral.cc",
-    description: "GitHub 下载加速代理地址",
+    description:
+      "GitHub 下载加速代理地址。节点在国内、面板在海外时选「面板中转」：节点经面板下载，面板会缓存文件",
     type: "input",
     dependsOn: "github_proxy_enabled",
     dependsValue: "true",
@@ -315,6 +316,28 @@ const describeBackground = (value?: string) => {
 
   return `纯色 ${value}`;
 };
+
+const DEFAULT_GITHUB_PROXY = "https://gcode.hostcentral.cc";
+
+/**
+ * The panel's GitHub mirror as nodes reach it: 面板后端地址 (what nodes connect
+ * to) plus /api/v1/open_api/gh. Without a scheme, port 443 or a page opened
+ * over HTTPS on the same address means https.
+ */
+function panelMirrorURL(ip: string): string {
+  const raw = ip.trim().replace(/\/+$/, "");
+
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return `${raw}/api/v1/open_api/gh`;
+  const port = raw.match(/:(\d+)$/)?.[1];
+  const pageHTTPS = window.location.protocol === "https:";
+  const https =
+    port === "443" ||
+    (port !== "80" && pageHTTPS && raw === window.location.host) ||
+    (!port && pageHTTPS);
+
+  return `${https ? "https" : "http"}://${raw}/api/v1/open_api/gh`;
+}
 
 export default function ConfigPage() {
   const navigate = useNavigate();
@@ -1218,7 +1241,49 @@ export default function ConfigPage() {
         label={item.label}
       >
         {renderConfigItem(item)}
+        {item.key === "github_proxy_url" && renderGithubProxyPresets()}
       </Field>
+    );
+  };
+
+  // Quick picks for 加速地址: the panel's own mirror (built from 面板后端地址)
+  // or the public proxy.
+  const renderGithubProxyPresets = () => {
+    const mirror = panelMirrorURL(configs.ip || "");
+    const current = (configs.github_proxy_url || "").replace(/\/+$/, "");
+
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button
+          color={current === mirror && mirror ? "primary" : "default"}
+          size="sm"
+          variant={current === mirror && mirror ? "solid" : "bordered"}
+          onPress={() => {
+            if (!mirror) {
+              toast.error("请先填写面板后端地址");
+
+              return;
+            }
+            handleConfigChange("github_proxy_url", mirror);
+          }}
+        >
+          面板中转
+        </Button>
+        <Button
+          size="sm"
+          variant="bordered"
+          onPress={() =>
+            handleConfigChange("github_proxy_url", DEFAULT_GITHUB_PROXY)
+          }
+        >
+          公共加速站
+        </Button>
+        {mirror && (
+          <span className="break-all text-xs text-default-500">
+            面板中转地址：{mirror}
+          </span>
+        )}
+      </div>
     );
   };
 
