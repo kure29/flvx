@@ -35,7 +35,7 @@ import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
-import { LatencyBadge } from "@/pages/inbound/latency";
+import { LatencyCell } from "@/pages/inbound/latency";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {
@@ -578,10 +578,10 @@ export default function InboundPage() {
     const selected = selectMode && selectedIds.has(item.id);
     const latency =
       item.enabled && !kernelBad && item.probe?.skipped !== true ? (
-        <LatencyBadge
+        <LatencyCell
           probe={probe}
           probing={probingIds.has(item.id)}
-          withSource={card}
+          variant={card ? "card" : "list"}
           onProbe={() => probeOne(item.id)}
         />
       ) : null;

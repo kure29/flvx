@@ -763,6 +763,16 @@ export interface InboundProbe {
   from?: string;
   error?: string;
   checkedAt: number;
+  /** Per reference point results, when the node measured several. */
+  points?: InboundProbePoint[];
+}
+
+export interface InboundProbePoint {
+  name: string;
+  ok: boolean;
+  latencyMs?: number;
+  lossPct?: number;
+  error?: string;
 }
 
 export interface InboundApiItem {

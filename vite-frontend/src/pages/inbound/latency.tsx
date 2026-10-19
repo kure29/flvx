@@ -1,10 +1,20 @@
-import type { InboundProbe } from "@/api/types";
+import type { InboundProbe, InboundProbePoint } from "@/api/types";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
+
+import {
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
+} from "@/shadcn-bridge/heroui/dropdown";
 
 /** Latency below GOOD shows green, below FAIR orange, anything else red. */
 export const LATENCY_GOOD_MS = 100;
 export const LATENCY_FAIR_MS = 300;
+
+/** Cards show this many reference points; the rest are in the popover. */
+const CARD_POINTS = 3;
 
 type Tone = "success" | "warning" | "danger" | "default";
 
@@ -15,16 +25,58 @@ const TONE: Record<Tone, [string, string]> = {
   default: ["bg-default-200/70 text-default-500", "bg-default-400"],
 };
 
-export function latencyTone(probe?: InboundProbe): Tone {
-  if (!probe || probe.skipped) return "default";
-  if (!probe.ok) return "danger";
-  const ms = probe.latencyMs ?? 0;
-  const loss = probe.lossPct ?? 0;
+const RANK: Record<Tone, number> = {
+  default: 0,
+  success: 1,
+  warning: 2,
+  danger: 3,
+};
+
+export function pointTone(p: InboundProbePoint): Tone {
+  if (!p.ok) return "danger";
+  const ms = p.latencyMs ?? 0;
+  const loss = p.lossPct ?? 0;
 
   if (ms >= LATENCY_FAIR_MS || loss >= 50) return "danger";
   if (ms >= LATENCY_GOOD_MS || loss > 0) return "warning";
 
   return "success";
+}
+
+/** The probe's reference points; a single-point probe becomes one point. */
+export function probePoints(probe?: InboundProbe): InboundProbePoint[] {
+  if (!probe || probe.skipped) return [];
+  if (probe.points?.length) return probe.points;
+
+  return [
+    {
+      name: probe.from || "面板服务器",
+      ok: probe.ok,
+      latencyMs: probe.latencyMs,
+      lossPct: probe.lossPct,
+      error: probe.error,
+    },
+  ];
+}
+
+// Unreachable sorts above any latency of the same red tone.
+const rank = (p: InboundProbePoint) => (p.ok ? RANK[pointTone(p)] : 4);
+
+/** The point that looks worst: unreachable, then the worse tone, then slower. */
+export function worstPoint(points: InboundProbePoint[]) {
+  let worst: InboundProbePoint | undefined;
+
+  for (const p of points) {
+    if (
+      !worst ||
+      rank(p) > rank(worst) ||
+      (rank(p) === rank(worst) && (p.latencyMs ?? 0) > (worst.latencyMs ?? 0))
+    ) {
+      worst = p;
+    }
+  }
+
+  return worst;
 }
 
 function ago(ts: number) {
@@ -36,77 +88,164 @@ function ago(ts: number) {
   return `${Math.floor(s / 3600)} 小时前`;
 }
 
-/** Where the probe was made from, e.g. "浙江移动" or "面板服务器". */
-export function probeSource(probe?: InboundProbe) {
-  if (!probe || probe.skipped) return "";
-
-  return probe.from || "面板服务器";
+function valueText(p: InboundProbePoint) {
+  return p.ok ? `${p.latencyMs} ms` : p.error || "连不上";
 }
 
-function describe(probe?: InboundProbe) {
-  if (!probe || probe.skipped) return "未检测，点击检测";
-  const parts = [`检测点：${probeSource(probe)}`];
+function Pill({
+  point,
+  label,
+  spinning,
+}: {
+  point: InboundProbePoint;
+  label?: boolean;
+  spinning?: boolean;
+}) {
+  const [pill, dot] = TONE[pointTone(point)];
+  const loss = point.ok ? (point.lossPct ?? 0) : 0;
 
-  if (probe.ok) {
-    parts.push(`延迟 ${probe.latencyMs} ms`);
-    if (probe.lossPct !== undefined) parts.push(`丢包 ${probe.lossPct}%`);
-  } else {
-    parts.push(probe.error || "连不上");
-  }
-  parts.push(ago(probe.checkedAt), "点击重新检测");
-
-  return parts.join(" · ");
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${pill}`}
+    >
+      {spinning ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      )}
+      {label && <span className="font-sans opacity-80">{point.name}</span>}
+      <span className="font-mono">{valueText(point)}</span>
+      {loss > 0 && <span className="font-mono opacity-80">丢{loss}%</span>}
+    </span>
+  );
 }
+
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
 /**
- * The inbound's last latency as a colored pill; pressing it probes again.
- * withSource also names the probe's vantage point next to it.
+ * The inbound's latency to each reference point. Cards list the points,
+ * list rows show the worst one with a dot per other point; pressing either
+ * opens every point's result and a re-probe button.
  */
-export function LatencyBadge({
+export function LatencyCell({
   probe,
   probing,
-  withSource,
+  variant,
   onProbe,
 }: {
   probe?: InboundProbe;
   probing?: boolean;
-  withSource?: boolean;
+  variant: "card" | "list";
   onProbe: () => void;
 }) {
-  const tone = latencyTone(probe);
-  const [pill, dot] = TONE[tone];
-  const known = probe && !probe.skipped;
-  const loss = known && probe.ok ? (probe.lossPct ?? 0) : 0;
-  const text = !known
-    ? "检测"
-    : probe.ok
-      ? `${probe.latencyMs} ms`
-      : probe.error || "连不上";
+  const points = probePoints(probe);
 
-  return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
-      {withSource && known && (
-        <span className="truncate text-default-400">{probeSource(probe)}</span>
-      )}
+  if (points.length === 0) {
+    return (
       <button
-        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-medium transition-opacity hover:opacity-80 disabled:cursor-wait ${pill}`}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${TONE.default[0]}`}
         disabled={probing}
-        title={describe(probe)}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           onProbe();
         }}
-        onKeyDown={(e) => e.stopPropagation()}
       >
         {probing ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : (
-          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+          <RefreshCw className="h-3 w-3" />
         )}
-        {text}
-        {loss > 0 && <span className="opacity-80">· 丢 {loss}%</span>}
+        检测
       </button>
-    </span>
+    );
+  }
+
+  const worst = worstPoint(points)!;
+  const shown = variant === "card" ? points.slice(0, CARD_POINTS) : [worst];
+  const more = points.length - shown.length;
+  const others = variant === "list" ? points.filter((p) => p !== worst) : [];
+
+  return (
+    <Dropdown placement="bottom-end">
+      <DropdownTrigger>
+        <button
+          className={`inline-flex max-w-full items-center justify-end gap-1 rounded-lg transition-opacity hover:opacity-80 ${variant === "card" ? "flex-wrap" : ""}`}
+          type="button"
+          onClick={stop}
+          onKeyDown={stop}
+        >
+          {shown.map((p, i) => (
+            <Pill
+              key={p.name}
+              label={variant === "card" || points.length > 1}
+              point={p}
+              spinning={probing && i === 0}
+            />
+          ))}
+          {more > 0 && variant === "card" && (
+            <span className="text-xs text-default-400">+{more}</span>
+          )}
+          {others.length > 0 && (
+            <span className="flex items-center gap-0.5">
+              {others.map((p) => (
+                <span
+                  key={p.name}
+                  className={`h-1.5 w-1.5 rounded-full ${TONE[pointTone(p)][1]}`}
+                />
+              ))}
+            </span>
+          )}
+        </button>
+      </DropdownTrigger>
+      <DropdownMenu aria-label="延迟详情" className="w-64">
+        <div role="presentation" onClick={stop} onPointerDown={stop}>
+          <div className="flex items-center justify-between px-2 pb-1.5 pt-1 text-xs text-default-500">
+            <span>到各测试点的延迟</span>
+            {probe && <span>{ago(probe.checkedAt)}</span>}
+          </div>
+          <div className="space-y-1 px-2 pb-2">
+            {points.map((p) => {
+              const [, dot] = TONE[pointTone(p)];
+
+              return (
+                <div
+                  key={p.name}
+                  className="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                    <span className="truncate">{p.name}</span>
+                  </span>
+                  <span className="shrink-0 font-mono text-xs">
+                    <span className={TONE[pointTone(p)][0].split(" ")[1]}>
+                      {valueText(p)}
+                    </span>
+                    {p.ok && (
+                      <span className="ml-2 text-default-400">
+                        丢包 {p.lossPct ?? 0}%
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <DropdownItem
+            className="justify-center border-t border-divider text-primary"
+            startContent={
+              probing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )
+            }
+            onPress={onProbe}
+          >
+            {probing ? "检测中…" : "重新检测"}
+          </DropdownItem>
+        </div>
+      </DropdownMenu>
+    </Dropdown>
   );
 }
