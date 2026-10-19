@@ -9,6 +9,8 @@ export interface Node {
   name: string;
   /** Latency from the node to each reference point. */
   latency?: InboundProbe;
+  /** The node's own reference points; null follows the defaults. */
+  latencyTargets?: { points: string[]; pinned: string[] } | null;
   remark?: string;
   expiryTime?: number;
   renewalCycle?: NodeRenewalCycle;

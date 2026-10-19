@@ -850,6 +850,13 @@ export const probeNodeLatency = (ids: number[] = []) =>
     { ids },
     { timeout: 60000 },
   );
+/** Sets the nodes' reference points: their own selection, or the defaults. */
+export const setNodeLatencyTargets = (data: {
+  ids: number[];
+  custom: boolean;
+  points: string[];
+  pinned: string[];
+}) => Network.post("/node/latency/targets", data);
 /** A node's last return-route traces to the reference points. */
 export const getNodeRoute = (id: number) =>
   Network.post<NodeRoute | null>("/node/route", { id });

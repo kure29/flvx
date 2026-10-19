@@ -44,6 +44,7 @@ import {
 } from "@/api";
 import { LatencyCell } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
+import { LatencyTargetsModal } from "@/pages/node/latency-targets-modal";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
@@ -214,6 +215,7 @@ export default function NodePage() {
   const [sheetNodeId, setSheetNodeId] = useState<number | null>(null);
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
   const [routeNode, setRouteNode] = useState<Node | null>(null);
+  const [targetNodes, setTargetNodes] = useState<Node[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -1148,9 +1150,11 @@ export default function NodePage() {
   const renderLatency = (node: Node, variant: "card" | "list") =>
     node.isRemote !== 1 && node.connectionStatus === "online" ? (
       <LatencyCell
+        note={node.latencyTargets ? "自定义" : undefined}
         probe={node.latency}
         probing={probingIds.has(node.id)}
         variant={variant}
+        onEditTargets={() => setTargetNodes([node])}
         onProbe={() => probeNode(node.id)}
         onShowRoute={() => setRouteNode(node)}
       />
@@ -1457,6 +1461,19 @@ export default function NodePage() {
               label: "升级",
               disabled: !canBatchUpgrade || batchUpgradeLoading,
               onPress: () => openUpgradeModal("batch"),
+            },
+            {
+              key: "targets",
+              label: "测试点",
+              disabled: !displayNodes.some(
+                (n) => selectedIds.has(n.id) && n.isRemote !== 1,
+              ),
+              onPress: () =>
+                setTargetNodes(
+                  displayNodes.filter(
+                    (n) => selectedIds.has(n.id) && n.isRemote !== 1,
+                  ),
+                ),
             },
             {
               key: "delete",
@@ -2252,6 +2269,11 @@ export default function NodePage() {
                         onPress: () => handleEdit(node),
                       },
                       {
+                        key: "targets",
+                        label: "测试点",
+                        onPress: () => setTargetNodes([node]),
+                      },
+                      {
                         key: "upgrade",
                         label: "升级",
                         disabled: !online,
@@ -2407,6 +2429,11 @@ export default function NodePage() {
         nodeId={routeNode?.id ?? null}
         nodeName={routeNode?.name}
         onClose={() => setRouteNode(null)}
+      />
+      <LatencyTargetsModal
+        nodes={targetNodes}
+        onClose={() => setTargetNodes([])}
+        onSaved={() => loadNodes({ silent: true })}
       />
     </AnimatedPage>
   );

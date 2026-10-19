@@ -10,19 +10,16 @@ import {
 } from "@/shadcn-bridge/heroui/dropdown";
 import { Input } from "@/shadcn-bridge/heroui/input";
 import { Switch } from "@/shadcn-bridge/heroui/switch";
+import {
+  LATENCY_TARGETS_KEY,
+  type LatencyTarget,
+  parseLatencyTargets,
+} from "@/utils/latency-targets";
 
-export const LATENCY_TARGETS_KEY = "latency_targets";
+export { LATENCY_TARGETS_KEY };
 
-const MAX_TARGETS = 10;
+const MAX_TARGETS = 30;
 const MAX_PINNED = 3;
-
-interface LatencyTarget {
-  name: string;
-  host: string;
-  port: number;
-  enabled: boolean;
-  pinned?: boolean;
-}
 
 // Province × carrier TCP-ping addresses on carrier CDN nodes, port 80.
 const CITIES = [
@@ -46,26 +43,16 @@ const PRESETS: LatencyTarget[] = CITIES.flatMap(([city, c]) =>
 // One point per carrier, spread over regions.
 const RECOMMENDED = ["广东电信", "上海联通", "北京移动"];
 
-function parseTargets(raw: string | undefined): LatencyTarget[] {
-  try {
-    const list = JSON.parse(raw || "[]");
-
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
 /** One line for the collapsed section. */
 export function latencySummary(configs: Record<string, string>): string {
-  const targets = parseTargets(configs[LATENCY_TARGETS_KEY]);
+  const targets = parseLatencyTargets(configs[LATENCY_TARGETS_KEY]);
   const enabled = targets.filter((t) => t.enabled);
 
-  if (enabled.length === 0) return "未设置 · 延迟从面板服务器测";
+  if (targets.length === 0) return "未设置 · 延迟从面板服务器测";
   const pinned = enabled.filter((t) => t.pinned).map((t) => t.name);
 
   return [
-    `${enabled.length} 个测试点`,
+    `${targets.length} 个测试点，默认测 ${enabled.length} 个`,
     pinned.length ? `卡片显示 ${pinned.join("、")}` : "卡片显示最差和最好的",
   ].join(" · ");
 }
@@ -78,7 +65,7 @@ export function LatencySettings({
   configs: Record<string, string>;
   onChange: (key: string, value: string) => void;
 }) {
-  const targets = parseTargets(configs[LATENCY_TARGETS_KEY]);
+  const targets = parseLatencyTargets(configs[LATENCY_TARGETS_KEY]);
   const pinnedCount = targets.filter((t) => t.pinned).length;
   const names = new Set(targets.map((t) => t.name));
 
@@ -107,7 +94,8 @@ export function LatencySettings({
       <p className="text-xs text-default-500">
         节点定时用 TCP
         连接测到这些地址的延迟和丢包，代表该地区运营商用户到节点的延迟。
-        节点和自建入站的卡片显示勾选“卡片显示”的测试点（最多 {MAX_PINNED}{" "}
+        打开“默认”的测试点所有节点都测；某台节点要测别的，到节点页的“测试点”单独选或批量设置。
+        卡片显示勾选“卡片显示”的测试点（最多 {MAX_PINNED}{" "}
         个，没选够时补最差和最好的）。不设置时，入站延迟仍从面板服务器测。
       </p>
 
@@ -178,12 +166,12 @@ export function LatencySettings({
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1.5">
                 <Switch
-                  aria-label="启用"
+                  aria-label="默认"
                   isSelected={t.enabled}
                   size="sm"
                   onValueChange={(v) => update(i, { enabled: v })}
                 />
-                启用
+                默认
               </span>
               <Checkbox
                 isDisabled={!t.pinned && pinnedCount >= MAX_PINNED}

@@ -1,6 +1,6 @@
 import type { InboundProbe, InboundProbePoint } from "@/api/types";
 
-import { Loader2, RefreshCw, Route } from "lucide-react";
+import { Loader2, ListChecks, RefreshCw, Route } from "lucide-react";
 
 import {
   Dropdown,
@@ -202,6 +202,8 @@ export function LatencyCell({
   variant,
   onProbe,
   onShowRoute,
+  onEditTargets,
+  note,
 }: {
   probe?: InboundProbe;
   probing?: boolean;
@@ -209,6 +211,10 @@ export function LatencyCell({
   onProbe: () => void;
   /** Opens the node's return routes; omitted where there is no node. */
   onShowRoute?: () => void;
+  /** Opens the node's reference point choice. */
+  onEditTargets?: () => void;
+  /** Shown before the time on cards, e.g. "自定义". */
+  note?: string;
 }) {
   const points = probePoints(probe);
 
@@ -255,6 +261,7 @@ export function LatencyCell({
             <span className="mb-1.5 flex items-center justify-between text-sm">
               <span className="text-default-600">延迟</span>
               <span className="text-xs text-default-400">
+                {note ? `${note} · ` : ""}
                 {more > 0 ? `共 ${points.length} 个 · ` : ""}
                 {hiddenBad > 0 && (
                   <span className="text-rose-600">{hiddenBad} 个异常 · </span>
@@ -294,7 +301,10 @@ export function LatencyCell({
           </button>
         )}
       </DropdownTrigger>
-      <DropdownMenu aria-label="延迟详情" className="w-72">
+      <DropdownMenu
+        aria-label="延迟详情"
+        className="w-80 max-w-[calc(100vw-32px)]"
+      >
         <div role="presentation" onClick={stop} onPointerDown={stop}>
           <div className="flex items-center justify-between px-2 pb-1.5 pt-1 text-xs text-default-500">
             <span>到各测试点的延迟</span>
@@ -328,11 +338,9 @@ export function LatencyCell({
               );
             })}
           </div>
-          <div
-            className={`grid border-t border-divider ${onShowRoute ? "grid-cols-2" : ""}`}
-          >
+          <div className="grid auto-cols-fr grid-flow-col border-t border-divider">
             <DropdownItem
-              className="justify-center text-primary"
+              className="justify-center whitespace-nowrap px-1 text-xs text-primary"
               startContent={
                 probing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -347,11 +355,21 @@ export function LatencyCell({
             {onShowRoute && (
               <DropdownItem
                 closeOnSelect
-                className="justify-center text-primary"
+                className="justify-center whitespace-nowrap px-1 text-xs text-primary"
                 startContent={<Route className="h-3.5 w-3.5" />}
                 onPress={() => setTimeout(onShowRoute, 0)}
               >
                 回程路由
+              </DropdownItem>
+            )}
+            {onEditTargets && (
+              <DropdownItem
+                closeOnSelect
+                className="justify-center whitespace-nowrap px-1 text-xs text-primary"
+                startContent={<ListChecks className="h-3.5 w-3.5" />}
+                onPress={() => setTimeout(onEditTargets, 0)}
+              >
+                测试点
               </DropdownItem>
             )}
           </div>
