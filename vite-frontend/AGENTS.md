@@ -14,7 +14,7 @@ React dashboard for FLYX. rolldown-vite + TypeScript + Tailwind v4 + shadcn/radi
 | `src/components/ui/` | shadcn/radix primitives |
 | `src/styles/globals.css` | Base styles — **must import `tailwind-theme.pcss`** |
 | `src/styles/tailwind-theme.pcss` | Tailwind v4 `@theme inline` semantic tokens |
-| `vite.config.ts` | host `0.0.0.0:3000`, `minify: false`, `treeshake: false` |
+| `vite.config.ts` | host `0.0.0.0:3000`, PWA plugin, `@` alias to `src/` |
 
 ## Conventions
 

@@ -281,3 +281,6 @@ go-backend/cmd/paneld/paneld
 doc/node_modules/
 doc/.vitepress/dist/
 doc/.vitepress/cache/
+
+# Playwright output
+test-results/

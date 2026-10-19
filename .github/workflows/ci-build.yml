@@ -63,6 +63,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "run gofmt -w on the files above"; exit 1; }
+
       - name: Build
         run: go build -v ./...
 

@@ -159,12 +159,12 @@ func TestImportedRelayEndpoint(t *testing.T) {
 func TestImportRejections(t *testing.T) {
 	bad := map[string]string{
 		"vmess://abc": "vmess 链接格式不正确",
-		"ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:x")) + "@127.0.0.1:80": "本机",
-		"ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:x")) + "@1.2.3.4:70000": "端口",
+		"ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:x")) + "@127.0.0.1:80":              "本机",
+		"ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:x")) + "@1.2.3.4:70000":             "端口",
 		"ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:x")) + "@1.2.3.4:80/?plugin=kcptun": "插件",
-		"vless://u@1.2.3.4:443?security=reality&sni=a.com":                                         "pbk",
-		"wireguard://x@1.2.3.4:51820":                                                               "暂不支持",
-		"hello world":                                                                               "无法识别",
+		"vless://u@1.2.3.4:443?security=reality&sni=a.com":                                                     "pbk",
+		"wireguard://x@1.2.3.4:51820": "暂不支持",
+		"hello world":                 "无法识别",
 	}
 	for input, want := range bad {
 		_, errs := ParseImport(input)

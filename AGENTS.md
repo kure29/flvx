@@ -58,10 +58,10 @@ FLYX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 
 - Backend: `(cd go-backend && go test ./...)` — includes contract tests in `tests/contract/`.
 - Frontend: no test infrastructure.
-- CI runs one PostgreSQL contract test: env var `FLVX_POSTGRES_TEST_DSN`.
+- CI runs `gofmt -l`, `go vet` and `go test ./...` on `go-backend`, `eslint .` on the frontend, plus one PostgreSQL contract test (env var `FLVX_POSTGRES_TEST_DSN`).
 
 ## Build quirks
 
 - `vite-frontend` uses `rolldown-vite` (Rust bundler), not standard Vite.
-- `vite.config.ts`: `minify: false`, `treeshake: false` (debugging mode).
+- `vite.config.ts`: PWA via `vite-plugin-pwa`; build uses default minify and treeshake, no sourcemaps.
 - CI builds `go-gost` with `CGO_ENABLED=0` then compresses with UPX `--best --lzma`.

@@ -26,7 +26,6 @@ import (
 	"go-backend/internal/security"
 	"go-backend/internal/store/repo"
 	"go-backend/internal/ws"
-
 )
 
 type Handler struct {
@@ -43,10 +42,10 @@ type Handler struct {
 	passkeyMu      sync.Mutex
 	passkeyPending map[string]passkeyCeremony
 
-	jobsMu              sync.Mutex
-	jobsCancel          context.CancelFunc
-	jobsStarted         bool
-	jobsWG              sync.WaitGroup
+	jobsMu      sync.Mutex
+	jobsCancel  context.CancelFunc
+	jobsStarted bool
+	jobsWG      sync.WaitGroup
 
 	upgradeMu                   sync.Mutex
 	systemUpgradeMu             sync.Mutex
@@ -59,7 +58,7 @@ type Handler struct {
 	qualityProber  *tunnelQualityProber
 	externalProbes *externalProbeStore
 	notifier       *notifier
-	bestExit      *bestExitManager
+	bestExit       *bestExitManager
 }
 
 const monitorTunnelQualityEnabledConfigKey = "monitor_tunnel_quality_enabled"
