@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 
@@ -45,7 +45,11 @@ export function Segmented<T extends string>({
   );
 }
 
-/** The editor's page tabs: text with an underline under the current one. */
+/**
+ * The editor's page tabs: a rounded segmented bar whose tabs share the width
+ * equally. It never scrolls, so on a phone it can't be dragged around and
+ * every page stays one tap away; keep labels short (two characters).
+ */
 export function EditorTabs<T extends string>({
   value,
   tabs,
@@ -55,29 +59,20 @@ export function EditorTabs<T extends string>({
   tabs: Array<{ key: T; label: string; badge?: string | number }>;
   onChange: (v: T) => void;
 }) {
-  const bar = useRef<HTMLDivElement>(null);
-
-  // On a phone the tabs scroll sideways; keep the picked one in view.
-  useEffect(() => {
-    bar.current
-      ?.querySelector('[aria-selected="true"]')
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [value]);
-
   return (
     <div
-      ref={bar}
-      className="-mx-1 flex gap-1 overflow-x-auto border-b border-divider px-1 [scrollbar-width:none]"
+      className="grid gap-1 rounded-xl bg-default-100/90 p-1 backdrop-blur-md"
       role="tablist"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
       {tabs.map((t) => (
         <button
           key={t.key}
           aria-selected={value === t.key}
-          className={`-mb-px flex shrink-0 items-center gap-1 border-b-2 px-3 pb-2 pt-1 text-sm transition-colors ${
+          className={`relative whitespace-nowrap rounded-lg px-1 py-1.5 text-sm transition-colors ${
             value === t.key
-              ? "border-primary font-medium text-primary"
-              : "border-transparent text-default-500 hover:text-foreground"
+              ? "bg-content1 font-medium text-primary shadow-sm"
+              : "text-default-500 hover:text-foreground"
           }`}
           role="tab"
           type="button"
@@ -86,10 +81,10 @@ export function EditorTabs<T extends string>({
           {t.label}
           {t.badge !== undefined && t.badge !== "" && (
             <span
-              className={`rounded-full px-1.5 text-[11px] leading-4 ${
+              className={`absolute -right-0.5 -top-1 rounded-full px-1 text-[10px] leading-4 ${
                 value === t.key
                   ? "bg-primary text-white"
-                  : "bg-default-100 text-default-500"
+                  : "bg-default-300 text-default-700"
               }`}
             >
               {t.badge}
@@ -97,6 +92,36 @@ export function EditorTabs<T extends string>({
           )}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * A text field followed by three equal quick-pick buttons. The buttons take
+ * the same fixed width in every row, so stacked rows line up.
+ */
+export function QuickPickRow({
+  children,
+  picks,
+}: {
+  children: ReactNode;
+  picks: Array<{ label: string; onPick: () => void }>;
+}) {
+  return (
+    <div className="flex gap-2">
+      <div className="relative min-w-0 flex-1">{children}</div>
+      <div className="grid w-40 shrink-0 grid-cols-3 gap-1.5">
+        {picks.map((p) => (
+          <button
+            key={p.label}
+            className="h-10 rounded-lg bg-default-100 text-sm text-default-700 transition-colors hover:bg-default-200"
+            type="button"
+            onClick={p.onPick}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

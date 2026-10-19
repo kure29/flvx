@@ -45,6 +45,7 @@ import { formatTraffic } from "@/utils/traffic";
 import { SUB_CLIENTS } from "@/pages/subscription/clients";
 import {
   EditorTabs,
+  QuickPickRow,
   Segmented,
   ToggleRow,
 } from "@/pages/subscription/controls";
@@ -505,14 +506,14 @@ function Editor({
       </ModalHeader>
       {/* A steady height, so switching pages doesn't resize the dialog. */}
       <ModalBody className="min-h-[min(65vh,34rem)] space-y-4">
-        <div className="sticky top-0 z-10 -mx-1 bg-content1 px-1 pt-1">
+        <div className="sticky top-0 z-10">
           <EditorTabs
             tabs={[
               { key: "basic", label: "基本" },
               { key: "nodes", label: "节点" },
               { key: "naming", label: "命名" },
               { key: "rules", label: "规则", badge: o.rules ? "开" : "" },
-              { key: "chain", label: "链式代理", badge: chainOn ? "开" : "" },
+              { key: "chain", label: "链式", badge: chainOn ? "开" : "" },
               {
                 key: "preview",
                 label: "预览",
@@ -542,28 +543,23 @@ function Editor({
                 <label className="text-sm font-medium" htmlFor="sub-expire">
                   到期日期
                 </label>
-                <div className="flex gap-2">
+                <QuickPickRow
+                  picks={[30, 90, 365].map((d) => ({
+                    label: d === 365 ? "1年" : `${d}天`,
+                    onPick: () =>
+                      set({ expire: toDateInput(Date.now() + d * 86400000) }),
+                  }))}
+                >
+                  {/* appearance-none: iOS otherwise draws the date field
+                      taller than a text field. */}
                   <input
-                    className="h-10 min-w-0 flex-1 rounded-lg border border-divider bg-background px-2 text-sm"
+                    className="block h-10 w-full appearance-none rounded-lg border border-divider bg-background px-2 text-left text-sm"
                     id="sub-expire"
                     type="date"
                     value={draft.expire}
                     onChange={(e) => set({ expire: e.target.value })}
                   />
-                  {[30, 90, 365].map((d) => (
-                    <Button
-                      key={d}
-                      className="min-w-0 px-2"
-                      size="sm"
-                      variant="flat"
-                      onPress={() =>
-                        set({ expire: toDateInput(Date.now() + d * 86400000) })
-                      }
-                    >
-                      {d === 365 ? "1年" : `${d}天`}
-                    </Button>
-                  ))}
-                </div>
+                </QuickPickRow>
                 <p className="text-xs text-default-500">
                   {draft.expire ? "到期当天 23:59 后断开" : "留空表示永不过期"}
                 </p>
@@ -572,40 +568,32 @@ function Editor({
                 <label className="text-sm font-medium" htmlFor="sub-limit">
                   流量上限
                 </label>
-                <div className="flex gap-2">
-                  <div className="relative min-w-0 flex-1">
-                    <input
-                      className="h-10 w-full rounded-lg border border-divider bg-background px-2 pr-9 text-sm"
-                      id="sub-limit"
-                      inputMode="decimal"
-                      placeholder="不限"
-                      value={draft.limitGB}
-                      onChange={(e) =>
-                        set({ limitGB: e.target.value.replace(/[^\d.]/g, "") })
-                      }
-                    />
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-default-500">
-                      GB
-                    </span>
-                  </div>
-                  {[50, 100, 500].map((g) => (
-                    <Button
-                      key={g}
-                      className="min-w-0 px-2"
-                      size="sm"
-                      variant="flat"
-                      onPress={() => set({ limitGB: String(g) })}
-                    >
-                      {g}G
-                    </Button>
-                  ))}
-                </div>
+                <QuickPickRow
+                  picks={[50, 100, 500].map((g) => ({
+                    label: `${g}G`,
+                    onPick: () => set({ limitGB: String(g) }),
+                  }))}
+                >
+                  <input
+                    className="block h-10 w-full rounded-lg border border-divider bg-background px-2 pr-9 text-sm"
+                    id="sub-limit"
+                    inputMode="decimal"
+                    placeholder="不限"
+                    value={draft.limitGB}
+                    onChange={(e) =>
+                      set({ limitGB: e.target.value.replace(/[^\d.]/g, "") })
+                    }
+                  />
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-default-500">
+                    GB
+                  </span>
+                </QuickPickRow>
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <label className="text-sm" htmlFor="sub-reset-day">
                     每月重置
                   </label>
                   <select
-                    className="h-9 rounded-lg border border-divider bg-background px-2 text-sm"
+                    className="h-10 rounded-lg border border-divider bg-background px-2 text-sm"
                     id="sub-reset-day"
                     value={draft.resetDay}
                     onChange={(e) => set({ resetDay: Number(e.target.value) })}
