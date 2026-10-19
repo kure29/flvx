@@ -12,9 +12,9 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
       manifest: {
-        name: "FLVX",
-        short_name: "FLVX",
-        description: "FLVX forwarding management panel",
+        name: "FLYX",
+        short_name: "FLYX",
+        description: "FLYX forwarding management panel",
         theme_color: "#2563eb",
         background_color: "#f6f7fb",
         display: "standalone",

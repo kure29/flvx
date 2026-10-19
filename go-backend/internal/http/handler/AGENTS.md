@@ -6,7 +6,7 @@
 **Tag:** 2.1.9-beta6
 
 ## OVERVIEW
-HTTP request handlers for FLVX Admin API. Core business logic layer.
+HTTP request handlers for FLYX Admin API. Core business logic layer.
 **Stack:** Go 1.24, net/http, GORM via Repository pattern.
 
 ## STRUCTURE

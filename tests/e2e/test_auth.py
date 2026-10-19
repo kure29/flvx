@@ -1,5 +1,5 @@
 """
-Test authentication flow for FLVX.
+Test authentication flow for FLYX.
 Tests login, logout, session management, and protected routes.
 """
 

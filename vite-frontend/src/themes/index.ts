@@ -1,6 +1,6 @@
 /**
  * @module @/themes
- * Public API for the FLVX theme system.
+ * Public API for the FLYX theme system.
  *
  * Usage:
  *   import { ThemeProvider, useThemeContext, registerTheme } from "@/themes";

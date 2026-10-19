@@ -133,7 +133,7 @@ func TestPublicConfigGetAndAuthConfigContract(t *testing.T) {
 	router, r := setupContractRouter(t, "contract-jwt-secret")
 
 	for name, value := range map[string]string{
-		"app_name":              "FLVX Public",
+		"app_name":              "FLYX Public",
 		"app_logo":              "logo",
 		"app_favicon":           "favicon",
 		"app_bg_image":          "bg",

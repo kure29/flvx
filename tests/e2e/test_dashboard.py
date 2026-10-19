@@ -1,5 +1,5 @@
 """
-Test dashboard and navigation for FLVX.
+Test dashboard and navigation for FLYX.
 Tests dashboard rendering, sidebar navigation, and user interactions.
 """
 

@@ -559,7 +559,7 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	appName := "FLVX"
+	appName := "FLYX"
 	if cfg, err := h.repo.GetConfigByName("app_name"); err == nil && cfg != nil && strings.TrimSpace(cfg.Value) != "" {
 		appName = strings.TrimSpace(cfg.Value)
 	}

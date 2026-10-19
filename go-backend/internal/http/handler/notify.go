@@ -91,7 +91,7 @@ func (h *Handler) notifyConfig(event string) (notifySettings, string, bool) {
 	}
 	app := strings.TrimSpace(cfg["app_name"])
 	if app == "" {
-		app = "FLVX"
+		app = "FLYX"
 	}
 	settings := notifySettings{
 		TelegramToken:   strings.TrimSpace(cfg[notifyConfigTGToken]),

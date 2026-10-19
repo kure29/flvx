@@ -1,13 +1,13 @@
 /**
  * Default Theme
  * =============
- * This is the built-in "stock" FLVX theme.  It doesn't override any
+ * This is the built-in "stock" FLYX theme.  It doesn't override any
  * components — it only declares the CSS tokens that match the colours
  * already defined in `globals.css`.  This serves as the **reference
  * implementation** that theme authors can copy and modify.
  *
  * When this theme is active, the frontend looks identical to an
- * unmodified FLVX install.
+ * unmodified FLYX install.
  */
 
 import type { ThemePackage } from "../types";
@@ -15,9 +15,9 @@ import type { ThemePackage } from "../types";
 const defaultTheme: ThemePackage = {
   id: "default",
   name: "默认主题",
-  author: "FLVX Team",
+  author: "FLYX Team",
   version: "1.0.0",
-  description: "FLVX 内置默认蓝色主题",
+  description: "FLYX 内置默认蓝色主题",
 
   tokens: {
     light: {

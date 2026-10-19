@@ -18,7 +18,7 @@ func fakeGitHubMirrorUpstream(t *testing.T, down *atomic.Bool) map[string]*atomi
 	t.Helper()
 	hits := map[string]*atomic.Int32{}
 	for _, p := range []string{
-		"/kure29/flvx/releases/download/3.3.6/gost-amd64",
+		"/kure29/flyx/releases/download/3.3.6/gost-amd64",
 		"/blob/gost-amd64",
 		"/v2fly/geoip/releases/latest",
 		"/v2fly/geoip/releases/download/202610/geoip.dat",
@@ -36,7 +36,7 @@ func fakeGitHubMirrorUpstream(t *testing.T, down *atomic.Bool) map[string]*atomi
 			return
 		}
 		switch r.URL.Path {
-		case "/kure29/flvx/releases/download/3.3.6/gost-amd64":
+		case "/kure29/flyx/releases/download/3.3.6/gost-amd64":
 			// GitHub sends release files on to its asset host.
 			http.Redirect(w, r, "/blob/gost-amd64", http.StatusFound)
 		case "/blob/gost-amd64":
@@ -88,7 +88,7 @@ func mirrorGet(t *testing.T, target string, header ...string) *httptest.Response
 func TestGithubMirrorCachesReleaseFiles(t *testing.T) {
 	var down atomic.Bool
 	hits := fakeGitHubMirrorUpstream(t, &down)
-	const file = "https://github.com/kure29/flvx/releases/download/3.3.6/gost-amd64"
+	const file = "https://github.com/kure29/flyx/releases/download/3.3.6/gost-amd64"
 
 	for i := 0; i < 3; i++ {
 		rec := mirrorGet(t, file)
@@ -175,12 +175,12 @@ func TestGithubMirrorRefreshesAPIAndServesStale(t *testing.T) {
 func TestGithubMirrorRefusesOtherRepos(t *testing.T) {
 	for _, target := range []string{
 		"https://github.com/someone/else/releases/download/v1/file",
-		"https://github.com/kure29/flvx/archive/refs/heads/main.zip",
-		"https://github.com/kure29/flvx/releases/download/../../x/y",
+		"https://github.com/kure29/flyx/archive/refs/heads/main.zip",
+		"https://github.com/kure29/flyx/releases/download/../../x/y",
 		"https://api.github.com/repos/someone/else/releases",
 		"https://api.github.com/user",
 		"https://raw.githubusercontent.com/someone/else/main/x",
-		"https://example.com/kure29/flvx/releases/download/v1/file",
+		"https://example.com/kure29/flyx/releases/download/v1/file",
 		"https://gist.github.com/x",
 	} {
 		if rec := mirrorGet(t, target); rec.Code != http.StatusNotFound {

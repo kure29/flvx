@@ -1,5 +1,5 @@
 """
-Test user management UI for FLVX.
+Test user management UI for FLYX.
 Tests user CRUD operations through the web interface.
 """
 

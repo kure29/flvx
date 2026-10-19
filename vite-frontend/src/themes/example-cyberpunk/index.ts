@@ -18,7 +18,7 @@ import { CyberpunkButton } from "./components/button";
 const cyberpunkTheme: ThemePackage = {
   id: "cyberpunk",
   name: "赛博朋克",
-  author: "FLVX Community",
+  author: "FLYX Community",
   version: "1.0.0",
   description: "霓虹灯风格的赛博朋克暗色主题",
 

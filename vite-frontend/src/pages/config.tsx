@@ -130,8 +130,8 @@ const CONFIG_ITEMS: ConfigItem[] = [
   },
   {
     key: "hide_footer_brand",
-    label: "隐藏底部 FLVX 版权",
-    description: "开启后页面底部不再显示 Powered by FLVX",
+    label: "隐藏底部 FLYX 版权",
+    description: "开启后页面底部不再显示 Powered by FLYX",
     type: "switch",
   },
   {

@@ -2,17 +2,17 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   lang: "zh-CN",
-  title: "FLVX",
+  title: "FLYX",
   description: "转发 + 节点搭建面板",
-  base: "/flvx/",
+  base: "/flyx/",
   cleanUrls: true,
   lastUpdated: true,
-  head: [["link", { rel: "icon", type: "image/png", href: "/flvx/logo.png" }]],
+  head: [["link", { rel: "icon", type: "image/png", href: "/flyx/logo.png" }]],
   themeConfig: {
     logo: "/logo.png",
     nav: [
       { text: "指南", link: "/guide/getting-started" },
-      { text: "下载", link: "https://github.com/kure29/flvx/releases" },
+      { text: "下载", link: "https://github.com/kure29/flyx/releases" },
     ],
     sidebar: [
       {
@@ -43,7 +43,7 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [{ icon: "github", link: "https://github.com/kure29/flvx" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/kure29/flyx" }],
     search: { provider: "local" },
     outline: { level: [2, 3], label: "本页目录" },
     docFooter: { prev: "上一页", next: "下一页" },

@@ -1,7 +1,7 @@
 [project]
 name = "flvx-e2e-tests"
 version = "0.1.0"
-description = "E2E tests for FLVX Panel"
+description = "E2E tests for FLYX Panel"
 requires-python = ">=3.11"
 dependencies = [
     "pytest>=8.0.0",

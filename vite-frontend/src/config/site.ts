@@ -26,7 +26,7 @@ const SENSITIVE_CONFIG_KEYS = new Set([
   "cloudflare_secret_key",
 ]);
 const GITHUB_REPO =
-  import.meta.env.VITE_GITHUB_REPO || "https://github.com/kure29/flvx";
+  import.meta.env.VITE_GITHUB_REPO || "https://github.com/kure29/flyx";
 
 const shouldPersistConfigKey = (key: string) => {
   return !SENSITIVE_CONFIG_KEYS.has(key.trim().toLowerCase());
@@ -108,7 +108,7 @@ const fetchPublicBrandConfigs = async (): Promise<Record<string, string>> => {
 const getInitialConfig = () => {
   if (typeof window === "undefined") {
     return {
-      name: "FLVX",
+      name: "FLYX",
       version: VERSION,
       app_version: APP_VERSION,
       github_repo: GITHUB_REPO,
@@ -152,7 +152,7 @@ const getInitialConfig = () => {
   }
 
   return {
-    name: "FLVX",
+    name: "FLYX",
     version: VERSION,
     app_version: APP_VERSION,
     github_repo: GITHUB_REPO,
@@ -416,7 +416,7 @@ export const updateSiteConfig = async (configMap?: Record<string, string>) => {
     ? String(resolvedConfigMap.app_bg_image_dark || "").trim()
     : (siteConfig.app_bg_image_dark || "").trim();
 
-  siteConfig.name = appName || "FLVX";
+  siteConfig.name = appName || "FLYX";
   siteConfig.app_logo = appLogo;
   siteConfig.app_favicon = appFavicon;
   siteConfig.app_bg_image = appBgImage;

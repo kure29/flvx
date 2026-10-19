@@ -1,6 +1,6 @@
 # PostgreSQL 数据库指南
 
-FLVX 默认使用 SQLite 作为数据库，同时也内置了对 PostgreSQL 的完整支持。本文档介绍如何使用 PostgreSQL 部署面板、从 SQLite 迁移以及日常维护。
+FLYX 默认使用 SQLite 作为数据库，同时也内置了对 PostgreSQL 的完整支持。本文档介绍如何使用 PostgreSQL 部署面板、从 SQLite 迁移以及日常维护。
 
 ## 一、SQLite 与 PostgreSQL 对比
 

@@ -1,6 +1,6 @@
 # AI Skill 使用指南
 
-让大模型直接操作 FLVX 面板的技能包。支持 OpenCode、OpenClaw、Claude Code 等工具。
+让大模型直接操作 FLYX 面板的技能包。支持 OpenCode、OpenClaw、Claude Code 等工具。
 
 ## 安装
 
@@ -15,14 +15,14 @@ postinstall 脚本会自动链接到 `~/.agents/skills/flvx-api/`。
 ### 方式 2: 手动链接
 
 ```bash
-# 从 FLVX 源码
-cd /path/to/flvx
+# 从 FLYX 源码
+cd /path/to/flyx
 mkdir -p ~/.agents/skills
 ln -sf $(pwd)/skills/flvx-api ~/.agents/skills/
 
 # 或从 GitHub
-git clone https://github.com/kure29/flvx.git
-cd flvx
+git clone https://github.com/kure29/flyx.git
+cd flyx
 ln -sf $(pwd)/skills/flvx-api ~/.agents/skills/
 ```
 
@@ -91,7 +91,7 @@ npm install -g @flvx/skill-api
 
 # 或手动链接
 mkdir -p ~/.openclaw/skills
-ln -sf /path/to/flvx/skills/flvx-api ~/.openclaw/skills/flvx-api
+ln -sf /path/to/flyx/skills/flvx-api ~/.openclaw/skills/flvx-api
 ```
 
 **使用:**
@@ -114,9 +114,9 @@ Claude Code 是 Anthropic 官方的命令行工具，支持通过 CLAUDE.md 扩�
 在项目根目录创建 `CLAUDE.md`：
 
 ```markdown
-# FLVX API Skill
+# FLYX API Skill
 
-你可以通过 REST API 操作 FLVX 面板。
+你可以通过 REST API 操作 FLYX 面板。
 
 ## 环境变量
 - FLVX_BASE_URL: 面板地址
@@ -158,9 +158,9 @@ claude
 ```bash
 mkdir -p ~/.claude
 cat > ~/.claude/CLAUDE.md << 'EOF'
-# FLVX Panel Operations
+# FLYX Panel Operations
 
-使用 FLVX REST API 操作流量转发面板。
+使用 FLYX REST API 操作流量转发面板。
 
 环境变量: FLVX_BASE_URL, FLVX_USERNAME, FLVX_PASSWORD
 调用方式: curl -X POST "$FLVX_BASE_URL/api/v1/..." -H "Authorization: $TOKEN"
@@ -176,7 +176,7 @@ cat ~/.agents/skills/flvx-api/SKILL.md >> ~/.claude/CLAUDE.md
 
 **示例对话:**
 ```
->>> 帮我查看 FLVX 面板上有哪些节点
+>>> 帮我查看 FLYX 面板上有哪些节点
 >>> 创建一个名为 test 的转发，目标地址 10.0.0.1:80
 >>> 查看我的流量使用情况
 ```

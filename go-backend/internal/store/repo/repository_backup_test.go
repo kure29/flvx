@@ -90,7 +90,7 @@ func TestExportAllOmitsSensitiveConfigs(t *testing.T) {
 	}
 	defer r.Close()
 
-	seedConfig(t, r, "app_name", "FLVX")
+	seedConfig(t, r, "app_name", "FLYX")
 	seedConfig(t, r, "app_logo", "logo")
 	seedConfig(t, r, "app_favicon", "favicon")
 	seedConfig(t, r, "app_bg_image", "bg")
@@ -115,7 +115,7 @@ func TestExportAllOmitsSensitiveConfigs(t *testing.T) {
 			if err != nil {
 				t.Fatalf("export backup: %v", err)
 			}
-			if backup.Configs["app_name"] != "FLVX" {
+			if backup.Configs["app_name"] != "FLYX" {
 				t.Fatalf("expected public config in export, got %+v", backup.Configs)
 			}
 			if backup.Configs["cloudflare_site_key"] != "site-key" {
@@ -250,5 +250,28 @@ func assertConfigValue(t *testing.T, r *Repository, name, want string) {
 	}
 	if cfg == nil || cfg.Value != want {
 		t.Fatalf("expected config %s=%q, got %+v", name, want, cfg)
+	}
+}
+
+func TestSeedDataRenamesDefaultAppName(t *testing.T) {
+	for old, want := range map[string]string{"FLVX": "FLYX", "flux": "FLYX", "My Panel": "My Panel"} {
+		path := filepath.Join(t.TempDir(), "rename.db")
+		r, err := Open(path)
+		if err != nil {
+			t.Fatalf("open repo: %v", err)
+		}
+		seedConfig(t, r, "app_name", old)
+		r.Close()
+
+		// Reopening runs the seed again, as a panel upgrade does.
+		r, err = Open(path)
+		if err != nil {
+			t.Fatalf("reopen repo: %v", err)
+		}
+		cfg, err := r.GetConfigByName("app_name")
+		r.Close()
+		if err != nil || cfg == nil || cfg.Value != want {
+			t.Fatalf("app_name %q became %v (%v), want %q", old, cfg, err, want)
+		}
 	}
 }

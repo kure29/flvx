@@ -1,5 +1,5 @@
 """
-Test API endpoints for FLVX backend.
+Test API endpoints for FLYX backend.
 Tests API responses directly without browser.
 """
 

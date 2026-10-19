@@ -49,7 +49,7 @@ func buildCapabilityCheckCommand(nft, tableName string) string {
 		"trap 'rm -f \"$tmp\"' EXIT\n" +
 		"cat > \"$tmp\" <<'EOF'\n" + script + "\nEOF\n" +
 		"if ! " + nft + " -c -f \"$tmp\"; then\n" +
-		"  echo 'nftables cannot validate the generated FLVX rules' >&2\n" +
+		"  echo 'nftables cannot validate the generated FLYX rules' >&2\n" +
 		"  exit 1\n" +
 		"fi"
 }

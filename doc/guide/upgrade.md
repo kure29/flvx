@@ -11,17 +11,17 @@
 在面板部署目录（存放 `docker-compose.yml` 和 `.env` 的目录）重新运行安装脚本，选 `2. 更新面板`：
 
 ```bash
-curl -L https://github.com/kure29/flvx/releases/latest/download/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
 数据会保留，更新前会自动备份到部署目录的 `backups/`。
 
 ## 指定版本
 
-到 [Releases](https://github.com/kure29/flvx/releases) 复制对应版本的命令，例如：
+到 [Releases](https://github.com/kure29/flyx/releases) 复制对应版本的命令，例如：
 
 ```bash
-curl -L https://github.com/kure29/flvx/releases/download/3.0.7/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+curl -L https://github.com/kure29/flyx/releases/download/3.0.7/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
 ## 节点 agent 升级

@@ -28,7 +28,7 @@ if [ -z "${BASH_VERSION:-}" ]; then
 fi
 
 # GitHub repo used for release downloads
-REPO="kure29/flvx"
+REPO="kure29/flyx"
 
 # 固定版本号（Release 构建时自动填充，留空则获取最新版）
 PINNED_VERSION=""

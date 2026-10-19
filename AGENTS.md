@@ -1,6 +1,6 @@
 # AGENTS
 
-FLVX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
+FLYX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 
 ## Structure
 
@@ -44,11 +44,12 @@ FLVX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 - **Backend DB**: handlers use Repository methods, never `repo.DB()` directly.
 - **GORM models**: always define `TableName()` (GORM pluralizes by default).
 - **GORM tags**: no `type:jsonb` or `type:serial` (SQLite incompatible).
+- **Commits**: no `Co-Authored-By: Claude …` trailer — the owner doesn't want Claude listed as a contributor.
 - **Go versions**: `go.mod` says 1.25.0 for all three modules; CI builds with 1.23.
 
 ## Anti-patterns
 
-- `install.sh` / `panel_install.sh`: `REPO` must stay `kure29/flvx` (this repo is independent of upstream; don't sync it back). The release job rewrites `REPO`, the version and `PINNED_VERSION` in the release copies, so don't hand-edit those for a release.
+- `install.sh` / `panel_install.sh`: `REPO` must stay `kure29/flyx` (this repo is independent of upstream; don't sync it back). The release job rewrites `REPO`, the version and `PINNED_VERSION` in the release copies, so don't hand-edit those for a release.
 - Don't edit `go-gost/x/internal/util/grpc/proto/*.pb.go` (generated).
 - Don't add frontend tests (no Vitest/Jest configured).
 - Don't reintroduce `@heroui/*` or `@nextui-org/*` packages.

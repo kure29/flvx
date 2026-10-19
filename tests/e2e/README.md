@@ -1,6 +1,6 @@
-# FLVX E2E Tests
+# FLYX E2E Tests
 
-End-to-end testing suite for FLVX Panel using Playwright and pytest.
+End-to-end testing suite for FLYX Panel using Playwright and pytest.
 
 ## Structure
 

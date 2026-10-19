@@ -491,11 +491,14 @@ func seedData(db *gorm.DB) {
 		}
 	}
 
-	appNameConfig := model.ViteConfig{ID: 1, Name: "app_name", Value: "FLVX", Time: 1755147963000}
+	appNameConfig := model.ViteConfig{ID: 1, Name: "app_name", Value: "FLYX", Time: 1755147963000}
 	db.Where("id = ?", 1).FirstOrCreate(&appNameConfig)
 	// "flux" was the seeded name, hidden behind the old commercial license
 	// (it could not be changed without one); show the product name instead.
-	db.Model(&model.ViteConfig{}).Where("name = ? AND value = ?", "app_name", "flux").Update("value", "FLVX")
+	db.Model(&model.ViteConfig{}).Where("name = ? AND value = ?", "app_name", "flux").Update("value", "FLYX")
+	// The project was renamed FLVX → FLYX; panels still on the old default
+	// follow, a name the admin chose is kept.
+	db.Model(&model.ViteConfig{}).Where("name = ? AND value = ?", "app_name", "FLVX").Update("value", "FLYX")
 	now := time.Now().UnixMilli()
 	for name, value := range map[string]string{
 		"hide_footer_brand": "false",

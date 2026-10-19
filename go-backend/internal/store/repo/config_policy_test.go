@@ -48,7 +48,7 @@ func TestConfigPolicyHelpers(t *testing.T) {
 	}
 
 	input := map[string]string{
-		"app_name":              "FLVX",
+		"app_name":              "FLYX",
 		"license_key":           "secret-license",
 		"cloudflare_secret_key": "secret-cloudflare",
 		"jwt_secret":            "secret-jwt",
@@ -58,7 +58,7 @@ func TestConfigPolicyHelpers(t *testing.T) {
 	if len(filtered) != 2 {
 		t.Fatalf("expected 2 public configs, got %d", len(filtered))
 	}
-	if filtered["app_name"] != "FLVX" || filtered["cloudflare_site_key"] != "site-key" {
+	if filtered["app_name"] != "FLYX" || filtered["cloudflare_site_key"] != "site-key" {
 		t.Fatalf("unexpected filtered configs: %+v", filtered)
 	}
 	if _, ok := filtered["jwt_secret"]; ok {

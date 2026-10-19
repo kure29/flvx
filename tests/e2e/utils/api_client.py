@@ -1,5 +1,5 @@
 """
-API client for FLVX backend testing.
+API client for FLYX backend testing.
 """
 
 import json
@@ -9,7 +9,7 @@ import requests
 
 
 class APIClient:
-    """API client for FLVX backend."""
+    """API client for FLYX backend."""
 
     def __init__(self, base_url: str, jwt_secret: Optional[str] = None):
         self.base_url = base_url.rstrip("/")

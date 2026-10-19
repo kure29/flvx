@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="doc/public/logo.png" width="88" alt="FLVX" />
+<img src="doc/public/logo.png" width="88" alt="FLYX" />
 
-# FLVX
+# FLYX
 
 转发 + 节点搭建面板
 
 在一个面板里管理中转与落地：一键部署 Xray / sing-box / Snell 节点，对接中转，生成订阅。
 
-[使用文档](https://kure29.github.io/flvx/) · [快速上手](https://kure29.github.io/flvx/guide/getting-started) · [下载](https://github.com/kure29/flvx/releases)
+[使用文档](https://kure29.github.io/flyx/) · [快速上手](https://kure29.github.io/flyx/guide/getting-started) · [下载](https://github.com/kure29/flyx/releases)
 
 </div>
 
@@ -27,14 +27,14 @@
 面板（需要 Docker）：
 
 ```bash
-curl -L https://github.com/kure29/flvx/releases/latest/download/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
 选 `1. 安装面板`，完成后访问 `http://服务器IP:6366`，默认账号 `admin_user` / `admin_user`，登录后请立即修改密码。
 
 节点：在面板 **节点** 页新建节点，复制生成的安装命令到服务器上执行。
 
-更多说明见 [使用文档](https://kure29.github.io/flvx/)：[安装部署](https://kure29.github.io/flvx/guide/install) · [搭建节点](https://kure29.github.io/flvx/guide/nodes) · [对接中转](https://kure29.github.io/flvx/guide/relay) · [导入节点](https://kure29.github.io/flvx/guide/import) · [升级](https://kure29.github.io/flvx/guide/upgrade) · [常见问题](https://kure29.github.io/flvx/guide/faq)
+更多说明见 [使用文档](https://kure29.github.io/flyx/)：[安装部署](https://kure29.github.io/flyx/guide/install) · [搭建节点](https://kure29.github.io/flyx/guide/nodes) · [对接中转](https://kure29.github.io/flyx/guide/relay) · [导入节点](https://kure29.github.io/flyx/guide/import) · [升级](https://kure29.github.io/flyx/guide/upgrade) · [常见问题](https://kure29.github.io/flyx/guide/faq)
 
 ## 许可
 

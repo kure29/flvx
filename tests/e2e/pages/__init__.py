@@ -1,5 +1,5 @@
 """
-Page Object Models for FLVX E2E tests.
+Page Object Models for FLYX E2E tests.
 """
 
 from typing import Optional
