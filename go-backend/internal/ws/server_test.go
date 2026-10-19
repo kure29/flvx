@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go-backend/internal/auth"
 	"go-backend/internal/store/repo"
@@ -212,4 +213,88 @@ func websocketTestPipe(t *testing.T) (*websocket.Conn, *websocket.Conn) {
 	}
 
 	return nil, nil
+}
+
+func TestRealtimeSessionGetsLatestNodeMetricOnConnect(t *testing.T) {
+	secret := "unit-test-secret"
+	token, err := auth.GenerateToken(1, "admin_user", 0, secret)
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+
+	r, err := repo.Open(t.TempDir() + "/metric.db")
+	if err != nil {
+		t.Fatalf("open repo: %v", err)
+	}
+	defer r.Close()
+	now := time.Now().UnixMilli()
+	if err := r.DB().Exec(`
+		INSERT INTO node(name, secret, server_ip, port, created_time, updated_time, status, tcp_listen_addr, udp_listen_addr, inx)
+		VALUES('metric-node', 'metric-node-secret', '10.9.0.1', '40000-40010', ?, ?, 0, '[::]', '[::]', 0)
+	`, now, now).Error; err != nil {
+		t.Fatalf("insert node: %v", err)
+	}
+
+	server := NewServer(r, secret)
+	server.SetUserAuthStateLookup(func(userID int64) (*auth.UserAuthState, error) {
+		return &auth.UserAuthState{ID: userID, RoleID: 0, Status: 1, PasswordChangedAt: 0}, nil
+	})
+	ts := httptest.NewServer(server)
+	defer ts.Close()
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/system-info"
+
+	dialAdmin := func() *websocket.Conn {
+		t.Helper()
+		conn, _, err := websocket.DefaultDialer.Dial(wsURL+"?type=0&secret="+url.QueryEscape(token), nil)
+		if err != nil {
+			t.Fatalf("dial admin websocket: %v", err)
+		}
+		return conn
+	}
+	waitLastMetric := func(want int) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			server.mu.RLock()
+			got := len(server.lastMetric)
+			server.mu.RUnlock()
+			if got == want {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("cached metrics = %d, want %d", got, want)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	node, _, err := websocket.DefaultDialer.Dial(wsURL+"?type=1&secret=metric-node-secret&version=v1", nil)
+	if err != nil {
+		t.Fatalf("dial node websocket: %v", err)
+	}
+	if err := node.WriteMessage(websocket.TextMessage, []byte(`{"type":"metric","data":{"cpu_usage":12.5}}`)); err != nil {
+		t.Fatalf("send metric: %v", err)
+	}
+	waitLastMetric(1)
+
+	admin := dialAdmin()
+	_ = admin.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, raw, err := admin.ReadMessage()
+	_ = admin.Close()
+	if err != nil {
+		t.Fatalf("expected the cached metric on connect: %v", err)
+	}
+	if msg := string(raw); !strings.Contains(msg, `"type":"metric"`) || !strings.Contains(msg, "cpu_usage") {
+		t.Fatalf("unexpected first message: %s", msg)
+	}
+
+	// Once the node disconnects its metric is stale and must not be replayed.
+	_ = node.Close()
+	waitLastMetric(0)
+	admin = dialAdmin()
+	defer admin.Close()
+	_ = admin.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	if _, raw, err := admin.ReadMessage(); err == nil {
+		t.Fatalf("expected no replay after the node went offline, got %s", raw)
+	}
 }

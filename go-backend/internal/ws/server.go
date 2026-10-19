@@ -95,6 +95,10 @@ type Server struct {
 	nodes    map[int64]*nodeSession
 	byConn   map[*websocket.Conn]*nodeSession
 	pending  map[string]pendingRequest
+	// lastMetric holds each online node's latest broadcast metric message, so
+	// a page that connects between agent reports shows metrics right away
+	// instead of waiting for the next report.
+	lastMetric map[int64]string
 }
 
 type SystemInfo struct {
@@ -158,11 +162,12 @@ func NewServer(repo *repo.Repository, jwtSecret string) *Server {
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
-		admins:   make(map[*adminSession]struct{}),
-		monitors: make(map[*monitorSession]struct{}),
-		nodes:    make(map[int64]*nodeSession),
-		byConn:   make(map[*websocket.Conn]*nodeSession),
-		pending:  make(map[string]pendingRequest),
+		admins:     make(map[*adminSession]struct{}),
+		monitors:   make(map[*monitorSession]struct{}),
+		nodes:      make(map[int64]*nodeSession),
+		byConn:     make(map[*websocket.Conn]*nodeSession),
+		pending:    make(map[string]pendingRequest),
+		lastMetric: make(map[int64]string),
 	}
 }
 
@@ -236,9 +241,7 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, userID int6
 		return s.validateAdminSession(session.userID, session.claims)
 	})
 
-	s.mu.Lock()
-	s.admins[session] = struct{}{}
-	s.mu.Unlock()
+	s.registerRealtime(cw, func() { s.admins[session] = struct{}{} })
 
 	defer func() {
 		close(done)
@@ -271,9 +274,7 @@ func (s *Server) handleMonitor(w http.ResponseWriter, r *http.Request, userID in
 		return s.validateMonitorSession(session.userID, session.claims)
 	})
 
-	s.mu.Lock()
-	s.monitors[session] = struct{}{}
-	s.mu.Unlock()
+	s.registerRealtime(cw, func() { s.monitors[session] = struct{}{} })
 
 	defer func() {
 		close(done)
@@ -343,6 +344,9 @@ func (s *Server) handleNode(w http.ResponseWriter, r *http.Request, nodeID int64
 			needOfflineBroadcast = true
 		}
 		delete(s.byConn, conn)
+		if needOfflineBroadcast {
+			delete(s.lastMetric, nodeID)
+		}
 		s.mu.Unlock()
 		if needOfflineBroadcast {
 			s.failPendingForNode(nodeID, "节点连接已断开")
@@ -652,7 +656,40 @@ func (s *Server) broadcastInfo(nodeID int64, data string) {
 func (s *Server) broadcastTyped(nodeID int64, msgType string, data string) {
 	payload := broadcastMessage{ID: nodeID, Type: msgType, Data: data}
 	raw, _ := json.Marshal(payload)
+	if msgType == "metric" {
+		s.mu.Lock()
+		if _, online := s.nodes[nodeID]; online {
+			s.lastMetric[nodeID] = string(raw)
+		}
+		s.mu.Unlock()
+	}
 	s.broadcastToRealtime(string(raw))
+}
+
+// registerRealtime adds a realtime (admin or monitor) session and sends it the
+// latest metric of every online node. The connection's write lock is held
+// across both steps, so a broadcast racing with the registration is written
+// after the replayed metrics and never gets overwritten by an older one.
+func (s *Server) registerRealtime(cw *connWrap, add func()) {
+	cw.mu.Lock()
+	defer cw.mu.Unlock()
+
+	s.mu.Lock()
+	add()
+	replay := make([]string, 0, len(s.lastMetric))
+	for _, msg := range s.lastMetric {
+		replay = append(replay, msg)
+	}
+	s.mu.Unlock()
+
+	for _, msg := range replay {
+		_ = cw.conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+		err := cw.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		_ = cw.conn.SetWriteDeadline(time.Time{})
+		if err != nil {
+			return
+		}
+	}
 }
 
 func (s *Server) broadcastToRealtime(message string) {
