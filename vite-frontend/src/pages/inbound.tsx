@@ -35,6 +35,7 @@ import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
+import { LatencyBadge } from "@/pages/inbound/latency";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {
@@ -246,6 +247,7 @@ export default function InboundPage() {
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [batchToggling, setBatchToggling] = useState(false);
   const [probing, setProbing] = useState(false);
+  const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
   const [sources, setSources] = useState<RemoteSourceItem[]>([]);
 
   const loadData = useCallback(
@@ -526,6 +528,34 @@ export default function InboundPage() {
     }
   };
 
+  // Probes one inbound again and patches its result in place.
+  const probeOne = async (id: number) => {
+    setProbingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await probeInbounds([id]);
+      const probe = res.code === 0 ? res.data?.[String(id)] : undefined;
+
+      if (!probe) {
+        toast.error(res.msg || "检测失败");
+
+        return;
+      }
+      setInbounds((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, probe } : i)),
+      );
+    } catch {
+      toast.error("检测失败");
+    } finally {
+      setProbingIds((prev) => {
+        const next = new Set(prev);
+
+        next.delete(id);
+
+        return next;
+      });
+    }
+  };
+
   const gridClass = card ? CARD_GRID : "grid grid-cols-1 gap-2 2xl:grid-cols-2";
 
   const renderInbound = (item: InboundApiItem) => {
@@ -546,6 +576,15 @@ export default function InboundPage() {
         : item.nodeName;
 
     const selected = selectMode && selectedIds.has(item.id);
+    const latency =
+      item.enabled && !kernelBad && item.probe?.skipped !== true ? (
+        <LatencyBadge
+          probe={probe}
+          probing={probingIds.has(item.id)}
+          withSource={card}
+          onProbe={() => probeOne(item.id)}
+        />
+      ) : null;
     const activate = () =>
       selectMode ? toggleSelect(item.id) : setSheetFor(item.id);
     const dotClass = unreachable
@@ -612,16 +651,6 @@ export default function InboundPage() {
             内核{KERNEL_STATUS[item.kernelStatus]?.label ?? "异常"}
           </Chip>
         )}
-        {unreachable && (
-          <Chip
-            className="shrink-0 whitespace-nowrap"
-            color="danger"
-            size="sm"
-            variant="flat"
-          >
-            {probe?.error || "连不上"}
-          </Chip>
-        )}
       </>
     );
 
@@ -686,10 +715,8 @@ export default function InboundPage() {
                 {formatTraffic(item.downloadBytes)}
               </span>,
             ],
-            ...(item.enabled && probe?.ok
-              ? ([["延迟", `${probe.latencyMs} ms`]] as Array<
-                  [string, React.ReactNode]
-                >)
+            ...(latency
+              ? ([["延迟", latency]] as Array<[string, React.ReactNode]>)
               : []),
           ]}
           selectMode={selectMode}
@@ -756,13 +783,15 @@ export default function InboundPage() {
           <div className="truncate text-xs text-default-500">
             {describeInbound(item)} · {item.port}
             {where ? ` · ${where}` : ""}
-            {item.enabled && probe?.ok ? ` · ${probe.latencyMs} ms` : ""}
             <span className="sm:hidden">
               {" "}
               · {formatTraffic(item.uploadBytes + item.downloadBytes)}
             </span>
           </div>
         </div>
+        {latency && (
+          <div className="flex shrink-0 justify-end sm:w-32">{latency}</div>
+        )}
         <div className="hidden shrink-0 text-right font-mono text-xs text-default-500 sm:block">
           <div>↑ {formatTraffic(item.uploadBytes)}</div>
           <div>↓ {formatTraffic(item.downloadBytes)}</div>
