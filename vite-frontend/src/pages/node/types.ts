@@ -1,11 +1,14 @@
 import { type NodeRenewalCycle } from "@/pages/node/renewal";
 import { type NodeSystemInfo } from "@/pages/node/system-info";
+import { type InboundProbe } from "@/api/types";
 
 /** Shapes used by the node page. */
 export interface Node {
   id: number;
   inx?: number;
   name: string;
+  /** Latency from the node to each reference point. */
+  latency?: InboundProbe;
   remark?: string;
   expiryTime?: number;
   renewalCycle?: NodeRenewalCycle;

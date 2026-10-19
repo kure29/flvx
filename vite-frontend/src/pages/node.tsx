@@ -39,8 +39,10 @@ import {
   rollbackNode,
   getPeerRemoteUsageList,
   dismissNodeExpiryReminder,
+  probeNodeLatency,
   type ReleaseChannel,
 } from "@/api";
+import { LatencyCell } from "@/components/latency-cell";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
@@ -209,6 +211,7 @@ export default function NodePage() {
   );
 
   const [sheetNodeId, setSheetNodeId] = useState<number | null>(null);
+  const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -1112,6 +1115,44 @@ export default function NodePage() {
   };
 
   // 处理拖拽结束
+  // Probes one node's latency again and patches its result in place.
+  const probeNode = async (id: number) => {
+    setProbingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await probeNodeLatency([id]);
+      const latency = res.code === 0 ? res.data?.[String(id)] : undefined;
+
+      if (!latency) {
+        toast.error(res.msg || "检测失败");
+
+        return;
+      }
+      setNodeList((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, latency } : n)),
+      );
+    } catch {
+      toast.error("检测失败");
+    } finally {
+      setProbingIds((prev) => {
+        const next = new Set(prev);
+
+        next.delete(id);
+
+        return next;
+      });
+    }
+  };
+
+  const renderLatency = (node: Node, variant: "card" | "list") =>
+    node.isRemote !== 1 && node.connectionStatus === "online" ? (
+      <LatencyCell
+        probe={node.latency}
+        probing={probingIds.has(node.id)}
+        variant={variant}
+        onProbe={() => probeNode(node.id)}
+      />
+    ) : null;
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -1925,6 +1966,12 @@ export default function NodePage() {
                               </div>
                             )}
 
+                            {node.latency && (
+                              <div className="mb-4 empty:hidden">
+                                {renderLatency(node, "card")}
+                              </div>
+                            )}
+
                             <div className="mt-auto space-y-3">
                               {/* 操作按钮 */}
                               <div className="space-y-1.5">
@@ -2077,15 +2124,18 @@ export default function NodePage() {
                         }
                         meta={meta.filter(Boolean).join(" · ")}
                         right={
-                          !isDisplayFiltered && (
-                            <span
-                              className="cursor-grab touch-none p-1 text-default-300 hover:text-default-500 active:cursor-grabbing"
-                              title="拖动排序"
-                              {...listeners}
-                            >
-                              <GripVertical className="h-4 w-4" />
-                            </span>
-                          )
+                          <>
+                            {renderLatency(node, "list")}
+                            {!isDisplayFiltered && (
+                              <span
+                                className="cursor-grab touch-none p-1 text-default-300 hover:text-default-500 active:cursor-grabbing"
+                                title="拖动排序"
+                                {...listeners}
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </span>
+                            )}
+                          </>
                         }
                         selectMode={selectMode}
                         selected={selectedIds.has(node.id)}

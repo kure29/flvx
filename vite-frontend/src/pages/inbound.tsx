@@ -35,7 +35,7 @@ import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
-import { LatencyCell } from "@/pages/inbound/latency";
+import { LatencyCell } from "@/components/latency-cell";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {

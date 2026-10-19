@@ -842,6 +842,13 @@ export const probeInbounds = (ids: number[] = []) =>
     { ids },
     { timeout: 60000 },
   );
+/** Probes the nodes' latency to the reference points now. */
+export const probeNodeLatency = (ids: number[] = []) =>
+  Network.post<Record<string, InboundProbe>>(
+    "/node/latency/probe",
+    { ids },
+    { timeout: 60000 },
+  );
 export const updateInboundSplit = (data: {
   id: number;
   outboundId: number;

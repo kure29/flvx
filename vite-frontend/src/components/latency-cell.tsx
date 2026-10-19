@@ -81,14 +81,21 @@ function bestPoint(points: InboundProbePoint[]) {
 }
 
 /**
- * The points a card shows: all of them when they fit, else always the
- * best and the worst, filled up in configured order and kept in it.
+ * The points a card shows: all of them when they fit, else the ones pinned
+ * in settings, then the worst and the best, then configured order; shown
+ * in configured order.
  */
 function cardPoints(points: InboundProbePoint[]) {
   if (points.length <= CARD_POINTS) return points;
-  const keep = new Set([bestPoint(points)!, worstPoint(points)!]);
+  const keep = new Set<InboundProbePoint>();
+  const candidates = [
+    ...points.filter((p) => p.pinned),
+    worstPoint(points)!,
+    bestPoint(points)!,
+    ...points,
+  ];
 
-  for (const p of points) {
+  for (const p of candidates) {
     if (keep.size >= CARD_POINTS) break;
     keep.add(p);
   }
@@ -219,6 +226,10 @@ export function LatencyCell({
   const worst = worstPoint(points)!;
   const shown = cardPoints(points);
   const more = points.length - shown.length;
+  // Red points the card leaves out, so a hidden outage still shows.
+  const hiddenBad = points.filter(
+    (p) => !shown.includes(p) && pointTone(p) === "danger",
+  ).length;
   const others = points.filter((p) => p !== worst);
 
   return (
@@ -235,6 +246,9 @@ export function LatencyCell({
               <span className="text-default-600">延迟</span>
               <span className="text-xs text-default-400">
                 {more > 0 ? `共 ${points.length} 个 · ` : ""}
+                {hiddenBad > 0 && (
+                  <span className="text-rose-600">{hiddenBad} 个异常 · </span>
+                )}
                 {probe ? ago(probe.checkedAt) : ""}
               </span>
             </span>

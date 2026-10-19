@@ -769,6 +769,8 @@ export interface InboundProbe {
 
 export interface InboundProbePoint {
   name: string;
+  /** Chosen in settings to always show on cards. */
+  pinned?: boolean;
   ok: boolean;
   latencyMs?: number;
   lossPct?: number;
