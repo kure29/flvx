@@ -1,8 +1,4 @@
-import type {
-  BatchOperationFailure,
-  ForwardApiItem,
-  SpeedLimitApiItem,
-} from "@/api/types";
+import type { BatchOperationFailure, SpeedLimitApiItem } from "@/api/types";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
@@ -15,10 +11,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  type DraggableAttributes,
-  type DraggableSyntheticListeners,
-  type SensorDescriptor,
-  type SensorOptions,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -27,9 +19,6 @@ import {
   rectSortingStrategy,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, GripVertical } from "lucide-react";
 
 import { copyWithToast } from "@/utils/clipboard";
 import { ActionSheet } from "@/components/action-sheet";
@@ -39,11 +28,9 @@ import {
   ListRow,
   PageHeader,
   PageToolbar,
-  type RowStatus,
   SelectionBar,
   formatDate,
 } from "@/components/page-kit";
-import { AnimatedPage } from "@/components/animated-page";
 import { formatTraffic } from "@/utils/traffic";
 import { BatchActionResultModal } from "@/components/batch-action-result-modal";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -110,702 +97,56 @@ import { PageLoadingState } from "@/components/page-state";
 // import { useMobileBreakpoint } from "@/hooks/useMobileBreakpoint";
 import { saveOrder } from "@/utils/order-storage";
 import { JwtUtil } from "@/utils/jwt";
-
-interface Forward {
-  id: number;
-  name: string;
-  forwardMode?: "agent" | "nftables";
-  tunnelId: number;
-  tunnelName: string;
-  tunnelTrafficRatio?: number;
-  inIp: string;
-  inPort: number;
-  remoteAddr: string;
-  interfaceName?: string;
-  strategy: string;
-  status: number;
-  inFlow: number;
-  outFlow: number;
-  serviceRunning: boolean;
-  federationShareFlow?: number;
-  maxConn?: number;
-  createdTime: string;
-  userName?: string;
-  userId?: number;
-  inx?: number;
-  speedId?: number | null;
-  ipMaxConn?: number;
-  ipSpeedId?: number | null;
-  ipSpeedLimitName?: string;
-  proxyProtocol?: number;
-  proxyProtocolReceive?: number;
-  proxyProtocolSend?: number;
-}
-
-interface Tunnel {
-  id: number;
-  name: string;
-  forwardMode?: "agent" | "nftables";
-  type?: number;
-  inIp?: string;
-  inNodeId?: Array<{ nodeId: number }>;
-  inNodePortSta?: number;
-  inNodePortEnd?: number;
-  portRangeMin?: number;
-  portRangeMax?: number;
-}
-
-interface Node {
-  id: number;
-  name?: string;
-  serverIp?: string;
-  serverIpV4?: string;
-  serverIpV6?: string;
-  extraIPs?: string;
-}
-
-interface ForwardForm {
-  id?: number;
-  userId?: number;
-  name: string;
-  tunnelId: number | null;
-  inPort: number | null;
-  inIp: string;
-  remoteAddr: string;
-  interfaceName?: string;
-  strategy: string;
-  speedId: number | null;
-  ipMaxConn?: number;
-  ipSpeedId: number | null;
-  maxConn?: number;
-  proxyProtocol?: number;
-  proxyProtocolReceive?: number;
-  proxyProtocolSend?: number;
-}
-
-interface ForwardUserGroup {
-  userId: number;
-  userName: string;
-  tunnels: ForwardTunnelGroup[];
-}
-
-interface ForwardTunnelGroup {
-  tunnelKey: string;
-  tunnelName: string;
-  tunnelTrafficRatio?: number;
-  items: Forward[];
-}
-
-interface BatchProgressState {
-  active: boolean;
-  label: string;
-  percent: number;
-}
-
-interface BatchResultModalState {
-  failures: BatchOperationFailure[];
-  open: boolean;
-  summary: string;
-  title: string;
-}
-
-const EMPTY_BATCH_RESULT_MODAL_STATE: BatchResultModalState = {
-  failures: [],
-  open: false,
-  summary: "",
-  title: "",
-};
-
-type ForwardGroupOrderMap = Record<string, string[]>;
-type ForwardGroupCollapsedMap = Record<string, boolean>;
-
-const UNKNOWN_FORWARD_USER_NAME = "未知用户";
-const UNCATEGORIZED_FORWARD_TUNNEL_NAME = "未分类";
-const FORWARD_COMPACT_MODE_CONFIG_KEY = "forward_compact_mode";
-const FORWARD_COMPACT_MODE_EVENT = "forwardCompactModeChanged";
-const FORWARD_GROUP_ORDER_CONFIG_KEY = "forward_group_order_map";
-const FORWARD_GROUP_COLLAPSED_CONFIG_KEY = "forward_group_collapsed_map";
-const FORWARD_GROUP_ORDER_LOCAL_STORAGE_PREFIX = "forward-group-order";
-const FORWARD_GROUP_COLLAPSED_LOCAL_STORAGE_PREFIX = "forward-group-collapsed";
-const FORWARD_TUNNEL_GROUP_SORTABLE_PREFIX = "forward-tunnel-group";
-const normalizeForwardUserName = (userName?: string): string => {
-  const normalized = (userName || UNKNOWN_FORWARD_USER_NAME).trim();
-
-  return normalized || UNKNOWN_FORWARD_USER_NAME;
-};
-
-const compareForwardUserNameAsc = (a: string, b: string): number => {
-  return a.localeCompare(b, "en", {
-    sensitivity: "base",
-    numeric: true,
-  });
-};
-
-const normalizeForwardTunnelName = (tunnelName?: string): string => {
-  const normalized = (tunnelName || "").trim();
-
-  return normalized || UNCATEGORIZED_FORWARD_TUNNEL_NAME;
-};
-
-const buildForwardTunnelGroupKey = (tunnelName?: string): string => {
-  const normalized = normalizeForwardTunnelName(tunnelName);
-
-  if (normalized === UNCATEGORIZED_FORWARD_TUNNEL_NAME) {
-    return "__uncategorized__";
-  }
-
-  return normalized.toLocaleLowerCase();
-};
-
-const compareForwardTunnelNameAsc = (a: string, b: string): number => {
-  return a.localeCompare(b, "en", {
-    sensitivity: "base",
-    numeric: true,
-  });
-};
-
-const compareForwardTunnelGroupKeyAsc = (a: string, b: string): number => {
-  const aIsUncategorized = a === "__uncategorized__";
-  const bIsUncategorized = b === "__uncategorized__";
-
-  if (aIsUncategorized !== bIsUncategorized) {
-    return aIsUncategorized ? 1 : -1;
-  }
-
-  return compareForwardTunnelNameAsc(a, b);
-};
-
-const normalizeTunnelTrafficRatio = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-
-  return 1;
-};
-
-const formatTunnelTrafficRatio = (value?: number): string => {
-  const ratio = normalizeTunnelTrafficRatio(value);
-
-  if (Number.isInteger(ratio)) {
-    return `${ratio}x`;
-  }
-
-  return `${parseFloat(ratio.toFixed(2))}x`;
-};
-
-const buildForwardGroupOrderLocalKey = (tokenUserId: number): string => {
-  return `${FORWARD_GROUP_ORDER_LOCAL_STORAGE_PREFIX}:u:${tokenUserId}`;
-};
-
-const buildForwardGroupCollapsedLocalKey = (tokenUserId: number): string => {
-  return `${FORWARD_GROUP_COLLAPSED_LOCAL_STORAGE_PREFIX}:u:${tokenUserId}`;
-};
-
-const parsePreferenceMap = <T,>(
-  raw: string | null,
-): Record<string, T> | null => {
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-
-    return parsed as Record<string, T>;
-  } catch {
-    return null;
-  }
-};
-
-const parseGroupOrderMap = (raw: string | null): ForwardGroupOrderMap => {
-  const parsed = parsePreferenceMap<unknown>(raw);
-
-  if (!parsed) {
-    return {};
-  }
-
-  const result: ForwardGroupOrderMap = {};
-
-  Object.entries(parsed).forEach(([userId, value]) => {
-    if (!Array.isArray(value)) {
-      return;
-    }
-
-    const keys = value
-      .map((item) => (typeof item === "string" ? item.trim() : ""))
-      .filter((item) => item !== "");
-
-    if (keys.length > 0) {
-      result[userId] = Array.from(new Set(keys));
-    }
-  });
-
-  return result;
-};
-
-const parseGroupCollapsedMap = (
-  raw: string | null,
-): ForwardGroupCollapsedMap => {
-  const parsed = parsePreferenceMap<unknown>(raw);
-
-  if (!parsed) {
-    return {};
-  }
-
-  const result: ForwardGroupCollapsedMap = {};
-
-  Object.entries(parsed).forEach(([key, value]) => {
-    if (typeof value === "boolean") {
-      result[key] = value;
-    }
-  });
-
-  return result;
-};
-
-const sanitizeGroupOrderMap = (
-  source: ForwardGroupOrderMap,
-  availableTunnelKeysByUser: Map<number, Set<string>>,
-): ForwardGroupOrderMap => {
-  const sanitized: ForwardGroupOrderMap = {};
-
-  availableTunnelKeysByUser.forEach((availableKeys, userId) => {
-    if (availableKeys.size === 0) {
-      return;
-    }
-
-    const orderFromSource = source[userId.toString()] || [];
-    const used = new Set<string>();
-    const merged: string[] = [];
-
-    orderFromSource.forEach((key) => {
-      if (!availableKeys.has(key) || used.has(key)) {
-        return;
-      }
-
-      used.add(key);
-      merged.push(key);
-    });
-
-    Array.from(availableKeys)
-      .sort(compareForwardTunnelGroupKeyAsc)
-      .forEach((key) => {
-        if (!used.has(key)) {
-          used.add(key);
-          merged.push(key);
-        }
-      });
-
-    if (merged.length > 0) {
-      sanitized[userId.toString()] = merged;
-    }
-  });
-
-  return sanitized;
-};
-
-const sanitizeGroupCollapsedMap = (
-  source: ForwardGroupCollapsedMap,
-  availableCollapseKeys: Set<string>,
-): ForwardGroupCollapsedMap => {
-  const sanitized: ForwardGroupCollapsedMap = {};
-
-  availableCollapseKeys.forEach((key) => {
-    if (source[key] === true) {
-      sanitized[key] = true;
-    }
-  });
-
-  return sanitized;
-};
-
-const buildTunnelGroupCollapseKey = (
-  userId: number,
-  tunnelKey: string,
-): string => {
-  return `${userId}:${tunnelKey}`;
-};
-
-const buildTunnelGroupSortableId = (
-  userId: number,
-  tunnelKey: string,
-): string => {
-  return `${FORWARD_TUNNEL_GROUP_SORTABLE_PREFIX}:${userId}:${tunnelKey}`;
-};
-
-const parseTunnelGroupSortableId = (
-  value: unknown,
-): { userId: number; tunnelKey: string } | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  if (!value.startsWith(`${FORWARD_TUNNEL_GROUP_SORTABLE_PREFIX}:`)) {
-    return null;
-  }
-
-  const parts = value.split(":");
-
-  if (parts.length < 3) {
-    return null;
-  }
-
-  const userId = Number(parts[1]);
-  const tunnelKey = parts.slice(2).join(":").trim();
-
-  if (!Number.isFinite(userId) || tunnelKey === "") {
-    return null;
-  }
-
-  return { userId, tunnelKey };
-};
-
-const buildAvailableGroupData = (
-  forwards: Forward[],
-): {
-  availableTunnelKeysByUser: Map<number, Set<string>>;
-  availableCollapseKeys: Set<string>;
-} => {
-  const availableTunnelKeysByUser = new Map<number, Set<string>>();
-  const availableCollapseKeys = new Set<string>();
-
-  forwards.forEach((forward) => {
-    const userId = forward.userId ?? 0;
-    const tunnelKey = buildForwardTunnelGroupKey(forward.tunnelName);
-
-    let set = availableTunnelKeysByUser.get(userId);
-
-    if (!set) {
-      set = new Set<string>();
-      availableTunnelKeysByUser.set(userId, set);
-    }
-
-    set.add(tunnelKey);
-    availableCollapseKeys.add(buildTunnelGroupCollapseKey(userId, tunnelKey));
-  });
-
-  return { availableTunnelKeysByUser, availableCollapseKeys };
-};
-
-const isSameStringArray = (a: string[], b: string[]): boolean => {
-  if (a.length !== b.length) {
-    return false;
-  }
-
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
-const isSameGroupOrderMap = (
-  a: ForwardGroupOrderMap,
-  b: ForwardGroupOrderMap,
-): boolean => {
-  const aKeys = Object.keys(a).sort(compareForwardTunnelNameAsc);
-  const bKeys = Object.keys(b).sort(compareForwardTunnelNameAsc);
-
-  if (!isSameStringArray(aKeys, bKeys)) {
-    return false;
-  }
-
-  for (const key of aKeys) {
-    if (!isSameStringArray(a[key] || [], b[key] || [])) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
-const isSameGroupCollapsedMap = (
-  a: ForwardGroupCollapsedMap,
-  b: ForwardGroupCollapsedMap,
-): boolean => {
-  const aKeys = Object.keys(a).sort(compareForwardTunnelNameAsc);
-  const bKeys = Object.keys(b).sort(compareForwardTunnelNameAsc);
-
-  if (!isSameStringArray(aKeys, bKeys)) {
-    return false;
-  }
-
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
-const normalizeForwardItems = (items: Forward[]): Forward[] => {
-  return items.map((forward) => ({
-    ...forward,
-    serviceRunning: forward.status === 1,
-  }));
-};
-
-const mapForwardApiItems = (items: ForwardApiItem[]): Forward[] => {
-  return (items || []).map((forward) => ({
-    id: forward.id,
-    name: forward.name,
-    tunnelId: forward.tunnelId ?? 0,
-    tunnelName: forward.tunnelName || "",
-    tunnelTrafficRatio: normalizeTunnelTrafficRatio(forward.tunnelTrafficRatio),
-    inIp: forward.inIp || "",
-    inPort: forward.inPort ?? 0,
-    remoteAddr: forward.remoteAddr || "",
-    strategy: typeof forward.strategy === "string" ? forward.strategy : "fifo",
-    status: typeof forward.status === "number" ? forward.status : 0,
-    inFlow: forward.inFlow ?? 0,
-    outFlow: forward.outFlow ?? 0,
-    createdTime:
-      typeof forward.createdTime === "string" ? forward.createdTime : "",
-    userName:
-      typeof forward.userName === "string" ? forward.userName : undefined,
-    userId: typeof forward.userId === "number" ? forward.userId : undefined,
-    inx: typeof forward.inx === "number" ? forward.inx : undefined,
-    speedId:
-      typeof forward.speedId === "number" || forward.speedId === null
-        ? forward.speedId
-        : undefined,
-    ipMaxConn:
-      typeof forward.ipMaxConn === "number" ? forward.ipMaxConn : undefined,
-    ipSpeedId:
-      typeof forward.ipSpeedId === "number" || forward.ipSpeedId === null
-        ? forward.ipSpeedId
-        : undefined,
-    ipSpeedLimitName:
-      typeof forward.ipSpeedLimitName === "string"
-        ? forward.ipSpeedLimitName
-        : undefined,
-    maxConn: typeof forward.maxConn === "number" ? forward.maxConn : undefined,
-    proxyProtocol:
-      typeof forward.proxyProtocol === "number"
-        ? forward.proxyProtocol
-        : undefined,
-    proxyProtocolReceive:
-      typeof forward.proxyProtocolReceive === "number"
-        ? forward.proxyProtocolReceive
-        : 0,
-    proxyProtocolSend:
-      typeof forward.proxyProtocolSend === "number"
-        ? forward.proxyProtocolSend
-        : typeof forward.proxyProtocol === "number"
-          ? forward.proxyProtocol
-          : 0,
-    serviceRunning: forward.status === 1,
-  }));
-};
-
-const DragHandle = ({
-  attributes,
-  listeners,
-  title,
-}: {
-  attributes?: DraggableAttributes;
-  listeners?: DraggableSyntheticListeners;
-  title: string;
-}) => (
-  <span
-    className="inline-flex cursor-grab touch-none p-1 text-default-300 hover:text-default-500 active:cursor-grabbing"
-    title={title}
-    {...attributes}
-    {...listeners}
-  >
-    <GripVertical className="h-4 w-4" />
-  </span>
-);
-
-const buildSortableStyle = (
-  transform: ReturnType<typeof useSortable>["transform"],
-  transition: string | undefined,
-  isDragging: boolean,
-): React.CSSProperties => ({
-  transform: transform
-    ? CSS.Transform.toString({
-        ...transform,
-        x: Math.round(transform.x),
-        y: Math.round(transform.y),
-      })
-    : undefined,
-  transition: isDragging ? undefined : transition || undefined,
-  opacity: isDragging ? 0.55 : 1,
-  willChange: isDragging ? "transform" : undefined,
-  zIndex: isDragging ? 1 : undefined,
-  position: isDragging ? "relative" : undefined,
-});
-
-// 可拖拽的隧道分组
-const SortableTunnelGroup = ({
-  groupUserId,
-  tunnel,
-  collapsed,
-  onToggleCollapsed,
-  sensors,
-  onDragEnd,
-  children,
-}: {
-  groupUserId: number;
-  tunnel: ForwardTunnelGroup;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
-  sensors: SensorDescriptor<SensorOptions>[];
-  onDragEnd: (event: DragEndEvent) => void;
-  children: React.ReactNode;
-}) => {
-  const sortableId = buildTunnelGroupSortableId(groupUserId, tunnel.tunnelKey);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: sortableId });
-  const ratio = normalizeTunnelTrafficRatio(tunnel.tunnelTrafficRatio);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={buildSortableStyle(transform, transition, isDragging)}
-    >
-      {/* 组内规则单独排序；放在 ListGroup 外，免得 DndContext 的辅助节点落进网格 */}
-      <DndContext
-        collisionDetection={pointerWithin}
-        sensors={sensors}
-        onDragEnd={onDragEnd}
-      >
-        <SortableContext
-          items={tunnel.items.map((item) => item.id).filter((id) => id > 0)}
-          strategy={rectSortingStrategy}
-        >
-          <ListGroup
-            title={
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <button
-                  aria-expanded={!collapsed}
-                  className="flex min-w-0 items-center gap-1 text-left"
-                  title={collapsed ? "展开分组" : "折叠分组"}
-                  type="button"
-                  onClick={onToggleCollapsed}
-                >
-                  <ChevronDown
-                    className={`h-4 w-4 shrink-0 text-default-400 transition-transform ${
-                      collapsed ? "-rotate-90" : ""
-                    }`}
-                  />
-                  <span className="truncate">{tunnel.tunnelName}</span>
-                </button>
-                {ratio !== 1 && (
-                  <span className="shrink-0 text-xs font-normal text-default-500">
-                    倍率 {formatTunnelTrafficRatio(ratio)}
-                  </span>
-                )}
-                <span className="shrink-0 text-xs font-normal text-default-400">
-                  {tunnel.items.length}
-                </span>
-                <span className="-my-1 ml-auto flex shrink-0">
-                  <DragHandle
-                    attributes={attributes}
-                    listeners={listeners}
-                    title="拖动分组排序"
-                  />
-                </span>
-              </span>
-            }
-          >
-            {collapsed ? null : children}
-          </ListGroup>
-        </SortableContext>
-      </DndContext>
-    </div>
-  );
-};
-
-// 可拖拽的规则行
-const SortableForwardRow = ({
-  id,
-  children,
-}: {
-  id: number;
-  children: (handle: React.ReactNode) => React.ReactNode;
-}) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={buildSortableStyle(transform, transition, isDragging)}
-    >
-      {children(
-        <DragHandle
-          attributes={attributes}
-          listeners={listeners}
-          title="拖动排序"
-        />,
-      )}
-    </div>
-  );
-};
-
-const getForwardRowStatus = (status: number): RowStatus => {
-  switch (status) {
-    case 1:
-      return "ok";
-    case 0:
-      return "off";
-    case -1:
-      return "bad";
-    default:
-      return "warn";
-  }
-};
-
-const ForwardPageShell = ({
-  embedded,
-  children,
-}: {
-  embedded: boolean;
-  children: React.ReactNode;
-}) =>
-  embedded ? (
-    <div>{children}</div>
-  ) : (
-    <AnimatedPage className="px-3 lg:px-6 py-6">{children}</AnimatedPage>
-  );
-
-const getForwardDisplayFlow = (forward: Forward): number => {
-  const directFlow = (forward.inFlow || 0) + (forward.outFlow || 0);
-
-  if (directFlow > 0) {
-    return directFlow;
-  }
-
-  return forward.federationShareFlow || 0;
-};
+import {
+  Forward,
+  Tunnel,
+  Node,
+  ForwardForm,
+  ForwardUserGroup,
+  ForwardTunnelGroup,
+  BatchProgressState,
+  BatchResultModalState,
+  EMPTY_BATCH_RESULT_MODAL_STATE,
+  ForwardGroupOrderMap,
+  ForwardGroupCollapsedMap,
+} from "@/pages/forward/types";
+import {
+  UNKNOWN_FORWARD_USER_NAME,
+  UNCATEGORIZED_FORWARD_TUNNEL_NAME,
+  FORWARD_COMPACT_MODE_CONFIG_KEY,
+  FORWARD_COMPACT_MODE_EVENT,
+  FORWARD_GROUP_ORDER_CONFIG_KEY,
+  FORWARD_GROUP_COLLAPSED_CONFIG_KEY,
+  normalizeForwardUserName,
+  compareForwardUserNameAsc,
+  normalizeForwardTunnelName,
+  buildForwardTunnelGroupKey,
+  compareForwardTunnelNameAsc,
+  normalizeTunnelTrafficRatio,
+  formatTunnelTrafficRatio,
+  buildForwardGroupOrderLocalKey,
+  buildForwardGroupCollapsedLocalKey,
+  parsePreferenceMap,
+  parseGroupOrderMap,
+  parseGroupCollapsedMap,
+  sanitizeGroupOrderMap,
+  sanitizeGroupCollapsedMap,
+  buildTunnelGroupCollapseKey,
+  buildTunnelGroupSortableId,
+  parseTunnelGroupSortableId,
+  buildAvailableGroupData,
+  isSameGroupOrderMap,
+  isSameGroupCollapsedMap,
+  normalizeForwardItems,
+  mapForwardApiItems,
+} from "@/pages/forward/grouping";
+import {
+  SortableTunnelGroup,
+  SortableForwardRow,
+  getForwardRowStatus,
+  ForwardPageShell,
+  getForwardDisplayFlow,
+} from "@/pages/forward/sortable";
 
 export default function ForwardPage({
   embedded = false,
