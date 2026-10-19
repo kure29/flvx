@@ -623,6 +623,26 @@ func TestTunnelUpdateRecoversFromAddressInUseContract(t *testing.T) {
 	waitNodeStatus(t, r, entryNodeID, 1)
 	waitNodeStatus(t, r, exitNodeID, 1)
 
+	// Each node's online hook runs asynchronously after its status flips to 1:
+	// it reconciles kernels (KernelStatus) and redeploys the node's tunnels. If
+	// that redeploy reads the tunnel after the update below commits, it sends
+	// extra AddService calls. Let both hooks finish before updating.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		commandMu.Lock()
+		started := commandCounts["entry:kernelstatus"] > 0 && commandCounts["exit:kernelstatus"] > 0
+		seen := sortedCommandCounts(commandCounts)
+		commandMu.Unlock()
+		if started {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("node online hooks did not run (%v)", seen)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(200 * time.Millisecond)
+
 	payload := map[string]interface{}{
 		"id":           tunnelID,
 		"name":         "tunnel-bind-retry",
