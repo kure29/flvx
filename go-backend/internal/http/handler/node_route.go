@@ -47,6 +47,62 @@ func routeHopNet(ip string) string {
 	return ""
 }
 
+// China Mobile's international networks share address space, so CMI hops
+// are told apart by origin AS: AS58807 is CMIN2, AS58453 CMI. Team Cymru's
+// DNS service answers "58807 | 223.x.x.0/24 | HK | apnic | ..." for
+// d.c.b.a.origin.asn.cymru.com.
+var (
+	hopASNMu    sync.Mutex
+	hopASNCache = make(map[string]string)
+)
+
+// hopASNLookup returns the TXT records for an origin AS query; tests
+// replace it.
+var hopASNLookup = func(name string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return net.DefaultResolver.LookupTXT(ctx, name)
+}
+
+func hopOriginASN(ip string) string {
+	hopASNMu.Lock()
+	asn, ok := hopASNCache[ip]
+	hopASNMu.Unlock()
+	if ok {
+		return asn
+	}
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return ""
+	}
+	txt, err := hopASNLookup(parts[3] + "." + parts[2] + "." + parts[1] + "." + parts[0] + ".origin.asn.cymru.com")
+	if err != nil {
+		return "" // not cached, so a later trace asks again
+	}
+	if len(txt) > 0 {
+		// A prefix announced by several ASes lists them space-separated.
+		if f := strings.Fields(strings.SplitN(txt[0], "|", 2)[0]); len(f) > 0 {
+			asn = f[0]
+		}
+	}
+	hopASNMu.Lock()
+	hopASNCache[ip] = asn
+	hopASNMu.Unlock()
+	return asn
+}
+
+// refineHopNet splits CMI hops into CMI and CMIN2 by origin AS; others
+// keep their prefix match.
+func refineHopNet(ip, prefixNet string) string {
+	if prefixNet != "CMI" {
+		return prefixNet
+	}
+	if hopOriginASN(ip) == "58807" {
+		return "CMIN2"
+	}
+	return "CMI"
+}
+
 // classifyRoute names a return route from the backbones its hops cross.
 func classifyRoute(hops []routeHop) string {
 	seen := make(map[string]bool)
@@ -66,6 +122,8 @@ func classifyRoute(hops []routeHop) string {
 		return "联通 9929"
 	case seen["4837"]:
 		return "联通 4837"
+	case seen["CMIN2"]:
+		return "移动 CMIN2"
 	case seen["CMI"]:
 		return "移动 CMI"
 	}
@@ -159,7 +217,7 @@ func routePointFrom(t latencyTarget, data map[string]interface{}, err error) rou
 			TTL:   int(asInt64(m["ttl"], 0)),
 			IP:    ip,
 			RttMs: asFloat(m["rttMs"], 0),
-			Net:   routeHopNet(ip),
+			Net:   refineHopNet(ip, routeHopNet(ip)),
 		})
 	}
 	p.Route = classifyRoute(p.Hops)

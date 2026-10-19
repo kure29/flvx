@@ -102,3 +102,43 @@ func TestRouteFresh(t *testing.T) {
 		t.Fatal("a failed trace is retried after six hours")
 	}
 }
+
+func TestRefineHopNetSplitsCMIN2(t *testing.T) {
+	old := hopASNLookup
+	t.Cleanup(func() { hopASNLookup = old })
+	var asked []string
+	hopASNLookup = func(name string) ([]string, error) {
+		asked = append(asked, name)
+		switch name {
+		case "9.22.120.223.origin.asn.cymru.com":
+			return []string{"58807 | 223.120.22.0/24 | HK | apnic | 2012-08-21"}, nil
+		case "5.6.120.223.origin.asn.cymru.com":
+			return []string{"58453 9808 | 223.120.6.0/24 | HK | apnic | 2012-08-21"}, nil
+		case "7.7.119.223.origin.asn.cymru.com":
+			return nil, errors.New("timeout")
+		}
+		return nil, nil
+	}
+
+	if got := refineHopNet("223.120.22.9", "CMI"); got != "CMIN2" {
+		t.Fatalf("AS58807 hop = %q", got)
+	}
+	if got := refineHopNet("223.120.6.5", "CMI"); got != "CMI" {
+		t.Fatalf("AS58453 hop = %q", got)
+	}
+	if got := refineHopNet("223.119.7.7", "CMI"); got != "CMI" {
+		t.Fatalf("failed lookup must stay CMI, got %q", got)
+	}
+	if got := refineHopNet("59.43.1.1", "CN2"); got != "CN2" || len(asked) != 3 {
+		t.Fatalf("non-CMI hops are not looked up: %q, asked %v", got, asked)
+	}
+	// Answers are cached; failures are asked again.
+	refineHopNet("223.120.22.9", "CMI")
+	refineHopNet("223.119.7.7", "CMI")
+	if len(asked) != 4 {
+		t.Fatalf("asked %v", asked)
+	}
+	if got := classifyRoute([]routeHop{{IP: "223.120.22.9", Net: "CMIN2"}, {IP: "223.120.6.5", Net: "CMI"}}); got != "移动 CMIN2" {
+		t.Fatalf("route with a CMIN2 hop = %q", got)
+	}
+}

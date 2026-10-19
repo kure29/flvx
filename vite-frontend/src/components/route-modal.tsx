@@ -30,6 +30,10 @@ const ROUTES: Record<string, [string, string]> = {
     "bg-violet-500/15 text-violet-700 dark:text-violet-400",
   ],
   "联通 4837": ["4837", "bg-sky-500/15 text-sky-700 dark:text-sky-400"],
+  "移动 CMIN2": [
+    "CMIN2",
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  ],
   "移动 CMI": ["CMI", "bg-teal-500/15 text-teal-700 dark:text-teal-400"],
 };
 
@@ -38,6 +42,7 @@ const NET_CLASS: Record<string, string> = {
   "163": "text-default-500",
   "4837": "text-sky-600",
   "9929": "text-violet-600",
+  CMIN2: "text-emerald-600",
   CMI: "text-teal-600",
 };
 
@@ -207,7 +212,8 @@ export function RouteModal({
           <p className="text-xs text-default-400">
             按经过的骨干网识别：59.43 段为 CN2（不经过 202.97 即 GIA），202.97
             为 163，219.158 为联通 4837，218.105 / 210.51 为联通
-            9929，223.118–223.121 为移动 CMI。每天自动检测一次。
+            9929，223.118–223.121 为移动 CMI，其中归属 AS58807 的为
+            CMIN2。每天自动检测一次。
           </p>
         </ModalBody>
         <ModalFooter>

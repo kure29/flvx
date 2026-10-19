@@ -173,15 +173,18 @@ function Tile({
         )}
         <span className="truncate">{point.name}</span>
       </span>
-      <span className="flex w-full flex-wrap items-baseline gap-x-1 whitespace-nowrap font-mono text-sm font-semibold">
+      <span className="flex w-full items-baseline gap-1 whitespace-nowrap font-mono text-sm font-semibold">
         {valueText(point)}
         {loss > 0 && (
           <span className="text-[10px] font-normal opacity-80">丢{loss}%</span>
         )}
-        <span className="ml-auto">
+      </span>
+      {/* Always its own line so tiles line up whatever the width. */}
+      {point.route && point.route !== "未识别" && (
+        <span className="mt-0.5">
           <RouteTag short route={point.route} />
         </span>
-      </span>
+      )}
     </span>
   );
 }
