@@ -138,6 +138,9 @@ func (s *IngestionService) pruneMetricsAt(now time.Time) {
 	if err := s.repo.PruneServiceMonitorResults(cutoff); err != nil {
 		log.Printf("monitoring prune failed op=service_monitor_result cutoff=%d err=%v", cutoff, err)
 	}
+	if err := s.repo.PruneNodeLatencySamples(cutoff); err != nil {
+		log.Printf("monitoring prune failed op=node_latency_sample cutoff=%d err=%v", cutoff, err)
+	}
 }
 
 func (s *IngestionService) GetLatestMetric(nodeID int64) (*model.NodeMetric, error) {

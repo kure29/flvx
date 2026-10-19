@@ -50,6 +50,7 @@ import type {
   KernelStateApiData,
   InboundApiItem,
   InboundProbe,
+  LatencyTrend,
   NodeRoute,
   InboundMutationPayload,
   SplitRule,
@@ -857,6 +858,9 @@ export const setNodeLatencyTargets = (data: {
   points: string[];
   pinned: string[];
 }) => Network.post("/node/latency/targets", data, { timeout: 60000 });
+/** A node's latency to each reference point over the last hours. */
+export const getNodeLatencyHistory = (id: number, hours: number) =>
+  Network.post<LatencyTrend>("/node/latency/history", { id, hours });
 /** A node's last return-route traces to the reference points. */
 export const getNodeRoute = (id: number) =>
   Network.post<NodeRoute | null>("/node/route", { id });

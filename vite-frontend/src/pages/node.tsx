@@ -44,6 +44,7 @@ import {
 } from "@/api";
 import { LatencyCell } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
+import { LatencyTrendModal } from "@/components/latency-trend-modal";
 import { LatencyTargetsModal } from "@/pages/node/latency-targets-modal";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";
@@ -215,6 +216,7 @@ export default function NodePage() {
   const [sheetNodeId, setSheetNodeId] = useState<number | null>(null);
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
   const [routeNode, setRouteNode] = useState<Node | null>(null);
+  const [trendNode, setTrendNode] = useState<Node | null>(null);
   const [targetNodes, setTargetNodes] = useState<Node[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
@@ -1157,6 +1159,7 @@ export default function NodePage() {
         onEditTargets={() => setTargetNodes([node])}
         onProbe={() => probeNode(node.id)}
         onShowRoute={() => setRouteNode(node)}
+        onShowTrend={() => setTrendNode(node)}
       />
     ) : null;
 
@@ -2429,6 +2432,11 @@ export default function NodePage() {
         nodeId={routeNode?.id ?? null}
         nodeName={routeNode?.name}
         onClose={() => setRouteNode(null)}
+      />
+      <LatencyTrendModal
+        nodeId={trendNode?.id ?? null}
+        nodeName={trendNode?.name}
+        onClose={() => setTrendNode(null)}
       />
       <LatencyTargetsModal
         nodes={targetNodes}

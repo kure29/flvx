@@ -286,6 +286,17 @@ func (h *Handler) probeNodeLatency(ctx context.Context, ids []int64) (map[int64]
 		results[nodeID] = latencyProbe(list, now)
 	}
 	h.nodeLatency.replace(results, len(ids) == 0)
+	if ctx.Err() == nil {
+		h.recordLatencySamples(results)
+		// Streaks count scheduled rounds; a click's extra probe is not one.
+		if len(ids) == 0 {
+			names := make(map[int64]string, len(nodes))
+			for _, n := range nodes {
+				names[n.ID] = n.Name
+			}
+			h.alertLatency(results, names)
+		}
+	}
 	return results, nil
 }
 

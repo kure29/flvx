@@ -20,6 +20,16 @@ const NOTIFY_EVENTS = [
     description: "连续两次检测失败（约 6 分钟）才提醒",
   },
   {
+    key: "latency_bad",
+    label: "延迟 / 丢包异常",
+    description: "某个测试点连续 3 次（约 9 分钟）超过阈值才提醒，恢复时也通知",
+  },
+  {
+    key: "route_change",
+    label: "回程线路变化",
+    description: "例如 CN2 GIA 变成 163，每天检测回程时对比",
+  },
+  {
     key: "kernel_error",
     label: "内核运行出错",
     description: "Xray / sing-box / Snell 报错时提醒",
@@ -144,7 +154,7 @@ export function NotifySettings({
     <>
       <Field
         inline
-        help="节点掉线、节点连不上、内核出错、快到期时推送"
+        help="节点掉线、连不上、延迟异常、回程线路变化、内核出错、快到期时推送"
         label="启用通知"
       >
         <Switch
@@ -200,6 +210,48 @@ export function NotifySettings({
           </Checkbox>
         ))}
       </div>
+
+      {selected.includes("latency_bad") && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field help="1–100，默认 20" label="丢包超过">
+            <Input
+              aria-label="丢包阈值"
+              classNames={{
+                input: "text-sm",
+                inputWrapper: changedClass("notify_latency_loss_pct"),
+              }}
+              endContent="%"
+              max={100}
+              min={1}
+              placeholder="20"
+              size="sm"
+              type="number"
+              value={configs.notify_latency_loss_pct ?? ""}
+              variant="bordered"
+              onChange={(e) =>
+                onChange("notify_latency_loss_pct", e.target.value)
+              }
+            />
+          </Field>
+          <Field help="留空不按延迟提醒，只看丢包" label="延迟超过（可选）">
+            <Input
+              aria-label="延迟阈值"
+              classNames={{
+                input: "text-sm",
+                inputWrapper: changedClass("notify_latency_ms"),
+              }}
+              endContent="ms"
+              min={0}
+              placeholder="不限"
+              size="sm"
+              type="number"
+              value={configs.notify_latency_ms ?? ""}
+              variant="bordered"
+              onChange={(e) => onChange("notify_latency_ms", e.target.value)}
+            />
+          </Field>
+        </div>
+      )}
 
       {selected.includes("daily_report") && (
         <Field

@@ -941,6 +941,21 @@ type TunnelQuality struct {
 
 func (TunnelQuality) TableName() string { return "tunnel_quality" }
 
+// NodeLatencySample is one measurement of a node's latency to a reference
+// point, kept for the latency trend chart and pruned with the other
+// monitoring data.
+type NodeLatencySample struct {
+	ID          int64   `gorm:"primaryKey;autoIncrement"`
+	NodeID      int64   `gorm:"column:node_id;not null;index:idx_latency_sample_node_time,priority:1"`
+	CreatedTime int64   `gorm:"column:created_time;not null;index:idx_latency_sample_node_time,priority:2;index"`
+	Point       string  `gorm:"column:point;type:varchar(64);not null"`
+	OK          int     `gorm:"column:ok;not null;default:0"`
+	LatencyMs   int64   `gorm:"column:latency_ms;not null;default:0"`
+	LossPct     float64 `gorm:"column:loss_pct;not null;default:0"`
+}
+
+func (NodeLatencySample) TableName() string { return "node_latency_sample" }
+
 // PeerShareResource is the durable desired state for a namespaced peer command.
 // Rows are retained as tombstones until deletion has been acknowledged.
 type PeerShareResource struct {

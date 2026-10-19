@@ -795,6 +795,21 @@ export interface NodeRoutePoint {
   error?: string;
 }
 
+export interface LatencyTrendPoint {
+  name: string;
+  /** Averaged buckets; ms is null when every probe in it failed. */
+  samples: { t: number; ms: number | null; lossPct: number }[];
+  avgMs: number;
+  maxMs: number;
+  lossPct: number;
+}
+
+export interface LatencyTrend {
+  since: number;
+  until: number;
+  points: LatencyTrendPoint[];
+}
+
 export interface NodeRoute {
   checkedAt: number;
   points: NodeRoutePoint[];

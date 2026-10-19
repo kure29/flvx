@@ -60,6 +60,7 @@ type Handler struct {
 	reachProbes   *reachProbeStore
 	nodeLatency   *nodeLatencyStore
 	nodeRoutes    *nodeRouteStore
+	latencyAlerts *latencyAlertTracker
 	notifier      *notifier
 	bestExit      *bestExitManager
 }
@@ -123,6 +124,7 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 		reachProbes:              newReachProbeStore(),
 		nodeLatency:              newNodeLatencyStore(),
 		nodeRoutes:               newNodeRouteStore(),
+		latencyAlerts:            newLatencyAlertTracker(),
 		notifier:                 newNotifier(),
 	}
 	h.healthCheck = health.NewChecker(repo, h.wsServer)
@@ -225,6 +227,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/probe", h.inboundProbe)
 	mux.HandleFunc("/api/v1/node/latency/probe", h.nodeLatencyProbe)
 	mux.HandleFunc("/api/v1/node/latency/targets", h.nodeLatencyTargetsSet)
+	mux.HandleFunc("/api/v1/node/latency/history", h.nodeLatencyHistory)
 	mux.HandleFunc("/api/v1/node/route", h.nodeRouteGet)
 	mux.HandleFunc("/api/v1/node/route/probe", h.nodeRouteProbe)
 	mux.HandleFunc("/api/v1/inbound/batch-toggle", h.inboundBatchToggle)

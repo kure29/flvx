@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -247,6 +248,7 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 	type job struct {
 		targets []latencyTarget
 		agent   string
+		name    string
 	}
 	todo := make(map[int64]job)
 	for _, n := range nodes {
@@ -263,7 +265,7 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 				continue
 			}
 		}
-		todo[n.ID] = job{targets: targets, agent: agent}
+		todo[n.ID] = job{targets: targets, agent: agent, name: n.Name}
 	}
 
 	results := make(map[int64]nodeRoute, len(todo))
@@ -276,7 +278,7 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 		}
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(nodeID int64, targets []latencyTarget, agent string) {
+		go func(nodeID int64, targets []latencyTarget, agent, name string) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			r := nodeRoute{Points: make([]routePoint, len(targets)), agent: agent}
@@ -289,11 +291,17 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 				}
 			}
 			r.CheckedAt = time.Now().UnixMilli()
+			if prev, ok := h.nodeRoutes.get(nodeID); ok {
+				if changes := routeChanges(prev, r); len(changes) > 0 {
+					h.notify(notifyEventRouteChange, "回程线路变化",
+						fmt.Sprintf("节点：%s\n%s", name, strings.Join(changes, "\n")))
+				}
+			}
 			h.nodeRoutes.set(nodeID, r)
 			mu.Lock()
 			results[nodeID] = r
 			mu.Unlock()
-		}(id, j.targets, j.agent)
+		}(id, j.targets, j.agent, j.name)
 	}
 	wg.Wait()
 	return results, nil

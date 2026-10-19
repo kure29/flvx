@@ -1,6 +1,6 @@
 import type { InboundProbe, InboundProbePoint } from "@/api/types";
 
-import { Loader2, ListChecks, RefreshCw, Route } from "lucide-react";
+import { ChartLine, ListChecks, Loader2, RefreshCw, Route } from "lucide-react";
 
 import {
   Dropdown,
@@ -202,6 +202,7 @@ export function LatencyCell({
   variant,
   onProbe,
   onShowRoute,
+  onShowTrend,
   onEditTargets,
   note,
 }: {
@@ -211,6 +212,8 @@ export function LatencyCell({
   onProbe: () => void;
   /** Opens the node's return routes; omitted where there is no node. */
   onShowRoute?: () => void;
+  /** Opens the node's latency over time. */
+  onShowTrend?: () => void;
   /** Opens the node's reference point choice. */
   onEditTargets?: () => void;
   /** Shown before the time on cards, e.g. "自定义". */
@@ -350,8 +353,18 @@ export function LatencyCell({
               }
               onPress={onProbe}
             >
-              {probing ? "检测中…" : "重新检测"}
+              {probing ? "检测中" : "重测"}
             </DropdownItem>
+            {onShowTrend && (
+              <DropdownItem
+                closeOnSelect
+                className="justify-center whitespace-nowrap px-1 text-xs text-primary"
+                startContent={<ChartLine className="h-3.5 w-3.5" />}
+                onPress={() => setTimeout(onShowTrend, 0)}
+              >
+                趋势
+              </DropdownItem>
+            )}
             {onShowRoute && (
               <DropdownItem
                 closeOnSelect
@@ -359,7 +372,7 @@ export function LatencyCell({
                 startContent={<Route className="h-3.5 w-3.5" />}
                 onPress={() => setTimeout(onShowRoute, 0)}
               >
-                回程路由
+                回程
               </DropdownItem>
             )}
             {onEditTargets && (
