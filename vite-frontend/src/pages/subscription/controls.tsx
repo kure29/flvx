@@ -81,7 +81,7 @@ export function EditorTabs<T extends string>({
           {t.label}
           {t.badge !== undefined && t.badge !== "" && (
             <span
-              className={`absolute -right-0.5 -top-1 rounded-full px-1 text-[10px] leading-4 ${
+              className={`absolute right-0.5 top-0.5 rounded-full px-1 text-[10px] leading-4 ${
                 value === t.key
                   ? "bg-primary text-white"
                   : "bg-default-300 text-default-700"

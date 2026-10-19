@@ -46,6 +46,29 @@ func TestApplySubOptionsRenameAndSort(t *testing.T) {
 	}
 }
 
+// The subscription editor writes every rename rule as "/regex/ => repl",
+// escaping plain-text rules saved before. Those must rename exactly like the
+// plain-text form did, and $1 must expand to the group.
+func TestRenameRulesAsEditorWritesThem(t *testing.T) {
+	names := []string{"花云|香港🇭🇰|1.0x|10", "花云|日本🇯🇵|0.2x|01"}
+	legacy := endpointNames(ApplySubOptions(namedEndpoints(names...), SubOptions{
+		Rename: "花云| =>\n/\\|[0-9.]+x/ =>\n| => -",
+	}))
+	editor := endpointNames(ApplySubOptions(namedEndpoints(names...), SubOptions{
+		Rename: "/花云\\|/ => \n/\\|[0-9.]+x/ => \n/\\|/ => -",
+	}))
+	if strings.Join(editor, ",") != strings.Join(legacy, ",") {
+		t.Fatalf("editor rules %v, legacy rules %v", editor, legacy)
+	}
+
+	got := endpointNames(ApplySubOptions(namedEndpoints("HK-01"), SubOptions{
+		Rename: "/^([A-Z]+)-(\\d+)$/ => $2 $1",
+	}))
+	if got[0] != "01 HK" {
+		t.Fatalf("group reference: %v", got)
+	}
+}
+
 func TestRegionOf(t *testing.T) {
 	cases := map[string]string{
 		"花云|香港🇭🇰|1.0x|01":     "🇭🇰 香港",

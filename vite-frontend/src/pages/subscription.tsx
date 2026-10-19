@@ -10,7 +10,7 @@ import type { InboundApiItem } from "@/api/types";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ChevronDown, Copy } from "lucide-react";
+import { ChevronDown, Copy, X } from "lucide-react";
 
 import {
   deleteSubscription,
@@ -43,6 +43,7 @@ import {
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
 import { SUB_CLIENTS } from "@/pages/subscription/clients";
+import { RenameRules } from "@/pages/subscription/rename-rules";
 import {
   EditorTabs,
   QuickPickRow,
@@ -145,7 +146,9 @@ function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
         )}
       </div>
       {s.trafficLimit > 0 && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-default-100">
+        <div
+          className={`h-1.5 overflow-hidden rounded-full ${compact ? "bg-default-100" : "bg-default-200"}`}
+        >
           <div
             className={`h-full rounded-full ${tone}`}
             style={{ width: `${Math.max(2, pct)}%` }}
@@ -272,7 +275,7 @@ function Section({
   );
 }
 
-type EditorPage = "basic" | "nodes" | "naming" | "rules" | "chain" | "preview";
+type EditorPage = "basic" | "nodes" | "rules" | "preview";
 
 type ChainRole = "" | "landing" | "relay";
 
@@ -285,6 +288,21 @@ function filterSummary(o: SubPipeline): string {
   if (o.protocols.length) steps.push(`协议 ${o.protocols.length} 个`);
   if (o.include || o.exclude) steps.push("名称");
   if (o.dedupe) steps.push("去重");
+
+  return steps.join("、");
+}
+
+/** Names the naming steps a pipeline turns on, e.g. "改名 2 条、国旗". */
+function namingSummary(o: SubPipeline): string {
+  const steps: string[] = [];
+  const renames = o.rename
+    .split("\n")
+    .filter((l) => l.trim() && !l.trim().startsWith("#")).length;
+
+  if (renames) steps.push(`改名 ${renames} 条`);
+  if (o.addFlag) steps.push("国旗");
+  if (o.prefix) steps.push("前缀");
+  if (o.sort === "name") steps.push("按名称排序");
 
   return steps.join("、");
 }
@@ -429,16 +447,17 @@ function Editor({
         return;
       }
       setPreview(res.data);
-      if (page === "chain") setChainNodes(res.data.items);
+      if (page === "rules") setChainNodes(res.data.items);
     } finally {
       setPreviewing(false);
     }
   };
 
-  // The preview and the chain page load by themselves when opened.
+  // The preview, and the rules page (for the chain node list), load by
+  // themselves when opened.
   useEffect(() => {
     if (page === "preview" && !preview && !previewing) void runPreview();
-    if (page === "chain" && !chainNodes && !previewing) void runPreview();
+    if (page === "rules" && !chainNodes && !previewing) void runPreview();
   }, [page, preview, chainNodes]);
 
   const chainRole = (original: string): ChainRole =>
@@ -511,9 +530,11 @@ function Editor({
             tabs={[
               { key: "basic", label: "基本" },
               { key: "nodes", label: "节点" },
-              { key: "naming", label: "命名" },
-              { key: "rules", label: "规则", badge: o.rules ? "开" : "" },
-              { key: "chain", label: "链式", badge: chainOn ? "开" : "" },
+              {
+                key: "rules",
+                label: "规则",
+                badge: o.rules || chainOn ? "开" : "",
+              },
               {
                 key: "preview",
                 label: "预览",
@@ -678,6 +699,8 @@ function Editor({
             </Section>
 
             <Section
+              collapsible
+              defaultOpen={false}
               hint="只保留需要的节点；筛完剩几个可以在“预览”里看"
               summary={filterSummary(o) || "未设置"}
               title="筛选"
@@ -740,6 +763,52 @@ function Editor({
               />
             </Section>
             <Section
+              collapsible
+              defaultOpen={false}
+              hint="按顺序执行：改名 → 国旗 → 前缀 → 排序"
+              summary={namingSummary(o) || "未设置"}
+              title="命名"
+            >
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">改名规则</p>
+                <p className="text-xs text-default-500">
+                  从上到下依次替换，替换为留空就是删除匹配的部分，可用 $1
+                  引用分组
+                </p>
+                <RenameRules
+                  value={o.rename}
+                  onChange={(rename) => setOpts({ rename })}
+                />
+              </div>
+              <ToggleRow
+                hint="按名称识别地区，在前面加上国旗"
+                id="sub-flag"
+                label="自动加国旗"
+                value={o.addFlag}
+                onChange={(addFlag) => setOpts({ addFlag })}
+              />
+              <Input
+                label="名称前缀"
+                placeholder="例如 [家宽] "
+                value={o.prefix}
+                variant="bordered"
+                onChange={(e) => setOpts({ prefix: e.target.value })}
+              />
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">排序</p>
+                <Segmented
+                  options={[
+                    ["", "面板顺序"],
+                    ["name", "按名称"],
+                  ]}
+                  value={o.sort}
+                  onChange={(sort) => setOpts({ sort })}
+                />
+              </div>
+            </Section>
+            <Section
+              collapsible
+              defaultOpen={false}
               hint="在上面的筛选、改名、排序之后运行，可以写任意 JS 来筛选、改名、排序；只取回节点顺序和名称"
               summary={o.script ? "已设置" : "未设置"}
               title="JS 脚本"
@@ -781,58 +850,10 @@ function Editor({
           </div>
         )}
 
-        {page === "naming" && (
-          <div className="space-y-4">
-            <Section hint="按顺序执行：改名 → 国旗 → 前缀 → 排序" title="命名">
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">改名规则</p>
-                <p className="text-xs text-default-500">
-                  每行一条 <code>要替换的 =&gt; 替换成</code>
-                  ，右边留空就是删除，
-                  <code>/.../</code> 是正则
-                </p>
-                <Textarea
-                  classNames={{ input: "font-mono text-xs" }}
-                  minRows={2}
-                  placeholder={"花云| =>\n/\\|[0-9.]+x/ =>"}
-                  value={o.rename}
-                  variant="bordered"
-                  onChange={(e) => setOpts({ rename: e.target.value })}
-                />
-              </div>
-              <ToggleRow
-                hint="按名称识别地区，在前面加上国旗"
-                id="sub-flag"
-                label="自动加国旗"
-                value={o.addFlag}
-                onChange={(addFlag) => setOpts({ addFlag })}
-              />
-              <Input
-                label="名称前缀"
-                placeholder="例如 [家宽] "
-                value={o.prefix}
-                variant="bordered"
-                onChange={(e) => setOpts({ prefix: e.target.value })}
-              />
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">排序</p>
-                <Segmented
-                  options={[
-                    ["", "面板顺序"],
-                    ["name", "按名称"],
-                  ]}
-                  value={o.sort}
-                  onChange={(sort) => setOpts({ sort })}
-                />
-              </div>
-            </Section>
-          </div>
-        )}
-
         {page === "rules" && (
           <div className="space-y-4">
             <Section
-              hint="给 Clash（mihomo 内核）、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点"
+              hint="给 mihomo（Clash Meta 内核）、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点"
               title="分组与规则"
             >
               <ToggleRow
@@ -853,7 +874,7 @@ function Editor({
                 hint={
                   o.rules
                     ? "开启分流后已自动包含，无需单独打开"
-                    : "Clash / sing-box / Surge 里每个地区一个自动测速组"
+                    : "mihomo / sing-box / Surge 里每个地区一个自动测速组"
                 }
                 id="sub-groups"
                 label="按地区分组"
@@ -887,111 +908,116 @@ function Editor({
                 </div>
               )}
             </Section>
-          </div>
-        )}
-
-        {page === "chain" && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/30 dark:bg-primary-900/20">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                链式代理
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${chainOn ? "bg-success-100 text-success-700 dark:bg-success-500/20" : "bg-default-100 text-default-500"}`}
-                >
-                  {chainOn ? "已开启" : "未开启"}
-                </span>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                {["客户端", "中转节点", "落地节点", "网站"].map((s, i) => (
-                  <span key={s} className="flex items-center gap-2">
-                    {i > 0 && <span className="text-default-400">→</span>}
-                    <span
-                      className={`rounded-lg px-2 py-1 ${s === "中转节点" ? "bg-secondary-100 text-secondary-700 dark:bg-secondary-500/20" : s === "落地节点" ? "bg-warning-100 text-warning-700 dark:bg-warning-500/20" : "bg-content1 text-default-600"}`}
-                    >
-                      {s}
-                    </span>
-                  </span>
-                ))}
-              </div>
-              <p className="mt-3 text-xs leading-relaxed text-default-500">
-                网站看到的是落地节点的
-                IP。客户端里会多出「落地节点」「中转节点」两个组，分别选出口和中转。落地和中转都至少选一个才生效；通用分享链接（Base64）无法表达链式
-              </p>
-            </div>
-
-            {o.chainLanding && o.chainRelay && (
-              <p className="rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-700 dark:bg-warning-500/10">
-                现在用的是旧的关键词方式（落地：{o.chainLanding}，中转：
-                {o.chainRelay}）。在下面勾选节点后会改用勾选的节点
-              </p>
-            )}
-
             <Section
-              hint="按节点设置角色；用的是处理前的原名，改名不影响"
-              summary={`落地 ${o.chainLandingNames.length} 个 · 中转 ${o.chainRelayNames.length} 个`}
-              title="选择节点"
+              collapsible
+              defaultOpen={false}
+              summary={
+                chainOn
+                  ? `已开启 · 落地 ${o.chainLandingNames.length} 个 · 中转 ${o.chainRelayNames.length} 个`
+                  : "未开启"
+              }
+              title="链式代理"
             >
-              {!chainNodes ? (
-                <p className="py-6 text-center text-xs text-default-500">
-                  正在加载节点…
-                </p>
-              ) : chainNodes.length === 0 ? (
-                <p className="py-6 text-center text-xs text-default-500">
-                  订阅里还没有节点
-                </p>
-              ) : (
-                <div className="max-h-80 divide-y divide-divider overflow-y-auto rounded-xl border border-divider">
-                  {chainNodes.map((n, i) => {
-                    const role = chainRole(n.original);
-
-                    return (
-                      <div
-                        key={`${n.original}-${i}`}
-                        className="flex items-center gap-3 px-3 py-2"
+              <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/30 dark:bg-primary-900/20">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${chainOn ? "bg-success-100 text-success-700 dark:bg-success-500/20" : "bg-default-100 text-default-500"}`}
+                  >
+                    {chainOn ? "已开启" : "未开启"}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  {["客户端", "中转节点", "落地节点", "网站"].map((s, i) => (
+                    <span key={s} className="flex items-center gap-2">
+                      {i > 0 && <span className="text-default-400">→</span>}
+                      <span
+                        className={`rounded-lg px-2 py-1 ${s === "中转节点" ? "bg-secondary-100 text-secondary-700 dark:bg-secondary-500/20" : s === "落地节点" ? "bg-warning-100 text-warning-700 dark:bg-warning-500/20" : "bg-content1 text-default-600"}`}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm">{n.original}</div>
-                          <div className="truncate text-xs text-default-400">
-                            {[
-                              n.region,
-                              n.protocol,
-                              n.line === "relay" ? "中转线路" : "直连",
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
+                        {s}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-default-500">
+                  网站看到的是落地节点的
+                  IP。客户端里会多出「落地节点」「中转节点」两个组，分别选出口和中转。落地和中转都至少选一个才生效；通用分享链接（Base64）无法表达链式
+                </p>
+              </div>
+
+              {o.chainLanding && o.chainRelay && (
+                <p className="rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-700 dark:bg-warning-500/10">
+                  现在用的是旧的关键词方式（落地：{o.chainLanding}，中转：
+                  {o.chainRelay}）。在下面勾选节点后会改用勾选的节点
+                </p>
+              )}
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium">选择节点</p>
+                <p className="text-xs text-default-500">
+                  按节点设置角色；用的是处理前的原名，改名不影响
+                </p>
+                {!chainNodes ? (
+                  <p className="py-6 text-center text-xs text-default-500">
+                    正在加载节点…
+                  </p>
+                ) : chainNodes.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-default-500">
+                    订阅里还没有节点
+                  </p>
+                ) : (
+                  <div className="max-h-80 divide-y divide-divider overflow-y-auto rounded-xl border border-divider">
+                    {chainNodes.map((n, i) => {
+                      const role = chainRole(n.original);
+
+                      return (
+                        <div
+                          key={`${n.original}-${i}`}
+                          className="flex items-center gap-3 px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm">{n.original}</div>
+                            <div className="truncate text-xs text-default-400">
+                              {[
+                                n.region,
+                                n.protocol,
+                                n.line === "relay" ? "中转线路" : "直连",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-1">
+                            {(
+                              [
+                                ["", "不用"],
+                                ["landing", "落地"],
+                                ["relay", "中转"],
+                              ] as Array<[ChainRole, string]>
+                            ).map(([r, label]) => (
+                              <button
+                                key={r}
+                                className={`rounded-lg border px-2 py-1 text-xs transition-colors ${
+                                  role === r
+                                    ? r === "landing"
+                                      ? "border-warning bg-warning-50 text-warning-700 dark:bg-warning-500/20"
+                                      : r === "relay"
+                                        ? "border-secondary bg-secondary-50 text-secondary-700 dark:bg-secondary-500/20"
+                                        : "border-default-400 bg-default-100 text-default-700"
+                                    : "border-default-200 text-default-500 hover:border-default-400 dark:border-default-100"
+                                }`}
+                                type="button"
+                                onClick={() => setChainRole(n.original, r)}
+                              >
+                                {label}
+                              </button>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex shrink-0 gap-1">
-                          {(
-                            [
-                              ["", "不用"],
-                              ["landing", "落地"],
-                              ["relay", "中转"],
-                            ] as Array<[ChainRole, string]>
-                          ).map(([r, label]) => (
-                            <button
-                              key={r}
-                              className={`rounded-lg border px-2 py-1 text-xs transition-colors ${
-                                role === r
-                                  ? r === "landing"
-                                    ? "border-warning bg-warning-50 text-warning-700 dark:bg-warning-500/20"
-                                    : r === "relay"
-                                      ? "border-secondary bg-secondary-50 text-secondary-700 dark:bg-secondary-500/20"
-                                      : "border-default-400 bg-default-100 text-default-700"
-                                  : "border-default-200 text-default-500 hover:border-default-400 dark:border-default-100"
-                              }`}
-                              type="button"
-                              onClick={() => setChainRole(n.original, r)}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </Section>
           </div>
         )}
@@ -1394,7 +1420,15 @@ export default function SubscriptionPage() {
           {(onClose) =>
             detail && (
               <>
-                <ModalHeader className="flex flex-col gap-1">
+                <ModalHeader className="relative flex flex-col gap-1 pr-12">
+                  <button
+                    aria-label="关闭"
+                    className="absolute right-4 top-4 rounded-full p-1.5 text-default-500 hover:bg-default-100 hover:text-foreground"
+                    type="button"
+                    onClick={onClose}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                   <h2 className="text-lg font-bold break-all">{detail.name}</h2>
                   <p className="text-small font-normal text-default-500">
                     {detail.nodeCount} 个节点
@@ -1458,10 +1492,12 @@ export default function SubscriptionPage() {
                       return (
                         <div
                           key={c.key}
-                          className="relative flex h-14 items-center rounded-xl border border-divider transition-colors hover:bg-default-100"
+                          className="relative rounded-xl border border-divider transition-colors hover:bg-default-100"
                         >
+                          {/* Icon above the name: two columns on a phone are
+                              too narrow for "Shadowrocket" beside an icon. */}
                           <button
-                            className="h-full min-w-0 flex-1 truncate pl-3 pr-9 text-left text-sm font-medium"
+                            className="flex w-full flex-col items-start gap-1.5 p-2.5 text-left text-[13px] font-medium sm:text-sm"
                             title={
                               importURL
                                 ? `导入到 ${c.label}`
@@ -1472,11 +1508,16 @@ export default function SubscriptionPage() {
                             type="button"
                             onClick={open}
                           >
-                            {c.label}
+                            <span
+                              className={`flex h-7 w-7 items-center justify-center rounded-lg text-white ${c.tile}`}
+                            >
+                              <c.icon className="h-4 w-4" />
+                            </span>
+                            <span className="w-full truncate">{c.label}</span>
                           </button>
                           <button
                             aria-label={`复制 ${c.label} 订阅链接`}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-default-400 hover:bg-default-200 hover:text-default-600"
+                            className="absolute right-1.5 top-1.5 rounded-lg p-1.5 text-default-400 hover:bg-default-200 hover:text-default-600"
                             type="button"
                             onClick={() =>
                               copyText(link, `${c.label} 订阅已复制`)
@@ -1489,7 +1530,7 @@ export default function SubscriptionPage() {
                     })}
                   </div>
                   <p className="text-center text-xs text-default-400">
-                    点客户端直接导入，右侧按钮复制链接
+                    点客户端直接导入，右上角按钮复制链接
                   </p>
                   {detail.options.rules && (
                     <p className="text-xs text-default-500">
