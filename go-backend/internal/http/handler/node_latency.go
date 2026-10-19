@@ -47,6 +47,8 @@ type latencyPoint struct {
 	LatencyMs int64   `json:"latencyMs,omitempty"`
 	LossPct   float64 `json:"lossPct,omitempty"`
 	Error     string  `json:"error,omitempty"`
+	// Route names the return route to this point (node_route.go).
+	Route string `json:"route,omitempty"`
 }
 
 // parseLatencyTargets validates and normalizes the configured reference
@@ -268,7 +270,7 @@ func (h *Handler) inboundProbeView(row *model.NodeInbound) *reachProbe {
 			if hasReach && !reach.Skipped && !reach.OK {
 				return &reach
 			}
-			view := node
+			view := h.withRoutes(row.NodeID, node)
 			view.OK, view.Error = true, ""
 			return &view
 		}
@@ -294,6 +296,9 @@ func (h *Handler) onLatencyConfigChanged(key string) {
 	go func() {
 		if _, err := h.probeNodeLatency(ctx, nil); err != nil && ctx.Err() == nil {
 			log.Printf("node latency probe failed: %v", err)
+		}
+		if _, err := h.traceNodeRoutes(ctx, nil, false); err != nil && ctx.Err() == nil {
+			log.Printf("node route trace failed: %v", err)
 		}
 	}()
 }
@@ -322,7 +327,7 @@ func (h *Handler) nodeLatencyProbe(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make(map[string]reachProbe, len(results))
 	for id, p := range results {
-		out[strconv.FormatInt(id, 10)] = p
+		out[strconv.FormatInt(id, 10)] = h.withRoutes(id, p)
 	}
 	response.WriteJSON(w, response.OK(out))
 }

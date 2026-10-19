@@ -50,6 +50,7 @@ import type {
   KernelStateApiData,
   InboundApiItem,
   InboundProbe,
+  NodeRoute,
   InboundMutationPayload,
   SplitRule,
   InboundShareEntry,
@@ -848,6 +849,16 @@ export const probeNodeLatency = (ids: number[] = []) =>
     "/node/latency/probe",
     { ids },
     { timeout: 60000 },
+  );
+/** A node's last return-route traces to the reference points. */
+export const getNodeRoute = (id: number) =>
+  Network.post<NodeRoute | null>("/node/route", { id });
+/** Traces a node's return routes now (one reference point at a time). */
+export const probeNodeRoute = (id: number) =>
+  Network.post<NodeRoute | null>(
+    "/node/route/probe",
+    { id },
+    { timeout: 300000 },
   );
 export const updateInboundSplit = (data: {
   id: number;

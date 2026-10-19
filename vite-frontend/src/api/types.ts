@@ -775,6 +775,29 @@ export interface InboundProbePoint {
   latencyMs?: number;
   lossPct?: number;
   error?: string;
+  /** Return route to this point, e.g. "电信 CN2 GIA". */
+  route?: string;
+}
+
+export interface NodeRouteHop {
+  ttl: number;
+  ip?: string;
+  rttMs?: number;
+  /** Backbone the hop belongs to: CN2, 163, 4837, 9929, CMI. */
+  net?: string;
+}
+
+export interface NodeRoutePoint {
+  name: string;
+  route?: string;
+  reached: boolean;
+  hops?: NodeRouteHop[];
+  error?: string;
+}
+
+export interface NodeRoute {
+  checkedAt: number;
+  points: NodeRoutePoint[];
 }
 
 export interface InboundApiItem {

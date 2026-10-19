@@ -59,6 +59,7 @@ type Handler struct {
 	qualityProber *tunnelQualityProber
 	reachProbes   *reachProbeStore
 	nodeLatency   *nodeLatencyStore
+	nodeRoutes    *nodeRouteStore
 	notifier      *notifier
 	bestExit      *bestExitManager
 }
@@ -121,6 +122,7 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 		bestExit:                 newBestExitManager(),
 		reachProbes:              newReachProbeStore(),
 		nodeLatency:              newNodeLatencyStore(),
+		nodeRoutes:               newNodeRouteStore(),
 		notifier:                 newNotifier(),
 	}
 	h.healthCheck = health.NewChecker(repo, h.wsServer)
@@ -222,6 +224,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/batch-delete", h.inboundBatchDelete)
 	mux.HandleFunc("/api/v1/inbound/probe", h.inboundProbe)
 	mux.HandleFunc("/api/v1/node/latency/probe", h.nodeLatencyProbe)
+	mux.HandleFunc("/api/v1/node/route", h.nodeRouteGet)
+	mux.HandleFunc("/api/v1/node/route/probe", h.nodeRouteProbe)
 	mux.HandleFunc("/api/v1/inbound/batch-toggle", h.inboundBatchToggle)
 	mux.HandleFunc("/api/v1/notify/test", h.notifyTest)
 	mux.HandleFunc("/api/v1/subscription/list", h.subscriptionList)
@@ -552,8 +556,9 @@ func (h *Handler) nodeList(w http.ResponseWriter, r *http.Request) {
 
 	h.syncRemoteNodeStatuses(items)
 	for _, item := range items {
-		if p, ok := h.nodeLatency.get(asInt64(item["id"], 0)); ok {
-			item["latency"] = p
+		id := asInt64(item["id"], 0)
+		if p, ok := h.nodeLatency.get(id); ok {
+			item["latency"] = h.withRoutes(id, p)
 		}
 	}
 

@@ -43,6 +43,7 @@ import {
   type ReleaseChannel,
 } from "@/api";
 import { LatencyCell } from "@/components/latency-cell";
+import { RouteModal } from "@/components/route-modal";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
@@ -212,6 +213,7 @@ export default function NodePage() {
 
   const [sheetNodeId, setSheetNodeId] = useState<number | null>(null);
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
+  const [routeNode, setRouteNode] = useState<Node | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
@@ -1150,6 +1152,7 @@ export default function NodePage() {
         probing={probingIds.has(node.id)}
         variant={variant}
         onProbe={() => probeNode(node.id)}
+        onShowRoute={() => setRouteNode(node)}
       />
     ) : null;
 
@@ -2399,6 +2402,11 @@ export default function NodePage() {
         resetNodeFilterMode={resetNodeFilterMode}
         setIsFilterModalOpen={setIsFilterModalOpen}
         setNodeFilterMode={setNodeFilterMode}
+      />
+      <RouteModal
+        nodeId={routeNode?.id ?? null}
+        nodeName={routeNode?.name}
+        onClose={() => setRouteNode(null)}
       />
     </AnimatedPage>
   );

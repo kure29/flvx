@@ -62,6 +62,8 @@ export interface DropdownItemProps {
   children: React.ReactNode;
   className?: string;
   color?: "default" | "danger";
+  /** Close the menu after pressing (it stays open by default). */
+  closeOnSelect?: boolean;
   onPress?: () => void;
   startContent?: React.ReactNode;
 }
@@ -70,6 +72,7 @@ export function DropdownItem({
   children,
   className,
   color = "default",
+  closeOnSelect,
   onPress,
   startContent,
 }: DropdownItemProps) {
@@ -80,7 +83,7 @@ export function DropdownItem({
         className,
       )}
       onSelect={(event) => {
-        event.preventDefault();
+        if (!closeOnSelect) event.preventDefault();
         onPress?.();
       }}
     >

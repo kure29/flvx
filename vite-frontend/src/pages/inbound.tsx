@@ -36,6 +36,7 @@ import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { LatencyCell } from "@/components/latency-cell";
+import { RouteModal } from "@/components/route-modal";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {
@@ -248,6 +249,10 @@ export default function InboundPage() {
   const [batchToggling, setBatchToggling] = useState(false);
   const [probing, setProbing] = useState(false);
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
+  const [routeNode, setRouteNode] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [sources, setSources] = useState<RemoteSourceItem[]>([]);
 
   const loadData = useCallback(
@@ -583,6 +588,12 @@ export default function InboundPage() {
           probing={probingIds.has(item.id)}
           variant={card ? "card" : "list"}
           onProbe={() => probeOne(item.id)}
+          onShowRoute={
+            // Points come from the node, so its routes apply.
+            !item.external && probe?.points?.length
+              ? () => setRouteNode({ id: item.nodeId, name: item.nodeName })
+              : undefined
+          }
         />
       ) : null;
     // Cards give measured points their own block under the rows.
@@ -1408,6 +1419,11 @@ export default function InboundPage() {
           }}
         </ModalContent>
       </Modal>
+      <RouteModal
+        nodeId={routeNode?.id ?? null}
+        nodeName={routeNode?.name}
+        onClose={() => setRouteNode(null)}
+      />
     </AnimatedPage>
   );
 }

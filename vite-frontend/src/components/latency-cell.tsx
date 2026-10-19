@@ -1,6 +1,6 @@
 import type { InboundProbe, InboundProbePoint } from "@/api/types";
 
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Route } from "lucide-react";
 
 import {
   Dropdown,
@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownTrigger,
 } from "@/shadcn-bridge/heroui/dropdown";
+import { RouteTag } from "@/components/route-modal";
 
 /** Latency below GOOD shows green, below FAIR orange, anything else red. */
 export const LATENCY_GOOD_MS = 100;
@@ -162,7 +163,7 @@ function Tile({
 
   return (
     <span
-      className={`flex min-w-0 flex-col items-start rounded-lg px-2 py-1 text-left ${pill}`}
+      className={`flex min-w-0 flex-col items-start overflow-hidden rounded-lg px-2 py-1 text-left ${pill}`}
     >
       <span className="flex w-full min-w-0 items-center gap-1 text-[11px] opacity-80">
         {spinning ? (
@@ -172,11 +173,14 @@ function Tile({
         )}
         <span className="truncate">{point.name}</span>
       </span>
-      <span className="flex w-full items-baseline gap-1 whitespace-nowrap font-mono text-sm font-semibold">
+      <span className="flex w-full flex-wrap items-baseline gap-x-1 whitespace-nowrap font-mono text-sm font-semibold">
         {valueText(point)}
         {loss > 0 && (
           <span className="text-[10px] font-normal opacity-80">丢{loss}%</span>
         )}
+        <span className="ml-auto">
+          <RouteTag short route={point.route} />
+        </span>
       </span>
     </span>
   );
@@ -194,11 +198,14 @@ export function LatencyCell({
   probing,
   variant,
   onProbe,
+  onShowRoute,
 }: {
   probe?: InboundProbe;
   probing?: boolean;
   variant: "card" | "list";
   onProbe: () => void;
+  /** Opens the node's return routes; omitted where there is no node. */
+  onShowRoute?: () => void;
 }) {
   const points = probePoints(probe);
 
@@ -284,7 +291,7 @@ export function LatencyCell({
           </button>
         )}
       </DropdownTrigger>
-      <DropdownMenu aria-label="延迟详情" className="w-64">
+      <DropdownMenu aria-label="延迟详情" className="w-72">
         <div role="presentation" onClick={stop} onPointerDown={stop}>
           <div className="flex items-center justify-between px-2 pb-1.5 pt-1 text-xs text-default-500">
             <span>到各测试点的延迟</span>
@@ -302,6 +309,7 @@ export function LatencyCell({
                   <span className="flex min-w-0 items-center gap-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
                     <span className="truncate">{p.name}</span>
+                    <RouteTag short route={p.route} />
                   </span>
                   <span className="shrink-0 font-mono text-xs">
                     <span className={TONE[pointTone(p)][0].split(" ")[1]}>
@@ -317,19 +325,33 @@ export function LatencyCell({
               );
             })}
           </div>
-          <DropdownItem
-            className="justify-center border-t border-divider text-primary"
-            startContent={
-              probing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )
-            }
-            onPress={onProbe}
+          <div
+            className={`grid border-t border-divider ${onShowRoute ? "grid-cols-2" : ""}`}
           >
-            {probing ? "检测中…" : "重新检测"}
-          </DropdownItem>
+            <DropdownItem
+              className="justify-center text-primary"
+              startContent={
+                probing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )
+              }
+              onPress={onProbe}
+            >
+              {probing ? "检测中…" : "重新检测"}
+            </DropdownItem>
+            {onShowRoute && (
+              <DropdownItem
+                closeOnSelect
+                className="justify-center text-primary"
+                startContent={<Route className="h-3.5 w-3.5" />}
+                onPress={() => setTimeout(onShowRoute, 0)}
+              >
+                回程路由
+              </DropdownItem>
+            )}
+          </div>
         </div>
       </DropdownMenu>
     </Dropdown>
