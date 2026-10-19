@@ -856,7 +856,7 @@ export const setNodeLatencyTargets = (data: {
   custom: boolean;
   points: string[];
   pinned: string[];
-}) => Network.post("/node/latency/targets", data);
+}) => Network.post("/node/latency/targets", data, { timeout: 60000 });
 /** A node's last return-route traces to the reference points. */
 export const getNodeRoute = (id: number) =>
   Network.post<NodeRoute | null>("/node/route", { id });

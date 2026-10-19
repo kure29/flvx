@@ -61,7 +61,7 @@ func prepareSQLiteLegacyColumns(db *gorm.DB) error {
 	m := db.Migrator()
 
 	if m.HasTable(&model.Node{}) {
-		for _, field := range []string{"ServerIPV4", "ServerIPV6", "ExtraIPs", "TCPListenAddr", "UDPListenAddr", "Inx", "IsRemote", "RemoteURL", "RemoteToken", "RemoteConfig", "Remark", "ExpiryTime", "RenewalCycle", "ExpiryReminderDismissed"} {
+		for _, field := range []string{"ServerIPV4", "ServerIPV6", "ExtraIPs", "TCPListenAddr", "UDPListenAddr", "Inx", "IsRemote", "RemoteURL", "RemoteToken", "RemoteConfig", "Remark", "ExpiryTime", "RenewalCycle", "ExpiryReminderDismissed", "LatencyTargets"} {
 			if m.HasColumn(&model.Node{}, field) {
 				continue
 			}

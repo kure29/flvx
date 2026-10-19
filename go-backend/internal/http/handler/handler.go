@@ -224,6 +224,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/batch-delete", h.inboundBatchDelete)
 	mux.HandleFunc("/api/v1/inbound/probe", h.inboundProbe)
 	mux.HandleFunc("/api/v1/node/latency/probe", h.nodeLatencyProbe)
+	mux.HandleFunc("/api/v1/node/latency/targets", h.nodeLatencyTargetsSet)
 	mux.HandleFunc("/api/v1/node/route", h.nodeRouteGet)
 	mux.HandleFunc("/api/v1/node/route/probe", h.nodeRouteProbe)
 	mux.HandleFunc("/api/v1/inbound/batch-toggle", h.inboundBatchToggle)
@@ -557,6 +558,11 @@ func (h *Handler) nodeList(w http.ResponseWriter, r *http.Request) {
 	h.syncRemoteNodeStatuses(items)
 	for _, item := range items {
 		id := asInt64(item["id"], 0)
+		if c := parseNodeTargetChoice(asString(item["latencyTargets"])); c != nil {
+			item["latencyTargets"] = c
+		} else {
+			item["latencyTargets"] = nil
+		}
 		if p, ok := h.nodeLatency.get(id); ok {
 			item["latency"] = h.withRoutes(id, p)
 		}
@@ -982,12 +988,13 @@ func (h *Handler) updateConfigs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		prevPool := h.latencyPoolBefore(key)
 		if err := h.repo.UpsertConfig(key, value, now); err != nil {
 			response.WriteJSON(w, response.Err(-2, err.Error()))
 			return
 		}
 		h.notifyTunnelQualityConfigChanged(key)
-		h.onLatencyConfigChanged(key)
+		h.onLatencyConfigChanged(key, prevPool)
 	}
 
 	response.WriteJSON(w, response.OKEmpty())
@@ -1029,12 +1036,13 @@ func (h *Handler) updateSingleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prevPool := h.latencyPoolBefore(name)
 	if err := h.repo.UpsertConfig(name, value, time.Now().UnixMilli()); err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
 	h.notifyTunnelQualityConfigChanged(name)
-	h.onLatencyConfigChanged(name)
+	h.onLatencyConfigChanged(name, prevPool)
 
 	response.WriteJSON(w, response.OKEmpty())
 }

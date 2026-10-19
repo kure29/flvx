@@ -11,11 +11,24 @@ func (r *Repository) ListMonitorNodes() ([]model.Node, error) {
 		return nil, errors.New("repository not initialized")
 	}
 	var nodes []model.Node
-	err := r.db.Select("id", "inx", "name", "status", "version", "updated_time").
+	err := r.db.Select("id", "inx", "name", "status", "version", "updated_time", "latency_targets").
 		Where("is_remote = ?", 0).
 		Order("inx ASC, id ASC").
 		Find(&nodes).Error
 	return nodes, err
+}
+
+// SetNodesLatencyTargets stores the nodes' own latency reference point
+// choice ("" follows the defaults).
+func (r *Repository) SetNodesLatencyTargets(ids []int64, value string) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.Node{}).Where("id IN ? AND is_remote = ?", ids, 0).
+		Update("latency_targets", value).Error
 }
 
 // ListNodesWithExpiry returns local nodes that have an expiry time set.

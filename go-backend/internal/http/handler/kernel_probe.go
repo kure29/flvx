@@ -308,7 +308,7 @@ func (h *Handler) inboundProbe(w http.ResponseWriter, r *http.Request) {
 			nodeIDs = append(nodeIDs, row.NodeID)
 		}
 	}
-	if len(nodeIDs) > 0 && len(h.latencyTargets()) > 0 {
+	if len(nodeIDs) > 0 && len(h.latencyPool()) > 0 {
 		if len(req.IDs) == 0 {
 			nodeIDs = nil
 		}

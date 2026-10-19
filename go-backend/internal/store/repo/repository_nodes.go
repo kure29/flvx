@@ -127,6 +127,7 @@ func (r *Repository) ListNodes() ([]map[string]interface{}, error) {
 			"expiryReminderDismissed": n.ExpiryReminderDismissed,
 			"interfaceName":           nullableString(n.InterfaceName),
 			"sshConfig":               sshConfigByNodeID[n.ID],
+			"latencyTargets":          n.LatencyTargets,
 		})
 	}
 	return items, nil

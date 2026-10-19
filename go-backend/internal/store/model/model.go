@@ -95,6 +95,9 @@ type Node struct {
 	RemoteToken             sql.NullString `gorm:"column:remote_token;type:text"`
 	RemoteConfig            sql.NullString `gorm:"column:remote_config;type:text"`
 	ExpiryReminderDismissed int            `gorm:"column:expiry_reminder_dismissed;not null;default:0"`
+	// LatencyTargets is the node's own choice of latency reference points as
+	// JSON {"points":[...],"pinned":[...]}; empty follows the defaults.
+	LatencyTargets string `gorm:"column:latency_targets;type:text;not null;default:''"`
 }
 
 func (Node) TableName() string { return "node" }
@@ -578,6 +581,8 @@ type NodeBackup struct {
 	RemoteURL     string `json:"remoteUrl,omitempty"`
 	RemoteToken   string `json:"remoteToken,omitempty"`
 	RemoteConfig  string `json:"remoteConfig,omitempty"`
+	// LatencyTargets is the node's own latency reference point choice.
+	LatencyTargets string `json:"latencyTargets,omitempty"`
 }
 
 type TunnelBackup struct {

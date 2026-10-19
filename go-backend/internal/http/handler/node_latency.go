@@ -107,7 +107,9 @@ func normalizeLatencyTargetsConfig(raw string) (string, error) {
 	return string(b), nil
 }
 
-func (h *Handler) latencyTargets() []latencyTarget {
+// latencyPool returns every configured reference point; enabled ones are
+// the defaults.
+func (h *Handler) latencyPool() []latencyTarget {
 	raw, err := h.repo.GetViteConfigValue(latencyTargetsConfigKey)
 	if err != nil {
 		return nil
@@ -116,13 +118,59 @@ func (h *Handler) latencyTargets() []latencyTarget {
 	if err != nil {
 		return nil
 	}
-	enabled := targets[:0]
-	for _, t := range targets {
-		if t.Enabled {
-			enabled = append(enabled, t)
+	return targets
+}
+
+// nodeTargetChoice is a node's own pick of reference points, stored on the
+// node as JSON.
+type nodeTargetChoice struct {
+	Points []string `json:"points"`
+	Pinned []string `json:"pinned"`
+}
+
+func parseNodeTargetChoice(raw string) *nodeTargetChoice {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var c nodeTargetChoice
+	if err := json.Unmarshal([]byte(raw), &c); err != nil || len(c.Points) == 0 {
+		return nil
+	}
+	return &c
+}
+
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
 		}
 	}
-	return enabled
+	return false
+}
+
+// targetsForNode returns the points a node measures, in pool order: its own
+// choice (with its own pinned points), or the defaults. A choice whose
+// points were all removed from the pool falls back to the defaults.
+func targetsForNode(pool []latencyTarget, rawChoice string) []latencyTarget {
+	if c := parseNodeTargetChoice(rawChoice); c != nil {
+		var own []latencyTarget
+		for _, t := range pool {
+			if containsString(c.Points, t.Name) {
+				t.Pinned = containsString(c.Pinned, t.Name)
+				own = append(own, t)
+			}
+		}
+		if len(own) > 0 {
+			return own
+		}
+	}
+	var defaults []latencyTarget
+	for _, t := range pool {
+		if t.Enabled {
+			defaults = append(defaults, t)
+		}
+	}
+	return defaults
 }
 
 // nodeLatencyStore keeps each node's last measurement.
@@ -196,47 +244,46 @@ func (h *Handler) probeNodeLatency(ctx context.Context, ids []int64) (map[int64]
 	if err != nil {
 		return nil, err
 	}
-	targets := h.latencyTargets()
+	pool := h.latencyPool()
 	want := make(map[int64]bool, len(ids))
 	for _, id := range ids {
 		want[id] = true
 	}
-	var live []model.Node
+	targets := make(map[int64][]latencyTarget)
+	points := make(map[int64][]latencyPoint)
 	for _, n := range nodes {
-		if (len(ids) == 0 || want[n.ID]) && n.Status == 1 {
-			live = append(live, n)
+		if (len(ids) > 0 && !want[n.ID]) || n.Status != 1 {
+			continue
+		}
+		if t := targetsForNode(pool, n.LatencyTargets); len(t) > 0 {
+			targets[n.ID] = t
+			points[n.ID] = make([]latencyPoint, len(t))
 		}
 	}
 
-	results := make(map[int64]reachProbe, len(live))
-	if len(targets) > 0 {
-		points := make(map[int64][]latencyPoint, len(live))
-		for _, n := range live {
-			points[n.ID] = make([]latencyPoint, len(targets))
-		}
-		var wg sync.WaitGroup
-		sem := make(chan struct{}, latencyParallel)
-		for _, n := range live {
-			for i, t := range targets {
-				if ctx.Err() != nil {
-					break
-				}
-				wg.Add(1)
-				sem <- struct{}{}
-				go func(nodeID int64, i int, t latencyTarget) {
-					defer wg.Done()
-					defer func() { <-sem }()
-					data, err := nodeLatencyPing(h, nodeID, t.Host, t.Port)
-					// Each goroutine writes its own slot.
-					points[nodeID][i] = latencyPointFrom(t, data, err)
-				}(n.ID, i, t)
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, latencyParallel)
+	for nodeID, list := range targets {
+		for i, t := range list {
+			if ctx.Err() != nil {
+				break
 			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(nodeID int64, i int, t latencyTarget) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				data, err := nodeLatencyPing(h, nodeID, t.Host, t.Port)
+				// Each goroutine writes its own slot.
+				points[nodeID][i] = latencyPointFrom(t, data, err)
+			}(nodeID, i, t)
 		}
-		wg.Wait()
-		now := time.Now().UnixMilli()
-		for _, n := range live {
-			results[n.ID] = latencyProbe(points[n.ID], now)
-		}
+	}
+	wg.Wait()
+	now := time.Now().UnixMilli()
+	results := make(map[int64]reachProbe, len(points))
+	for nodeID, list := range points {
+		results[nodeID] = latencyProbe(list, now)
 	}
 	h.nodeLatency.replace(results, len(ids) == 0)
 	return results, nil
@@ -281,12 +328,23 @@ func (h *Handler) inboundProbeView(row *model.NodeInbound) *reachProbe {
 	return &reach
 }
 
-// onLatencyConfigChanged re-measures every node when the reference points
-// change, so cards do not keep showing removed points until the next round.
-func (h *Handler) onLatencyConfigChanged(key string) {
+// latencyPoolBefore returns the reference points as they are before a
+// config save, so renames can follow; nil for other keys.
+func (h *Handler) latencyPoolBefore(key string) []latencyTarget {
+	if strings.TrimSpace(key) != latencyTargetsConfigKey {
+		return nil
+	}
+	return h.latencyPool()
+}
+
+// onLatencyConfigChanged carries renamed points over to the nodes that
+// picked them, then re-measures every node so cards do not keep showing
+// removed points until the next round.
+func (h *Handler) onLatencyConfigChanged(key string, prev []latencyTarget) {
 	if strings.TrimSpace(key) != latencyTargetsConfigKey {
 		return
 	}
+	h.syncNodeTargetChoices(prev, h.latencyPool())
 	h.jobsMu.Lock()
 	ctx := h.jobsCtx
 	h.jobsMu.Unlock()
@@ -303,6 +361,153 @@ func (h *Handler) onLatencyConfigChanged(key string) {
 	}()
 }
 
+// renamedTargets maps old names to new ones for points whose address stayed
+// while the name changed.
+func renamedTargets(prev, next []latencyTarget) map[string]string {
+	oldNames := make(map[string]bool, len(prev))
+	for _, t := range prev {
+		oldNames[t.Name] = true
+	}
+	newNames := make(map[string]bool, len(next))
+	byAddr := make(map[string]string, len(next))
+	for _, t := range next {
+		newNames[t.Name] = true
+		if !oldNames[t.Name] {
+			byAddr[t.Host+":"+strconv.Itoa(t.Port)] = t.Name
+		}
+	}
+	renames := make(map[string]string)
+	for _, t := range prev {
+		if newNames[t.Name] {
+			continue
+		}
+		if name, ok := byAddr[t.Host+":"+strconv.Itoa(t.Port)]; ok {
+			renames[t.Name] = name
+		}
+	}
+	return renames
+}
+
+// syncNodeTargetChoices follows renames in the nodes' own choices and drops
+// removed points; a choice left empty follows the defaults again.
+func (h *Handler) syncNodeTargetChoices(prev, next []latencyTarget) {
+	nodes, err := h.repo.ListMonitorNodes()
+	if err != nil {
+		return
+	}
+	renames := renamedTargets(prev, next)
+	inPool := make(map[string]bool, len(next))
+	for _, t := range next {
+		inPool[t.Name] = true
+	}
+	carry := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if r, ok := renames[n]; ok {
+				n = r
+			}
+			if inPool[n] {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	for _, n := range nodes {
+		c := parseNodeTargetChoice(n.LatencyTargets)
+		if c == nil {
+			continue
+		}
+		next := nodeTargetChoice{Points: carry(c.Points), Pinned: carry(c.Pinned)}
+		value := ""
+		if len(next.Points) > 0 {
+			b, _ := json.Marshal(next)
+			value = string(b)
+		}
+		if value != n.LatencyTargets {
+			if err := h.repo.SetNodesLatencyTargets([]int64{n.ID}, value); err != nil {
+				log.Printf("sync node %d latency targets: %v", n.ID, err)
+			}
+		}
+	}
+}
+
+// nodeLatencyTargetsSet stores the nodes' own reference points, or clears
+// them to follow the defaults, then measures those nodes again.
+func (h *Handler) nodeLatencyTargetsSet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.WriteJSON(w, response.ErrDefault("请求失败"))
+		return
+	}
+	var req struct {
+		IDs    []int64  `json:"ids"`
+		Custom bool     `json:"custom"`
+		Points []string `json:"points"`
+		Pinned []string `json:"pinned"`
+	}
+	if err := decodeJSON(r.Body, &req); err != nil || len(req.IDs) == 0 {
+		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
+		return
+	}
+	value := ""
+	if req.Custom {
+		pool := h.latencyPool()
+		inPool := make(map[string]bool, len(pool))
+		for _, t := range pool {
+			inPool[t.Name] = true
+		}
+		var choice nodeTargetChoice
+		for _, n := range req.Points {
+			if !inPool[n] {
+				response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("测试点不存在：%s", n)))
+				return
+			}
+			if !containsString(choice.Points, n) {
+				choice.Points = append(choice.Points, n)
+			}
+		}
+		if len(choice.Points) == 0 {
+			response.WriteJSON(w, response.ErrDefault("至少选一个测试点"))
+			return
+		}
+		for _, n := range req.Pinned {
+			if containsString(choice.Points, n) && !containsString(choice.Pinned, n) {
+				choice.Pinned = append(choice.Pinned, n)
+			}
+		}
+		if len(choice.Pinned) > maxPinnedLatencyTargets {
+			response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("卡片最多固定显示 %d 个测试点", maxPinnedLatencyTargets)))
+			return
+		}
+		b, err := json.Marshal(choice)
+		if err != nil {
+			response.WriteJSON(w, response.Err(-2, err.Error()))
+			return
+		}
+		value = string(b)
+	}
+	if err := h.repo.SetNodesLatencyTargets(req.IDs, value); err != nil {
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
+	// Latency takes seconds, so the list the page reloads already shows the
+	// new points; traces take longer and follow in the background.
+	if _, err := h.probeNodeLatency(r.Context(), req.IDs); err != nil {
+		log.Printf("node latency probe failed: %v", err)
+	}
+	h.jobsMu.Lock()
+	ctx := h.jobsCtx
+	h.jobsMu.Unlock()
+	if ctx != nil {
+		ids := append([]int64(nil), req.IDs...)
+		go func() {
+			if _, err := h.traceNodeRoutes(ctx, ids, false); err != nil && ctx.Err() == nil {
+				log.Printf("node route trace failed: %v", err)
+			}
+		}()
+	}
+	response.WriteJSON(w, response.OKEmpty())
+}
+
 // nodeLatencyProbe measures the given nodes now (all of them when empty).
 func (h *Handler) nodeLatencyProbe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -316,7 +521,7 @@ func (h *Handler) nodeLatencyProbe(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
 		return
 	}
-	if len(h.latencyTargets()) == 0 {
+	if len(h.latencyPool()) == 0 {
 		response.WriteJSON(w, response.ErrDefault("还没有设置延迟测试点，请到网站配置添加"))
 		return
 	}

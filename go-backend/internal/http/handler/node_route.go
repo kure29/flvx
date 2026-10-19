@@ -232,8 +232,8 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 	if err != nil {
 		return nil, err
 	}
-	targets := h.latencyTargets()
-	if len(targets) == 0 {
+	pool := h.latencyPool()
+	if len(pool) == 0 {
 		return map[int64]nodeRoute{}, nil
 	}
 	want := make(map[int64]bool, len(ids))
@@ -241,9 +241,13 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 		want[id] = true
 	}
 	now := time.Now()
-	var todo []int64
+	todo := make(map[int64][]latencyTarget)
 	for _, n := range nodes {
 		if n.Status != 1 || (len(ids) > 0 && !want[n.ID]) {
+			continue
+		}
+		targets := targetsForNode(pool, n.LatencyTargets)
+		if len(targets) == 0 {
 			continue
 		}
 		if !force {
@@ -251,20 +255,20 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 				continue
 			}
 		}
-		todo = append(todo, n.ID)
+		todo[n.ID] = targets
 	}
 
 	results := make(map[int64]nodeRoute, len(todo))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, routeParallel)
-	for _, id := range todo {
+	for id, targets := range todo {
 		if ctx.Err() != nil {
 			break
 		}
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(nodeID int64) {
+		go func(nodeID int64, targets []latencyTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			r := nodeRoute{Points: make([]routePoint, len(targets))}
@@ -281,14 +285,14 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 			mu.Lock()
 			results[nodeID] = r
 			mu.Unlock()
-		}(id)
+		}(id, targets)
 	}
 	wg.Wait()
 	return results, nil
 }
 
 // routeFresh reports whether a stored trace is recent and was made to the
-// points configured now.
+// points the node measures now.
 func routeFresh(r nodeRoute, targets []latencyTarget, now time.Time) bool {
 	if len(r.Points) != len(targets) {
 		return false
@@ -347,7 +351,7 @@ func (h *Handler) nodeRouteRespond(w http.ResponseWriter, r *http.Request, probe
 		return
 	}
 	if probe {
-		if len(h.latencyTargets()) == 0 {
+		if len(h.latencyPool()) == 0 {
 			response.WriteJSON(w, response.ErrDefault("还没有设置延迟测试点，请到网站配置添加"))
 			return
 		}
