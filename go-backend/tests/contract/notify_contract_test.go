@@ -172,7 +172,7 @@ func TestNotifyImportedNodeDownContract(t *testing.T) {
 	}()
 	kernelContractPost(t, router, admin, "/api/v1/inbound/probe", `{}`)
 	calls = sink.waitWebhook(t, 2)
-	if calls[1]["title"] != "导入节点已恢复" {
+	if calls[1]["title"] != "节点已恢复" {
 		t.Fatalf("recovery alert: %v", calls[1])
 	}
 

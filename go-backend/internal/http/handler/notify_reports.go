@@ -202,10 +202,10 @@ func (h *Handler) dailyReportText(now time.Time) string {
 		}
 		lines = append(lines, fmt.Sprintf("内核出错：%d / %d", bad, len(kernels)))
 	}
-	if h.externalProbes != nil {
-		h.externalProbes.mu.RLock()
+	if h.reachProbes != nil {
+		h.reachProbes.mu.RLock()
 		down, checked := 0, 0
-		for _, p := range h.externalProbes.results {
+		for _, p := range h.reachProbes.results {
 			if p.Skipped {
 				continue
 			}
@@ -214,9 +214,9 @@ func (h *Handler) dailyReportText(now time.Time) string {
 				down++
 			}
 		}
-		h.externalProbes.mu.RUnlock()
+		h.reachProbes.mu.RUnlock()
 		if checked > 0 {
-			lines = append(lines, fmt.Sprintf("导入节点连不上：%d / %d", down, checked))
+			lines = append(lines, fmt.Sprintf("节点连不上：%d / %d", down, checked))
 		}
 	}
 	if total, err := h.repo.SumInboundTraffic(); err == nil {

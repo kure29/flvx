@@ -16,7 +16,7 @@ const NOTIFY_EVENTS = [
   },
   {
     key: "inbound_down",
-    label: "导入节点连不上 / 恢复",
+    label: "节点连不上 / 恢复",
     description: "连续两次检测失败（约 6 分钟）才提醒",
   },
   {
@@ -144,7 +144,7 @@ export function NotifySettings({
     <>
       <Field
         inline
-        help="节点掉线、导入节点连不上、内核出错、快到期时推送"
+        help="节点掉线、节点连不上、内核出错、快到期时推送"
         label="启用通知"
       >
         <Switch

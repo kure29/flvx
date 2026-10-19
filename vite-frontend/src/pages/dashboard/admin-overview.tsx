@@ -88,7 +88,7 @@ const KINDS: Record<
     path: "/inbound",
   },
   probe: {
-    label: (n) => `${n} 个导入节点连不上`,
+    label: (n) => `${n} 个节点连不上`,
     hint: "从面板服务器检测",
     path: "/inbound",
   },
@@ -267,11 +267,14 @@ export function AdminOverview() {
 
   const now = Date.now();
   const online = nodes.filter((n) => n.status === 1).length;
-  const badInbound = (i: InboundApiItem) =>
+  const kernelDown = (i: InboundApiItem) =>
+    i.enabled && !i.external && i.kernelStatus !== "running";
+  // A stopped kernel is reported as such, not as a failed probe.
+  const probeDown = (i: InboundApiItem) =>
     i.enabled &&
-    (i.external
-      ? Boolean(i.probe && !i.probe.skipped && !i.probe.ok)
-      : i.kernelStatus !== "running");
+    !kernelDown(i) &&
+    Boolean(i.probe && !i.probe.skipped && !i.probe.ok);
+  const badInbound = (i: InboundApiItem) => kernelDown(i) || probeDown(i);
   const enabledInbounds = inbounds.filter((i) => i.enabled);
   const runningInbounds = enabledInbounds.filter((i) => !badInbound(i));
   const relaysUp = relays.filter(
@@ -318,7 +321,7 @@ export function AdminOverview() {
   }
   for (const i of inbounds) {
     // Kernel errors are listed per kernel above.
-    if (!i.external && badInbound(i) && i.kernelStatus !== "error") {
+    if (kernelDown(i) && i.kernelStatus !== "error") {
       issues.push({
         kind: "inbound",
         level: "warning",
@@ -326,7 +329,7 @@ export function AdminOverview() {
         detail: `${i.nodeName} · ${i.kernelStatus}`,
       });
     }
-    if (i.external && badInbound(i)) {
+    if (probeDown(i)) {
       issues.push({
         kind: "probe",
         level: "warning",

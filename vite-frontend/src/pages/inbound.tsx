@@ -498,8 +498,6 @@ export default function InboundPage() {
     }
   };
 
-  const hasExternal = inbounds.some((i) => i.external);
-
   const runProbe = async () => {
     setProbing(true);
     try {
@@ -518,7 +516,7 @@ export default function InboundPage() {
           icon: "⚠️",
         });
       } else {
-        toast.success(`${results.length} 个导入节点都能连接`);
+        toast.success(`${results.length} 个节点都能连接`);
       }
       await loadData(false);
     } catch {
@@ -531,15 +529,13 @@ export default function InboundPage() {
   const gridClass = card ? CARD_GRID : "grid grid-cols-1 gap-2 2xl:grid-cols-2";
 
   const renderInbound = (item: InboundApiItem) => {
-    const probe =
-      item.external && !item.probe?.skipped ? item.probe : undefined;
-    const unreachable = item.enabled && probe !== undefined && !probe.ok;
-    const running =
-      item.enabled &&
-      !unreachable &&
-      (item.external || item.kernelStatus === "running");
+    const probe = item.probe?.skipped ? undefined : item.probe;
     const kernelBad =
       item.enabled && !item.external && item.kernelStatus !== "running";
+    // A stopped kernel explains a failed probe, so it is shown instead.
+    const unreachable =
+      item.enabled && !kernelBad && probe !== undefined && !probe.ok;
+    const running = item.enabled && !kernelBad && !unreachable;
     // The group header already names the server.
     const where = item.external
       ? grouped
@@ -872,16 +868,12 @@ export default function InboundPage() {
           {!selectMode && (
             <PageToolbar
               more={[
-                ...(hasExternal
-                  ? [
-                      {
-                        key: "probe",
-                        label: probing ? "检测中…" : "检测导入节点",
-                        disabled: probing,
-                        onPress: runProbe,
-                      },
-                    ]
-                  : []),
+                {
+                  key: "probe",
+                  label: probing ? "检测中…" : "检测节点连通性",
+                  disabled: probing || inbounds.length === 0,
+                  onPress: runProbe,
+                },
                 {
                   key: "import",
                   label: "导入节点",

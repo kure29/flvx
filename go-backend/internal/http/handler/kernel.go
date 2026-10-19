@@ -93,8 +93,8 @@ type inboundView struct {
 	DownloadBytes   int64              `json:"downloadBytes"`
 	CreatedTime     int64              `json:"createdTime"`
 	UpdatedTime     int64              `json:"updatedTime"`
-	// Probe is the last reachability check of an imported node.
-	Probe *externalProbe `json:"probe,omitempty"`
+	// Probe is the last reachability check made from the panel server.
+	Probe *reachProbe `json:"probe,omitempty"`
 	// SourceID / SourceName: the remote subscription it came from.
 	SourceID   int64  `json:"sourceId,omitempty"`
 	SourceName string `json:"sourceName,omitempty"`
@@ -589,10 +589,8 @@ func (h *Handler) inboundList(w http.ResponseWriter, r *http.Request) {
 			v.ImportedParams = kernel.ProxyParams(p)
 			v.Extra = ""
 		}
-		if v.External {
-			if p, ok := h.externalProbes.get(row.ID); ok {
-				v.Probe = &p
-			}
+		if p, ok := h.reachProbes.get(row.ID); ok {
+			v.Probe = &p
 		}
 		views = append(views, v)
 	}

@@ -798,7 +798,7 @@ export interface InboundApiItem {
   downloadBytes: number;
   createdTime: number;
   updatedTime: number;
-  /** Last reachability check of an imported node, from the panel. */
+  /** Last TCP reachability check, made from the panel server. */
   probe?: InboundProbe;
   /** Inbound this one's traffic is chained through; 0 leaves directly. */
   outboundId: number;

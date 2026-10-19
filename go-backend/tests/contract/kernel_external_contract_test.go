@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"go-backend/internal/auth"
 )
@@ -216,4 +217,108 @@ func TestExternalProbeContract(t *testing.T) {
 	if byName["down"]["ok"] == true || byName["down"]["error"] == "" {
 		t.Fatalf("closed port: %v", byName["down"])
 	}
+}
+
+func TestBuiltInboundProbeContract(t *testing.T) {
+	secret := "contract-jwt-secret"
+	router, r := setupContractRouter(t, secret)
+	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	upPort := ln.Addr().(*net.TCPAddr).Port
+	closed, _ := net.Listen("tcp", "127.0.0.1:0")
+	deadPort := closed.Addr().(*net.TCPAddr).Port
+	_ = closed.Close()
+
+	nodeID := seedKernelNode(t, r, "probe-node")
+	offlineNodeID := seedKernelNode(t, r, "probe-node-offline")
+	if err := r.DB().Exec(`UPDATE node SET server_ip = '127.0.0.1', status = 1 WHERE id = ?`, nodeID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := r.DB().Exec(`UPDATE node SET server_ip = '127.0.0.1' WHERE id = ?`, offlineNodeID).Error; err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	kernel := func(nodeID int64, kernelType, status string) int64 {
+		if err := r.DB().Exec(`INSERT INTO node_kernel(node_id, kernel_type, version, status, created_time, updated_time) VALUES(?, ?, 'latest', ?, ?, ?)`, nodeID, kernelType, status, now, now).Error; err != nil {
+			t.Fatal(err)
+		}
+		return mustLastInsertID(t, r, "node_kernel")
+	}
+	running := kernel(nodeID, "xray", "running")
+	stopped := kernel(nodeID, "sing-box", "stopped")
+	offline := kernel(offlineNodeID, "xray", "running")
+
+	type inboundRow struct {
+		name, protocol, listen, shareHost string
+		port, whitelist                   int
+		kernelID, nodeID                  int64
+	}
+	ids := map[string]int64{}
+	for _, row := range []inboundRow{
+		// Dialed at the node's server IP.
+		{"node-ip", "vless", "::", "", upPort, 0, running, nodeID},
+		// Dialed at the share host.
+		{"share-host", "vless", "::", "127.0.0.1", deadPort, 0, running, nodeID},
+		// Skipped.
+		{"whitelisted", "vless", "::", "", upPort, 1, running, nodeID},
+		{"loopback", "vless", "127.0.0.1", "", upPort, 0, running, nodeID},
+		{"udp-only", "hysteria2", "::", "", upPort, 0, running, nodeID},
+		{"kernel-stopped", "vless", "::", "", upPort, 0, stopped, nodeID},
+		{"node-offline", "vless", "::", "", upPort, 0, offline, offlineNodeID},
+	} {
+		if err := r.DB().Exec(`INSERT INTO node_inbound(kernel_id, node_id, name, protocol, listen, port, share_host, relay_whitelist, created_time, updated_time) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			row.kernelID, row.nodeID, row.name, row.protocol, row.listen, row.port, row.shareHost, row.whitelist, now, now).Error; err != nil {
+			t.Fatal(err)
+		}
+		ids[row.name] = mustLastInsertID(t, r, row.name)
+	}
+
+	out := kernelContractPost(t, router, admin, "/api/v1/inbound/probe", `{}`)
+	if out.Code != 0 {
+		t.Fatalf("probe: %+v", out)
+	}
+	results := out.Data.(map[string]interface{})
+	get := func(name string) map[string]interface{} {
+		p, _ := results[jsonInt64(ids[name])].(map[string]interface{})
+		if p == nil {
+			t.Fatalf("built inbound %q has no probe result: %v", name, results)
+		}
+		return p
+	}
+	if p := get("node-ip"); p["ok"] != true || valueAsInt(p["latencyMs"]) < 1 {
+		t.Fatalf("inbound reachable at the node's server IP: %v", p)
+	}
+	if p := get("share-host"); p["ok"] == true || p["error"] == "" {
+		t.Fatalf("inbound probed at its share host must fail on a closed port: %v", p)
+	}
+	for _, name := range []string{"whitelisted", "loopback", "udp-only", "kernel-stopped", "node-offline"} {
+		if p := get(name); p["skipped"] != true {
+			t.Fatalf("%s inbound must be skipped: %v", name, p)
+		}
+	}
+
+	for _, it := range kernelContractPost(t, router, admin, "/api/v1/inbound/list", `{}`).Data.([]interface{}) {
+		m := it.(map[string]interface{})
+		if m["name"] == "node-ip" {
+			if probe, _ := m["probe"].(map[string]interface{}); probe == nil || probe["ok"] != true {
+				t.Fatalf("list must carry the built inbound's probe: %v", m)
+			}
+			return
+		}
+	}
+	t.Fatal("node-ip inbound missing from the list")
 }

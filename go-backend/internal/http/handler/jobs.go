@@ -33,7 +33,7 @@ func (h *Handler) StartBackgroundJobs() {
 	go h.runNftablesTrafficCollectLoop(ctx)
 	go h.runFederationCleanupRetryLoop(ctx)
 	go h.runKernelStatusLoop(ctx)
-	go h.runExternalProbeLoop(ctx)
+	go h.runReachProbeLoop(ctx)
 	go h.runNotifyLoop(ctx)
 	go h.runSubscriptionLoop(ctx)
 	go h.runRemoteSourceLoop(ctx)
