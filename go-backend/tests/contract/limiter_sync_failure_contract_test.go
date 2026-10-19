@@ -1129,6 +1129,8 @@ func startMockNodeSessionWithCommandFailures(t *testing.T, baseURL string, nodeS
 		t.Fatalf("dial mock node websocket: %v", err)
 	}
 
+	ready := make(chan struct{})
+	var readyOnce sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -1138,6 +1140,7 @@ func startMockNodeSessionWithCommandFailures(t *testing.T, baseURL string, nodeS
 			if readErr != nil {
 				return
 			}
+			readyOnce.Do(func() { close(ready) })
 
 			plain := raw
 			var wrap struct {
@@ -1188,6 +1191,7 @@ func startMockNodeSessionWithCommandFailures(t *testing.T, baseURL string, nodeS
 			_ = conn.WriteMessage(websocket.TextMessage, respBytes)
 		}
 	}()
+	waitMockNodeRegistered(ready)
 
 	var stopOnce sync.Once
 	return func() {
@@ -1225,6 +1229,8 @@ func startMockNodeSessionWithCommandRecorder(t *testing.T, baseURL string, nodeS
 		t.Fatalf("dial mock node websocket: %v", err)
 	}
 
+	ready := make(chan struct{})
+	var readyOnce sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -1234,6 +1240,7 @@ func startMockNodeSessionWithCommandRecorder(t *testing.T, baseURL string, nodeS
 			if readErr != nil {
 				return
 			}
+			readyOnce.Do(func() { close(ready) })
 
 			plain := raw
 			var wrap struct {
@@ -1288,6 +1295,7 @@ func startMockNodeSessionWithCommandRecorder(t *testing.T, baseURL string, nodeS
 			_ = conn.WriteMessage(websocket.TextMessage, respBytes)
 		}
 	}()
+	waitMockNodeRegistered(ready)
 
 	var stopOnce sync.Once
 	return func() {

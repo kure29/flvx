@@ -531,6 +531,8 @@ func startMockSessionForMaxConn(t *testing.T, baseURL string, nodeSecret string,
 		t.Fatalf("dial mock node websocket: %v", err)
 	}
 
+	ready := make(chan struct{})
+	var readyOnce sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -540,6 +542,7 @@ func startMockSessionForMaxConn(t *testing.T, baseURL string, nodeSecret string,
 			if readErr != nil {
 				return
 			}
+			readyOnce.Do(func() { close(ready) })
 
 			plain := raw
 			var wrap struct {
@@ -594,6 +597,7 @@ func startMockSessionForMaxConn(t *testing.T, baseURL string, nodeSecret string,
 			_ = conn.WriteMessage(websocket.TextMessage, respBytes)
 		}
 	}()
+	waitMockNodeRegistered(ready)
 
 	var stopOnce sync.Once
 	return func() {

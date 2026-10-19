@@ -539,6 +539,8 @@ func startMockNodeSessionWithHook(t *testing.T, baseURL string, nodeSecret strin
 		t.Fatalf("dial mock node websocket: %v", err)
 	}
 
+	ready := make(chan struct{})
+	var readyOnce sync.Once
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -548,6 +550,7 @@ func startMockNodeSessionWithHook(t *testing.T, baseURL string, nodeSecret strin
 			if readErr != nil {
 				return
 			}
+			readyOnce.Do(func() { close(ready) })
 
 			plain := raw
 			var wrap struct {
@@ -599,6 +602,7 @@ func startMockNodeSessionWithHook(t *testing.T, baseURL string, nodeSecret strin
 			_ = conn.WriteMessage(websocket.TextMessage, respBytes)
 		}
 	}()
+	waitMockNodeRegistered(ready)
 
 	var stopOnce sync.Once
 	return func() {
@@ -606,6 +610,18 @@ func startMockNodeSessionWithHook(t *testing.T, baseURL string, nodeSecret strin
 			_ = conn.Close()
 			wg.Wait()
 		})
+	}
+}
+
+// waitMockNodeRegistered blocks until the panel sends the mock node its first
+// message. Dial returns as soon as the WebSocket handshake completes, before
+// the panel registers the session, so a request sent right away can find the
+// node offline. Once registered, the panel always sends KernelStatus. The
+// wait gives up quietly for tests whose node never gets a session.
+func waitMockNodeRegistered(ready <-chan struct{}) {
+	select {
+	case <-ready:
+	case <-time.After(3 * time.Second):
 	}
 }
 
