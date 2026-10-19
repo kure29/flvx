@@ -1492,12 +1492,10 @@ export default function SubscriptionPage() {
                       return (
                         <div
                           key={c.key}
-                          className="relative rounded-xl border border-divider transition-colors hover:bg-default-100"
+                          className="relative flex h-14 items-center rounded-xl border border-divider transition-colors hover:bg-default-100"
                         >
-                          {/* Icon above the name: two columns on a phone are
-                              too narrow for "Shadowrocket" beside an icon. */}
                           <button
-                            className="flex w-full flex-col items-start gap-1.5 p-2.5 text-left text-[13px] font-medium sm:text-sm"
+                            className="h-full min-w-0 flex-1 truncate pl-3 pr-9 text-left text-sm font-medium"
                             title={
                               importURL
                                 ? `导入到 ${c.label}`
@@ -1508,16 +1506,11 @@ export default function SubscriptionPage() {
                             type="button"
                             onClick={open}
                           >
-                            <span
-                              className={`flex h-7 w-7 items-center justify-center rounded-lg text-white ${c.tile}`}
-                            >
-                              <c.icon className="h-4 w-4" />
-                            </span>
-                            <span className="w-full truncate">{c.label}</span>
+                            {c.label}
                           </button>
                           <button
                             aria-label={`复制 ${c.label} 订阅链接`}
-                            className="absolute right-1.5 top-1.5 rounded-lg p-1.5 text-default-400 hover:bg-default-200 hover:text-default-600"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-default-400 hover:bg-default-200 hover:text-default-600"
                             type="button"
                             onClick={() =>
                               copyText(link, `${c.label} 订阅已复制`)
@@ -1530,7 +1523,7 @@ export default function SubscriptionPage() {
                     })}
                   </div>
                   <p className="text-center text-xs text-default-400">
-                    点客户端直接导入，右上角按钮复制链接
+                    点客户端直接导入，右侧按钮复制链接
                   </p>
                   {detail.options.rules && (
                     <p className="text-xs text-default-500">
