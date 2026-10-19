@@ -2,7 +2,11 @@ import * as React from "react";
 
 import { IconSvgProps } from "@/types";
 
-/** The brand mark: three waves on a rounded tile, recoloured for dark mode. */
+/**
+ * The brand mark: three waves, no background (app icons in public/ put
+ * them on a white tile), recoloured for dark mode. The viewBox is cropped
+ * to the waves so they read at sidebar sizes.
+ */
 export const Logo: React.FC<IconSvgProps> = ({
   size = 36,
   height,
@@ -11,16 +15,10 @@ export const Logo: React.FC<IconSvgProps> = ({
   <svg
     fill="none"
     height={size || height}
-    viewBox="0 0 256 256"
+    viewBox="37 30 200 200"
     width={size || height}
     {...props}
   >
-    <rect
-      className="fill-[#EFF5FE] dark:fill-[#1B2A4A]"
-      height="256"
-      rx="56"
-      width="256"
-    />
     <path
       className="fill-[#A9C8F7] dark:fill-[#3E5F94]"
       d="M46.0 160.0 C47.7 159.2 51.7 156.3 56.0 155.0 C60.3 153.7 66.7 152.0 72.0 152.0 C77.3 152.0 82.7 153.2 88.0 155.0 C93.3 156.8 98.7 160.2 104.0 163.0 C109.3 165.8 114.7 169.3 120.0 172.0 C125.3 174.7 130.7 177.5 136.0 179.0 C141.3 180.5 147.3 180.3 152.0 181.0 C156.7 181.7 162.0 182.7 164.0 183.0 C162.0 183.5 156.7 184.8 152.0 186.0 C147.3 187.2 141.3 189.2 136.0 190.0 C130.7 190.8 125.3 191.3 120.0 191.0 C114.7 190.7 109.3 189.8 104.0 188.0 C98.7 186.2 93.3 182.7 88.0 180.0 C82.7 177.3 77.3 174.5 72.0 172.0 C66.7 169.5 60.3 167.0 56.0 165.0 C51.7 163.0 47.7 160.8 46.0 160.0 Z"

@@ -44,7 +44,7 @@ FLYX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 - **Backend DB**: handlers use Repository methods, never `repo.DB()` directly.
 - **GORM models**: always define `TableName()` (GORM pluralizes by default).
 - **GORM tags**: no `type:jsonb` or `type:serial` (SQLite incompatible).
-- **Commits**: no `Co-Authored-By: Claude …` trailer — the owner doesn't want Claude listed as a contributor.
+- **Commits**: no `Co-Authored-By: Claude …` trailer — the owner doesn't want Claude listed as a contributor. Commit as the owner (set the repo's `user.name` / `user.email` to the owner's GitHub identity first; a Claude author makes GitHub add the co-author line back on squash merge).
 - **Go versions**: `go.mod` says 1.25.0 for all three modules; CI builds with 1.23.
 
 ## Anti-patterns
