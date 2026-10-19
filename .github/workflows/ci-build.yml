@@ -11,7 +11,7 @@ jobs:
     name: Test Installer Scripts (systemd and Alpine OpenRC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run installer regression tests
         run: bash test-install-scripts-proxy.sh
@@ -26,12 +26,12 @@ jobs:
       run:
         working-directory: vite-frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20.19.0'
+          node-version: '22'
 
       - name: Install pnpm
         run: npm install -g pnpm@10.28.1
@@ -52,12 +52,12 @@ jobs:
       run:
         working-directory: go-backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version: '1.25'
           cache-dependency-path: go-backend/go.sum
 
       - name: Download dependencies
@@ -96,12 +96,12 @@ jobs:
       run:
         working-directory: go-backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version: '1.25'
           cache-dependency-path: go-backend/go.sum
 
       - name: Download dependencies
@@ -119,12 +119,12 @@ jobs:
       run:
         working-directory: go-gost
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version: '1.25'
           cache-dependency-path: go-gost/go.sum
 
       - name: Download dependencies
