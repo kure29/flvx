@@ -19,8 +19,12 @@ import (
 
 func main() {
 	cfg := config.FromEnv()
-	if cfg.JWTSecret == "" {
-		log.Println("warning: JWT_SECRET is empty")
+	generated, err := config.EnsureJWTSecret(&cfg)
+	if err != nil {
+		log.Fatalf("JWT_SECRET is empty and no secret could be stored: %v", err)
+	}
+	if generated {
+		log.Printf("JWT_SECRET is empty; generated one and saved it next to the database")
 	}
 	log.Printf("starting go-backend on %s (db=%s)", cfg.Addr, cfg.DBPath)
 

@@ -33,10 +33,10 @@ func (User) TableName() string { return "user" }
 // Forward maps to the "forward" table.
 type Forward struct {
 	ID                   int64         `gorm:"primaryKey;autoIncrement"`
-	UserID               int64         `gorm:"column:user_id;not null"`
+	UserID               int64         `gorm:"column:user_id;not null;index"`
 	UserName             string        `gorm:"column:user_name;type:varchar(100);not null"`
 	Name                 string        `gorm:"type:varchar(100);not null"`
-	TunnelID             int64         `gorm:"column:tunnel_id;not null"`
+	TunnelID             int64         `gorm:"column:tunnel_id;not null;index"`
 	RemoteAddr           string        `gorm:"column:remote_addr;type:text;not null"`
 	Strategy             string        `gorm:"type:varchar(100);not null;default:'fifo'"`
 	InFlow               int64         `gorm:"not null;default:0"`
@@ -58,8 +58,8 @@ func (Forward) TableName() string { return "forward" }
 
 type ForwardPort struct {
 	ID        int64          `gorm:"primaryKey;autoIncrement"`
-	ForwardID int64          `gorm:"column:forward_id;not null"`
-	NodeID    int64          `gorm:"column:node_id;not null"`
+	ForwardID int64          `gorm:"column:forward_id;not null;index"`
+	NodeID    int64          `gorm:"column:node_id;not null;index"`
 	Port      int            `gorm:"not null"`
 	InIP      sql.NullString `gorm:"column:in_ip;type:text"`
 }
@@ -165,11 +165,11 @@ func (SpeedLimit) TableName() string { return "speed_limit" }
 
 type StatisticsFlow struct {
 	ID          int64  `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID      int64  `gorm:"column:user_id;not null" json:"userId"`
+	UserID      int64  `gorm:"column:user_id;not null;index" json:"userId"`
 	Flow        int64  `gorm:"not null" json:"flow"`
 	TotalFlow   int64  `gorm:"column:total_flow;not null" json:"totalFlow"`
 	Time        string `gorm:"type:varchar(100);not null" json:"time"`
-	CreatedTime int64  `gorm:"column:created_time;not null" json:"-"`
+	CreatedTime int64  `gorm:"column:created_time;not null;index" json:"-"`
 }
 
 func (StatisticsFlow) TableName() string { return "statistics_flow" }

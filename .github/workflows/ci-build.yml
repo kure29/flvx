@@ -39,11 +39,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm exec eslint .
+
       - name: Build
         run: pnpm run build
 
   backend:
-    name: Build Go Backend
+    name: Build and Test Go Backend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -62,6 +65,12 @@ jobs:
 
       - name: Build
         run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -count=1 ./...
 
   backend-postgres-contract:
     name: Go Backend PostgreSQL Contract
@@ -120,3 +129,6 @@ jobs:
 
       - name: Build
         run: go build -v .
+
+      - name: Vet
+        run: go vet ./...
