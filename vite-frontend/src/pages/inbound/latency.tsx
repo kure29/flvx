@@ -98,6 +98,7 @@ function Pill({
   spinning,
 }: {
   point: InboundProbePoint;
+  /** Name the point; hidden on phones, where rows are narrow. */
   label?: boolean;
   spinning?: boolean;
 }) {
@@ -113,9 +114,46 @@ function Pill({
       ) : (
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       )}
-      {label && <span className="font-sans opacity-80">{point.name}</span>}
+      {label && (
+        <span className="hidden font-sans opacity-80 sm:inline">
+          {point.name}
+        </span>
+      )}
       <span className="font-mono">{valueText(point)}</span>
       {loss > 0 && <span className="font-mono opacity-80">丢{loss}%</span>}
+    </span>
+  );
+}
+
+/** A card's reference point: its name over the colored latency. */
+function Tile({
+  point,
+  spinning,
+}: {
+  point: InboundProbePoint;
+  spinning?: boolean;
+}) {
+  const [pill, dot] = TONE[pointTone(point)];
+  const loss = point.ok ? (point.lossPct ?? 0) : 0;
+
+  return (
+    <span
+      className={`flex min-w-0 flex-col items-start rounded-lg px-2 py-1 text-left ${pill}`}
+    >
+      <span className="flex w-full min-w-0 items-center gap-1 text-[11px] opacity-80">
+        {spinning ? (
+          <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin" />
+        ) : (
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+        )}
+        <span className="truncate">{point.name}</span>
+      </span>
+      <span className="flex w-full items-baseline gap-1 whitespace-nowrap font-mono text-sm font-semibold">
+        {valueText(point)}
+        {loss > 0 && (
+          <span className="text-[10px] font-normal opacity-80">丢{loss}%</span>
+        )}
+      </span>
     </span>
   );
 }
@@ -123,9 +161,9 @@ function Pill({
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
 /**
- * The inbound's latency to each reference point. Cards list the points,
- * list rows show the worst one with a dot per other point; pressing either
- * opens every point's result and a re-probe button.
+ * The inbound's latency to each reference point. Cards show up to three
+ * points side by side, list rows the worst one with a dot per other point;
+ * pressing either opens every point's result and a re-probe button.
  */
 export function LatencyCell({
   probe,
@@ -162,41 +200,58 @@ export function LatencyCell({
   }
 
   const worst = worstPoint(points)!;
-  const shown = variant === "card" ? points.slice(0, CARD_POINTS) : [worst];
+  const shown = points.slice(0, CARD_POINTS);
   const more = points.length - shown.length;
-  const others = variant === "list" ? points.filter((p) => p !== worst) : [];
+  const others = points.filter((p) => p !== worst);
 
   return (
     <Dropdown placement="bottom-end">
       <DropdownTrigger>
-        <button
-          className={`inline-flex max-w-full items-center justify-end gap-1 rounded-lg transition-opacity hover:opacity-80 ${variant === "card" ? "flex-wrap" : ""}`}
-          type="button"
-          onClick={stop}
-          onKeyDown={stop}
-        >
-          {shown.map((p, i) => (
-            <Pill
-              key={p.name}
-              label={variant === "card" || points.length > 1}
-              point={p}
-              spinning={probing && i === 0}
-            />
-          ))}
-          {more > 0 && variant === "card" && (
-            <span className="text-xs text-default-400">+{more}</span>
-          )}
-          {others.length > 0 && (
-            <span className="flex items-center gap-0.5">
-              {others.map((p) => (
-                <span
-                  key={p.name}
-                  className={`h-1.5 w-1.5 rounded-full ${TONE[pointTone(p)][1]}`}
-                />
+        {variant === "card" ? (
+          <button
+            className="w-full rounded-lg text-left transition-opacity hover:opacity-80"
+            type="button"
+            onClick={stop}
+            onKeyDown={stop}
+          >
+            <span className="mb-1.5 flex items-center justify-between text-sm">
+              <span className="text-default-600">延迟</span>
+              <span className="text-xs text-default-400">
+                {more > 0 ? `共 ${points.length} 个 · ` : ""}
+                {probe ? ago(probe.checkedAt) : ""}
+              </span>
+            </span>
+            <span
+              className="grid gap-1.5"
+              style={{
+                gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {shown.map((p, i) => (
+                <Tile key={p.name} point={p} spinning={probing && i === 0} />
               ))}
             </span>
-          )}
-        </button>
+          </button>
+        ) : (
+          <button
+            className="inline-flex max-w-full items-center justify-end gap-1 rounded-lg transition-opacity hover:opacity-80"
+            type="button"
+            onClick={stop}
+            onKeyDown={stop}
+          >
+            <Pill label={points.length > 1} point={worst} spinning={probing} />
+            {others.length > 0 && (
+              <span className="flex items-center gap-0.5">
+                {others.map((p) => (
+                  <span
+                    key={p.name}
+                    className={`h-1.5 w-1.5 rounded-full ${TONE[pointTone(p)][1]}`}
+                  />
+                ))}
+              </span>
+            )}
+          </button>
+        )}
       </DropdownTrigger>
       <DropdownMenu aria-label="延迟详情" className="w-64">
         <div role="presentation" onClick={stop} onPointerDown={stop}>

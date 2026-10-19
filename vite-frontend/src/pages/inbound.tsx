@@ -585,6 +585,8 @@ export default function InboundPage() {
           onProbe={() => probeOne(item.id)}
         />
       ) : null;
+    // Cards give measured points their own block under the rows.
+    const latencyTiles = card && latency !== null && probe !== undefined;
     const activate = () =>
       selectMode ? toggleSelect(item.id) : setSheetFor(item.id);
     const dotClass = unreachable
@@ -715,7 +717,7 @@ export default function InboundPage() {
                 {formatTraffic(item.downloadBytes)}
               </span>,
             ],
-            ...(latency
+            ...(latency && !latencyTiles
               ? ([["延迟", latency]] as Array<[string, React.ReactNode]>)
               : []),
           ]}
@@ -734,7 +736,9 @@ export default function InboundPage() {
           tone={tone}
           onPress={() => setSheetFor(item.id)}
           onSelect={() => toggleSelect(item.id)}
-        />
+        >
+          {latencyTiles ? latency : null}
+        </InfoCard>
       );
     }
 
