@@ -1,12 +1,13 @@
 package repo
 
 import (
+	"database/sql"
 	"errors"
+	"go-backend/internal/store/model"
+	"sort"
 	"strings"
 
 	"gorm.io/gorm"
-
-	"go-backend/internal/store/model"
 )
 
 type FlowUploadForwardMeta struct {
@@ -412,4 +413,189 @@ func (r *Repository) GetSpeedLimitSpeed(id int64) (int, error) {
 		return 0, err
 	}
 	return sl.Speed, nil
+}
+
+func sortedFlowUploadTargetIDs(totals map[int64][2]int64) []int64 {
+	ids := make([]int64, 0, len(totals))
+	for id := range totals {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids
+}
+
+func (r *Repository) ApplyFlowUploadDeltasBatch(deltas []FlowUploadCounterDelta) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	if len(deltas) == 0 {
+		return nil
+	}
+
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return applyFlowUploadDeltasTx(tx, deltas)
+	})
+}
+
+func applyFlowUploadDeltasTx(tx *gorm.DB, deltas []FlowUploadCounterDelta) error {
+	if tx == nil {
+		return errors.New("database unavailable")
+	}
+	if len(deltas) == 0 {
+		return nil
+	}
+
+	forwardTotals := make(map[int64][2]int64, len(deltas))
+	userTotals := make(map[int64][2]int64, len(deltas))
+	userTunnelTotals := make(map[int64][2]int64, len(deltas))
+	for _, delta := range deltas {
+		if delta.ForwardID > 0 {
+			current := forwardTotals[delta.ForwardID]
+			current[0] += delta.InFlow
+			current[1] += delta.OutFlow
+			forwardTotals[delta.ForwardID] = current
+		}
+		if delta.UserID > 0 {
+			current := userTotals[delta.UserID]
+			current[0] += delta.InFlow
+			current[1] += delta.OutFlow
+			userTotals[delta.UserID] = current
+		}
+		if delta.UserTunnelID > 0 {
+			current := userTunnelTotals[delta.UserTunnelID]
+			current[0] += delta.InFlow
+			current[1] += delta.OutFlow
+			userTunnelTotals[delta.UserTunnelID] = current
+		}
+	}
+
+	for _, forwardID := range sortedFlowUploadTargetIDs(forwardTotals) {
+		total := forwardTotals[forwardID]
+		if err := tx.Model(&model.Forward{}).Where("id = ?", forwardID).UpdateColumns(map[string]interface{}{
+			"in_flow":  gorm.Expr("in_flow + ?", total[0]),
+			"out_flow": gorm.Expr("out_flow + ?", total[1]),
+		}).Error; err != nil {
+			return err
+		}
+	}
+	for _, userID := range sortedFlowUploadTargetIDs(userTotals) {
+		total := userTotals[userID]
+		if err := tx.Model(&model.User{}).Where("id = ?", userID).UpdateColumns(map[string]interface{}{
+			"in_flow":  gorm.Expr("in_flow + ?", total[0]),
+			"out_flow": gorm.Expr("out_flow + ?", total[1]),
+		}).Error; err != nil {
+			return err
+		}
+	}
+	for _, userTunnelID := range sortedFlowUploadTargetIDs(userTunnelTotals) {
+		total := userTunnelTotals[userTunnelID]
+		if err := tx.Model(&model.UserTunnel{}).Where("id = ?", userTunnelID).UpdateColumns(map[string]interface{}{
+			"in_flow":  gorm.Expr("in_flow + ?", total[0]),
+			"out_flow": gorm.Expr("out_flow + ?", total[1]),
+		}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ─── Statistics Queries ──────────────────────────────────────────────
+
+func (r *Repository) GetStatisticsFlows(userID int64, limit int) ([]model.StatisticsFlow, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var items []model.StatisticsFlow
+	err := r.db.Where("user_id = ?", userID).Order("id DESC").Limit(limit).Find(&items).Error
+	if err != nil {
+		return nil, err
+	}
+	if items == nil {
+		items = make([]model.StatisticsFlow, 0)
+	}
+	return items, nil
+}
+
+// ─── Flow ────────────────────────────────────────────────────────────
+
+func (r *Repository) AddFlow(forwardID, userID int64, userTunnelID int64, inFlow, outFlow int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Forward{}).Where("id = ?", forwardID).
+			UpdateColumns(map[string]interface{}{
+				"in_flow":  gorm.Expr("in_flow + ?", inFlow),
+				"out_flow": gorm.Expr("out_flow + ?", outFlow),
+			}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.User{}).Where("id = ?", userID).
+			UpdateColumns(map[string]interface{}{
+				"in_flow":  gorm.Expr("in_flow + ?", inFlow),
+				"out_flow": gorm.Expr("out_flow + ?", outFlow),
+			}).Error; err != nil {
+			return err
+		}
+		if userTunnelID > 0 {
+			if err := tx.Model(&model.UserTunnel{}).Where("id = ?", userTunnelID).
+				UpdateColumns(map[string]interface{}{
+					"in_flow":  gorm.Expr("in_flow + ?", inFlow),
+					"out_flow": gorm.Expr("out_flow + ?", outFlow),
+				}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ─── Jobs Queries (background stats / expiry) ───────────────────────
+
+func (r *Repository) PurgeOldStatisticsFlows(cutoffMs int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Where("created_time < ?", cutoffMs).Delete(&model.StatisticsFlow{}).Error
+}
+
+func (r *Repository) ListAllUserFlowSnapshots() ([]model.UserFlowSnapshot, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var users []model.User
+	err := r.db.Order("id ASC").Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.UserFlowSnapshot, len(users))
+	for i, u := range users {
+		out[i] = model.UserFlowSnapshot{UserID: u.ID, InFlow: u.InFlow, OutFlow: u.OutFlow}
+	}
+	return out, nil
+}
+
+func (r *Repository) GetLastStatisticsFlowTotal(userID int64) (sql.NullInt64, error) {
+	if r == nil || r.db == nil {
+		return sql.NullInt64{}, errors.New("repository not initialized")
+	}
+	var sf model.StatisticsFlow
+	err := r.db.Where("user_id = ?", userID).Order("id DESC").First(&sf).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return sql.NullInt64{}, nil
+	}
+	if err != nil {
+		return sql.NullInt64{}, err
+	}
+	return sql.NullInt64{Int64: sf.TotalFlow, Valid: true}, nil
+}
+
+func (r *Repository) CreateStatisticsFlow(userID, flow, totalFlow int64, timeText string, createdTime int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Create(&model.StatisticsFlow{
+		UserID: userID, Flow: flow, TotalFlow: totalFlow,
+		Time: timeText, CreatedTime: createdTime,
+	}).Error
 }

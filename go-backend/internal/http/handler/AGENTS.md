@@ -17,14 +17,22 @@ handler/
 ├── federation.go     # Federation/cluster sync API
 ├── flow_policy.go    # Traffic policy API
 ├── jobs.go           # Background job management (sync, cleanup)
-├── mutations.go      # CRUD for users, tunnels, forwards (~3700 LOC)
+├── user_mutations.go     # Users and user↔tunnel grants
+├── node_mutations.go     # Node CRUD, install, ordering
+├── tunnel_mutations.go   # Tunnel CRUD, ports, batch ops
+├── tunnel_state.go       # Building/validating tunnel state and chains
+├── tunnel_runtime.go     # Pushing tunnels to nodes (chains, services, dial addresses)
+├── federation_runtime.go # Federation runtime apply/cleanup
+├── forward_mutations.go  # Forward CRUD, pause/resume, batch ops, forward ports
+├── group_mutations.go    # Groups, permissions, speed limits
+├── request_helpers.go    # Request-body parsing helpers, batch results
 └── upgrade.go        # System upgrade API
 ```
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |------|----------|-------|
-| **User/Tunnel CRUD** | `mutations.go` | Largest file; all create/update/delete ops |
+| **User/Tunnel/Forward CRUD** | `*_mutations.go` | One file per resource; tunnel runtime in `tunnel_runtime.go` |
 | **Login/Captcha** | `handler.go` | Login flow, captcha verification |
 | **Federation Sync** | `federation.go` | Panel-to-panel sync |
 | **Traffic Policies** | `flow_policy.go` | Flow limiting, quota management |
@@ -33,7 +41,7 @@ handler/
 
 ## CONVENTIONS
 - Inherits from parent: GORM via Repository pattern, JWT in Authorization header.
-- Large files expected (`mutations.go` ~3700 LOC - central mutation hub).
+- Keep files per domain; split a file when it grows past ~1500 lines instead of adding to a catch-all.
 - Uses `repo.Repository` for DB access via `h.repo.XXX()` methods.
 - Handlers never call `repo.DB()` directly — all queries go through Repository methods.
 - Domain-driven file split: one file per functional area (federation, jobs, etc.).
