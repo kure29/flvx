@@ -310,3 +310,18 @@ func parsePortRangeMinMax(input string) (int, int) {
 	}
 	return minPort, maxPort
 }
+
+func asBool(v interface{}, def bool) bool {
+	s := strings.TrimSpace(strings.ToLower(asString(v)))
+	if s == "" {
+		return def
+	}
+	switch s {
+	case "1", "t", "true", "yes", "y":
+		return true
+	case "0", "f", "false", "no", "n":
+		return false
+	default:
+		return def
+	}
+}
