@@ -89,16 +89,22 @@ func TestTraceNodeRoutes(t *testing.T) {
 func TestRouteFresh(t *testing.T) {
 	targets := []latencyTarget{{Name: "电信", Host: "a.example.com"}}
 	now := time.Now()
-	r := nodeRoute{CheckedAt: now.Add(-time.Hour).UnixMilli(), Points: []routePoint{{Name: "电信", host: "a.example.com"}}}
-	if !routeFresh(r, targets, now) {
+	r := nodeRoute{CheckedAt: now.Add(-time.Hour).UnixMilli(), Points: []routePoint{{Name: "电信", host: "a.example.com"}}, agent: "3.3.16"}
+	if !routeFresh(r, targets, "3.3.16", now) {
 		t.Fatal("an hour-old trace is fresh")
 	}
-	if routeFresh(r, []latencyTarget{{Name: "电信", Host: "b.example.com"}}, now) {
+	if routeFresh(r, []latencyTarget{{Name: "电信", Host: "b.example.com"}}, "3.3.16", now) {
 		t.Fatal("an edited point must be traced again")
+	}
+	// An upgraded agent is traced again, even a failure from minutes ago.
+	failed := r
+	failed.failed = true
+	if routeFresh(failed, targets, "3.3.17", now) {
+		t.Fatal("a trace by an older agent must not count as fresh")
 	}
 	r.failed = true
 	r.CheckedAt = now.Add(-7 * time.Hour).UnixMilli()
-	if routeFresh(r, targets, now) {
+	if routeFresh(r, targets, "3.3.16", now) {
 		t.Fatal("a failed trace is retried after six hours")
 	}
 }
@@ -140,5 +146,42 @@ func TestRefineHopNetSplitsCMIN2(t *testing.T) {
 	}
 	if got := classifyRoute([]routeHop{{IP: "223.120.22.9", Net: "CMIN2"}, {IP: "223.120.6.5", Net: "CMI"}}); got != "移动 CMIN2" {
 		t.Fatalf("route with a CMIN2 hop = %q", got)
+	}
+}
+
+func TestTraceNodeRoutesAgainAfterAgentUpgrade(t *testing.T) {
+	h, r := setupLatencyHandler(t, `[{"name":"电信","host":"ct.example.com","port":80,"enabled":true}]`)
+	node := mustCreateLatencyNode(t, r, "online", 1, 0)
+	if err := r.UpdateNodeOnline(node, 1, "3.3.15", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	old := nodeTraceroute
+	t.Cleanup(func() { nodeTraceroute = old })
+	upgraded := false
+	nodeTraceroute = func(*Handler, int64, string) (map[string]interface{}, error) {
+		if !upgraded {
+			return nil, errors.New("未知命令类型: Traceroute")
+		}
+		return map[string]interface{}{"reached": true, "hops": []interface{}{
+			map[string]interface{}{"ttl": 1.0, "ip": "202.97.1.1"},
+		}}, nil
+	}
+
+	got, _ := h.traceNodeRoutes(context.Background(), nil, false)
+	if got[node].Points[0].Error == "" {
+		t.Fatalf("old agent = %+v", got[node].Points[0])
+	}
+	// Same agent: the failure is not retried yet.
+	if got, _ := h.traceNodeRoutes(context.Background(), nil, false); len(got) != 0 {
+		t.Fatalf("retried too soon: %v", got)
+	}
+	// The node upgrades its agent; the next round traces it again.
+	upgraded = true
+	if err := r.UpdateNodeOnline(node, 1, "3.3.17", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = h.traceNodeRoutes(context.Background(), nil, false)
+	if p := got[node].Points; len(p) != 1 || p[0].Error != "" || p[0].Route != "电信 163" {
+		t.Fatalf("after upgrade = %+v", got[node])
 	}
 }

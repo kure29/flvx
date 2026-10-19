@@ -151,6 +151,9 @@ type nodeRoute struct {
 	CheckedAt int64        `json:"checkedAt"`
 	Points    []routePoint `json:"points"`
 	failed    bool
+	// agent is the node's agent version when traced, so an upgraded agent
+	// (one that gained Traceroute, say) is traced again right away.
+	agent string
 }
 
 type nodeRouteStore struct {
@@ -241,7 +244,11 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 		want[id] = true
 	}
 	now := time.Now()
-	todo := make(map[int64][]latencyTarget)
+	type job struct {
+		targets []latencyTarget
+		agent   string
+	}
+	todo := make(map[int64]job)
 	for _, n := range nodes {
 		if n.Status != 1 || (len(ids) > 0 && !want[n.ID]) {
 			continue
@@ -250,28 +257,29 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 		if len(targets) == 0 {
 			continue
 		}
+		agent := n.Version.String
 		if !force {
-			if r, ok := h.nodeRoutes.get(n.ID); ok && routeFresh(r, targets, now) {
+			if r, ok := h.nodeRoutes.get(n.ID); ok && routeFresh(r, targets, agent, now) {
 				continue
 			}
 		}
-		todo[n.ID] = targets
+		todo[n.ID] = job{targets: targets, agent: agent}
 	}
 
 	results := make(map[int64]nodeRoute, len(todo))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, routeParallel)
-	for id, targets := range todo {
+	for id, j := range todo {
 		if ctx.Err() != nil {
 			break
 		}
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(nodeID int64, targets []latencyTarget) {
+		go func(nodeID int64, targets []latencyTarget, agent string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			r := nodeRoute{Points: make([]routePoint, len(targets))}
+			r := nodeRoute{Points: make([]routePoint, len(targets)), agent: agent}
 			// One trace at a time per node keeps the agent's raw socket quiet.
 			for i, t := range targets {
 				data, err := nodeTraceroute(h, nodeID, t.Host)
@@ -285,16 +293,16 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 			mu.Lock()
 			results[nodeID] = r
 			mu.Unlock()
-		}(id, targets)
+		}(id, j.targets, j.agent)
 	}
 	wg.Wait()
 	return results, nil
 }
 
-// routeFresh reports whether a stored trace is recent and was made to the
-// points the node measures now.
-func routeFresh(r nodeRoute, targets []latencyTarget, now time.Time) bool {
-	if len(r.Points) != len(targets) {
+// routeFresh reports whether a stored trace is recent and was made by the
+// node's current agent to the points it measures now.
+func routeFresh(r nodeRoute, targets []latencyTarget, agent string, now time.Time) bool {
+	if r.agent != agent || len(r.Points) != len(targets) {
 		return false
 	}
 	for i, t := range targets {
