@@ -36,6 +36,8 @@ type reachProbe struct {
 	LatencyMs int64  `json:"latencyMs,omitempty"`
 	Error     string `json:"error,omitempty"`
 	CheckedAt int64  `json:"checkedAt"`
+	// Points is a node's latency to each reference point (node_latency.go).
+	Points []latencyPoint `json:"points,omitempty"`
 }
 
 type reachProbeStore struct {
@@ -260,6 +262,9 @@ func (h *Handler) runReachProbeLoop(ctx context.Context) {
 		if _, err := h.probeInboundReach(ctx, nil); err != nil && ctx.Err() == nil {
 			log.Printf("inbound reachability probe failed: %v", err)
 		}
+		if _, err := h.probeNodeLatency(ctx, nil); err != nil && ctx.Err() == nil {
+			log.Printf("node latency probe failed: %v", err)
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -286,9 +291,36 @@ func (h *Handler) inboundProbe(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
+	rows, err := h.repo.ListNodeInbounds()
+	if err != nil {
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
+	// Built inbounds show their node's latency, so measure those nodes too.
+	var nodeIDs []int64
+	seen := make(map[int64]bool)
+	for _, row := range rows {
+		if _, ok := results[row.ID]; ok && !isExternalInbound(&row) && !seen[row.NodeID] {
+			seen[row.NodeID] = true
+			nodeIDs = append(nodeIDs, row.NodeID)
+		}
+	}
+	if len(nodeIDs) > 0 && len(h.latencyTargets()) > 0 {
+		if len(req.IDs) == 0 {
+			nodeIDs = nil
+		}
+		if _, err := h.probeNodeLatency(r.Context(), nodeIDs); err != nil {
+			log.Printf("node latency probe failed: %v", err)
+		}
+	}
 	out := make(map[string]reachProbe, len(results))
-	for id, p := range results {
-		out[strconv.FormatInt(id, 10)] = p
+	for _, row := range rows {
+		if _, ok := results[row.ID]; !ok {
+			continue
+		}
+		if v := h.inboundProbeView(&row); v != nil {
+			out[strconv.FormatInt(row.ID, 10)] = *v
+		}
 	}
 	response.WriteJSON(w, response.OK(out))
 }

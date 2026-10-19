@@ -44,6 +44,7 @@ type Handler struct {
 
 	jobsMu      sync.Mutex
 	jobsCancel  context.CancelFunc
+	jobsCtx     context.Context
 	jobsStarted bool
 	jobsWG      sync.WaitGroup
 
@@ -57,6 +58,7 @@ type Handler struct {
 
 	qualityProber *tunnelQualityProber
 	reachProbes   *reachProbeStore
+	nodeLatency   *nodeLatencyStore
 	notifier      *notifier
 	bestExit      *bestExitManager
 }
@@ -118,6 +120,7 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 		nodeOnlineRedeploying:    make(map[int64]struct{}),
 		bestExit:                 newBestExitManager(),
 		reachProbes:              newReachProbeStore(),
+		nodeLatency:              newNodeLatencyStore(),
 		notifier:                 newNotifier(),
 	}
 	h.healthCheck = health.NewChecker(repo, h.wsServer)
@@ -218,6 +221,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/delete", h.inboundDelete)
 	mux.HandleFunc("/api/v1/inbound/batch-delete", h.inboundBatchDelete)
 	mux.HandleFunc("/api/v1/inbound/probe", h.inboundProbe)
+	mux.HandleFunc("/api/v1/node/latency/probe", h.nodeLatencyProbe)
 	mux.HandleFunc("/api/v1/inbound/batch-toggle", h.inboundBatchToggle)
 	mux.HandleFunc("/api/v1/notify/test", h.notifyTest)
 	mux.HandleFunc("/api/v1/subscription/list", h.subscriptionList)
@@ -547,6 +551,11 @@ func (h *Handler) nodeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.syncRemoteNodeStatuses(items)
+	for _, item := range items {
+		if p, ok := h.nodeLatency.get(asInt64(item["id"], 0)); ok {
+			item["latency"] = p
+		}
+	}
 
 	response.WriteJSON(w, response.OK(items))
 }
@@ -973,6 +982,7 @@ func (h *Handler) updateConfigs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.notifyTunnelQualityConfigChanged(key)
+		h.onLatencyConfigChanged(key)
 	}
 
 	response.WriteJSON(w, response.OKEmpty())
@@ -1019,6 +1029,7 @@ func (h *Handler) updateSingleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.notifyTunnelQualityConfigChanged(name)
+	h.onLatencyConfigChanged(name)
 
 	response.WriteJSON(w, response.OKEmpty())
 }
@@ -1033,6 +1044,8 @@ func isAdminRequest(r *http.Request) bool {
 
 func normalizeAndValidateConfigValue(key, value string) (string, error) {
 	switch strings.TrimSpace(key) {
+	case latencyTargetsConfigKey:
+		return normalizeLatencyTargetsConfig(value)
 	case "app_logo", "app_favicon":
 		normalized := strings.TrimSpace(value)
 		if normalized == "" {

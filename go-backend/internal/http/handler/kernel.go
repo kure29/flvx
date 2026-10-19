@@ -589,9 +589,7 @@ func (h *Handler) inboundList(w http.ResponseWriter, r *http.Request) {
 			v.ImportedParams = kernel.ProxyParams(p)
 			v.Extra = ""
 		}
-		if p, ok := h.reachProbes.get(row.ID); ok {
-			v.Probe = &p
-		}
+		v.Probe = h.inboundProbeView(&row)
 		views = append(views, v)
 	}
 	response.WriteJSON(w, response.OK(views))
