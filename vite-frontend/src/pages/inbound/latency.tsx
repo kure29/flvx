@@ -62,21 +62,38 @@ export function probePoints(probe?: InboundProbe): InboundProbePoint[] {
 // Unreachable sorts above any latency of the same red tone.
 const rank = (p: InboundProbePoint) => (p.ok ? RANK[pointTone(p)] : 4);
 
-/** The point that looks worst: unreachable, then the worse tone, then slower. */
+/** Positive when a looks worse than b: unreachable, worse tone, slower. */
+const compare = (a: InboundProbePoint, b: InboundProbePoint) =>
+  rank(a) - rank(b) || (a.latencyMs ?? 0) - (b.latencyMs ?? 0);
+
 export function worstPoint(points: InboundProbePoint[]) {
-  let worst: InboundProbePoint | undefined;
+  return points.reduce<InboundProbePoint | undefined>(
+    (w, p) => (!w || compare(p, w) > 0 ? p : w),
+    undefined,
+  );
+}
+
+function bestPoint(points: InboundProbePoint[]) {
+  return points.reduce<InboundProbePoint | undefined>(
+    (b, p) => (!b || compare(p, b) < 0 ? p : b),
+    undefined,
+  );
+}
+
+/**
+ * The points a card shows: all of them when they fit, else always the
+ * best and the worst, filled up in configured order and kept in it.
+ */
+function cardPoints(points: InboundProbePoint[]) {
+  if (points.length <= CARD_POINTS) return points;
+  const keep = new Set([bestPoint(points)!, worstPoint(points)!]);
 
   for (const p of points) {
-    if (
-      !worst ||
-      rank(p) > rank(worst) ||
-      (rank(p) === rank(worst) && (p.latencyMs ?? 0) > (worst.latencyMs ?? 0))
-    ) {
-      worst = p;
-    }
+    if (keep.size >= CARD_POINTS) break;
+    keep.add(p);
   }
 
-  return worst;
+  return points.filter((p) => keep.has(p));
 }
 
 function ago(ts: number) {
@@ -200,7 +217,7 @@ export function LatencyCell({
   }
 
   const worst = worstPoint(points)!;
-  const shown = points.slice(0, CARD_POINTS);
+  const shown = cardPoints(points);
   const more = points.length - shown.length;
   const others = points.filter((p) => p !== worst);
 
