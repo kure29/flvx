@@ -1014,6 +1014,11 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 		response.Type = "RollbackAgentResponse"
 		// needSaveConfig = false (默认值)
 
+	// 节点调优：读取 / 应用 sysctl 网络参数
+	case "TuneStatus", "TuneApply":
+		response.Type = cmd.Type + "Response"
+		response.Data, err = handleTuneCommand(cmd.Type, cmd.Data)
+
 	// 代理内核（Xray / sing-box / Snell）相关命令，由 kernel.Manager 自行串行化
 	case "KernelApply", "KernelControl", "KernelStatus":
 		response.Type = cmd.Type + "Response"

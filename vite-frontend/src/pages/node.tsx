@@ -73,6 +73,7 @@ import {
   getRemoteSyncErrorMessage,
 } from "@/pages/node/display";
 import { tryCopyInstallCommand } from "@/pages/node/install-command";
+import { NodeTuneModal } from "@/pages/node/tune-modal";
 import { copyWithToast } from "@/utils/clipboard";
 import {
   getNodeRenewalSnapshot,
@@ -345,6 +346,7 @@ export default function NodePage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
+  const [tuneNode, setTuneNode] = useState<Node | null>(null);
   const [nodeToRollback, setNodeToRollback] = useState<Node | null>(null);
   const [nodeToDelete, setNodeToDelete] = useState<Node | null>(null);
   const [protocolDisabled, setProtocolDisabled] = useState(false);
@@ -2184,8 +2186,22 @@ export default function NodePage() {
                                   </div>
                                 )}
                                 <div
-                                  className={`grid gap-1.5 ${isRemoteNode ? "grid-cols-1" : "grid-cols-2"}`}
+                                  className={`grid gap-1.5 ${isRemoteNode ? "grid-cols-1" : "grid-cols-3"}`}
                                 >
+                                  {!isRemoteNode && (
+                                    <Button
+                                      className="min-h-8"
+                                      color="success"
+                                      isDisabled={
+                                        node.connectionStatus !== "online"
+                                      }
+                                      size="sm"
+                                      variant="flat"
+                                      onPress={() => setTuneNode(node)}
+                                    >
+                                      调优
+                                    </Button>
+                                  )}
                                   {!isRemoteNode && (
                                     <Button
                                       className="min-h-8"
@@ -2385,6 +2401,12 @@ export default function NodePage() {
                         label: "安装命令",
                         color: "primary" as const,
                         onPress: () => openInstallSelector(node),
+                      },
+                      {
+                        key: "tune",
+                        label: "调优",
+                        disabled: !online,
+                        onPress: () => setTuneNode(node),
                       },
                       {
                         key: "edit",
@@ -3102,6 +3124,8 @@ export default function NodePage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <NodeTuneModal node={tuneNode} onClose={() => setTuneNode(null)} />
 
       {/* 回退确认模态框 */}
       <Modal

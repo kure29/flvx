@@ -177,6 +177,41 @@ export const getNodeReleases = (channel: ReleaseChannel = "stable") =>
   Network.post<NodeReleaseApiItem[]>("/node/releases", { channel });
 export const rollbackNode = (id: number) =>
   Network.post("/node/rollback", { id });
+
+export interface NodeTuneSetting {
+  key: string;
+  current: string;
+  target: string;
+  supported: boolean;
+  /** Already meets the recommendation (limits are only ever raised). */
+  ok: boolean;
+}
+export interface NodeTuneGroup {
+  id: string;
+  name: string;
+  desc: string;
+  applied: boolean;
+  settings: NodeTuneSetting[];
+}
+export interface NodeTuneStatus {
+  kernel: string;
+  congestion: string;
+  available: string;
+  hasBackup: boolean;
+  groups: NodeTuneGroup[];
+  warnings?: string[];
+}
+/** Node network tuning (sysctl): read, apply the chosen groups, or restore. */
+export const nodeTune = (
+  id: number,
+  action: "status" | "apply" | "restore",
+  groups: string[] = [],
+) =>
+  Network.post<NodeTuneStatus>(
+    "/node/tune",
+    { id, action, groups },
+    { timeout: 40 * 1000 },
+  );
 export const testNodeNftables = (nodeId: number) =>
   Network.post("/node/nftables/test", { nodeId });
 export const reconcileNodeNftables = (nodeId: number) =>

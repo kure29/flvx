@@ -202,6 +202,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/node/upgrade", h.nodeUpgrade)
 	mux.HandleFunc("/api/v1/node/batch-upgrade", h.nodeBatchUpgrade)
 	mux.HandleFunc("/api/v1/node/rollback", h.nodeRollback)
+	mux.HandleFunc("/api/v1/node/tune", h.nodeTune)
 	mux.HandleFunc("/api/v1/node/releases", h.listReleases)
 	mux.HandleFunc("/api/v1/node/nftables/test", h.nodeNftablesTest)
 	mux.HandleFunc("/api/v1/node/nftables/reconcile", h.nodeNftablesReconcile)
