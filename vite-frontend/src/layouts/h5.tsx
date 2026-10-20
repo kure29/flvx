@@ -198,8 +198,11 @@ export default function H5Layout({ children }: { children: React.ReactNode }) {
   };
 
   // 过滤tab项（根据权限）
-  const filteredTabItems = tabItems.filter((item) =>
-    isAdmin ? !item.userOnly : !item.adminOnly,
+  const filteredTabItems = tabItems.filter(
+    (item) =>
+      (isAdmin ? !item.userOnly : !item.adminOnly) &&
+      // Users see 监控 only once granted it (用户 page → 监控权限).
+      (isAdmin || item.path !== "/monitor" || monitorAllowed),
   );
 
   return (

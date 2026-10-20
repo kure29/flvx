@@ -389,6 +389,8 @@ export default function AdminLayout({
   // 过滤菜单项（根据权限）
   const filteredMenuItems = menuItems
     .filter((item) => (isAdmin ? !item.userOnly : !item.adminOnly))
+    // Users see 监控 only once granted it (用户 page → 监控权限).
+    .filter((item) => isAdmin || item.path !== "/monitor" || monitorAllowed)
     .map((item) =>
       isAdmin && item.adminLabel ? { ...item, label: item.adminLabel } : item,
     );
