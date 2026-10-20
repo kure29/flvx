@@ -10,7 +10,12 @@
 
 - 只有 IPv6 的节点也能看回程：节点没有 IPv4、或测试点只有 IPv6 地址时自动改用 IPv6 检测，按每一跳的归属网络识别 CN2 / 163 / 9929 / 4837 / CMI，结果旁标 **IPv6**；测不了时直接说明原因，见 [回程线路](./guide/latency.md#回程线路)
 - 隧道的入口是 nftables 节点时，表单不再显示转发引擎，改为提示由 nftables 转发；引擎选项写明各自适合的场景
+- 入站可以设置出站 IP 策略：自动、仅 IPv4、仅 IPv6、优先 IPv4、优先 IPv6（连不上时回退另一种），入站监听不受影响；在入站的高级选项或分流里设置，优先模式需要 Xray 25.6.8+ 或 sing-box 1.12+，见 [出站 IP 策略](./guide/routing.md#出站-ip-策略)
+- 订阅模板新增 **选择规则**：不用写配置，勾选分类、添加自定义规则和策略组就能生成 Mihomo / sing-box / Surge 模板，保存后可以继续编辑；生成的 Mihomo 模板 Stash、Shadowrocket 也能用，见 [订阅模板](./guide/subscription-templates.md)
+- 订阅的线路筛选新增 **有中转优先显示中转**：落地有启用的中转时只显示中转，没有中转时保留直连，见 [对接中转](./guide/relay.md)
 - 修复：手机上下拉框选中后仍多出一项“请选择”
+- 修复：没有 systemd-resolved 的服务器上，sing-box 1.13+ 可能解析不了域名，导致 REALITY / ShadowTLS 握手和出站失败
+- 感谢 @jiuaiya 贡献出站 IP 策略、模板规则编辑器、中转优先和 DNS 修复
 - **升级**：IPv6 回程需要把节点 agent 升级到 3.3.27 及以上
 
 ## 3.3.26
