@@ -45,6 +45,7 @@ func ghMirrorRepos() map[string]bool {
 		"xtls/xray-core":               true,
 		"sagernet/sing-box":            true,
 		"ihciah/shadow-tls":            true,
+		"zhboner/realm":                true,
 		"v2fly/geoip":                  true,
 		"v2fly/domain-list-community":  true,
 		"sagernet/sing-geosite":        true,
