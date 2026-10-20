@@ -98,7 +98,7 @@ func (p *subPipeline) normalize() error {
 	}
 	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
 	templates := map[string]int64{}
-	for _, kind := range kernel.TemplateFormats {
+	for _, kind := range kernel.TemplateSlots {
 		if id := p.Templates[kind]; id > 0 {
 			templates[kind] = id
 		}

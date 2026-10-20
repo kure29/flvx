@@ -34,13 +34,35 @@ const (
 // TemplateFormats lists the template formats in display order.
 var TemplateFormats = []string{TemplateClash, TemplateSingbox, TemplateSurge}
 
+// Stash and Shadowrocket read Mihomo-format templates; the panel writes
+// their auto groups' nodes out, since neither fills include-all groups.
+const (
+	TemplateStash        = "stash"
+	TemplateShadowrocket = "shadowrocket"
+)
+
+// TemplateSlots are the clients a subscription picks templates for.
+var TemplateSlots = []string{TemplateClash, TemplateSingbox, TemplateSurge, TemplateStash, TemplateShadowrocket}
+
+// TemplateKindOf is the template format a client slot takes.
+func TemplateKindOf(slot string) string {
+	if slot == TemplateStash || slot == TemplateShadowrocket {
+		return TemplateClash
+	}
+	return slot
+}
+
 // MaxTemplateBytes bounds a template's size.
 const MaxTemplateBytes = 2 << 20
 
-// templateFor returns the template kind a subscription format renders
+// templateFor returns the template slot a subscription format renders
 // with, or "" for formats without templates.
 func templateFor(format string) string {
 	switch format {
+	case FormatStash:
+		return TemplateStash
+	case FormatShadowrocket:
+		return TemplateShadowrocket
 	case FormatClash:
 		return TemplateClash
 	case FormatSingbox:
@@ -286,6 +308,12 @@ func checkClashTemplate(content string, names []string) (TemplateSummary, error)
 	}
 	if p, _ := tplMapGet(root, "rule-providers"); p != nil && p.Kind == yaml.MappingNode {
 		s.Providers = len(p.Content) / 2
+		for i := 1; i < len(p.Content); i += 2 {
+			if tplScalar(p.Content[i], "format") == "mrs" {
+				s.Warnings = append(s.Warnings, "规则集用了 mrs 格式，只有 Mihomo 能读；这个模板如果也给 Stash / Shadowrocket 用，请换成 yaml 或 text 格式")
+				break
+			}
+		}
 	}
 	return s, nil
 }
@@ -344,38 +372,85 @@ func reindent(block string, indent int) []string {
 	return out
 }
 
-func clashTemplateProfile(content string, endpoints []Endpoint) (string, error) {
+// autoKeys are how a Mihomo group takes nodes by itself.
+var autoKeys = map[string]bool{"include-all": true, "include-all-proxies": true, "include-all-providers": true,
+	"filter": true, "exclude-filter": true, "exclude-type": true}
+
+// expandedGroup writes out an auto group's nodes (its own members first),
+// for clients that don't fill include-all groups; nil for other groups. A
+// filter Go can't read keeps every node.
+func expandedGroup(g *yaml.Node, names []string) yamlNode {
+	if tplScalar(g, "include-all") != "true" && tplScalar(g, "include-all-proxies") != "true" {
+		return nil
+	}
+	picked := names
+	inc, err1 := compileAll(strings.Split(tplScalar(g, "filter"), "`"))
+	exc, err2 := compileAll(strings.Split(tplScalar(g, "exclude-filter"), "`"))
+	if errors.Join(err1, err2) == nil {
+		picked = nameFilter{include: inc, exclude: exc}.apply(names)
+	}
+	seen := map[string]bool{}
+	list := []interface{}{}
+	for _, m := range append(tplStrings(g, "proxies"), picked...) {
+		if !seen[m] {
+			seen[m] = true
+			list = append(list, m)
+		}
+	}
+	if len(list) == 0 {
+		list = []interface{}{"DIRECT"} // an empty group is rejected
+	}
+	out := yamlNode{}
+	placed := false
+	for i := 0; i+1 < len(g.Content); i += 2 {
+		k := g.Content[i].Value
+		switch {
+		case autoKeys[k]:
+		case k == "proxies":
+			out, placed = append(out, yamlField{k, list}), true
+		default:
+			var v interface{}
+			if g.Content[i+1].Decode(&v) == nil {
+				out = append(out, yamlField{k, v})
+			}
+		}
+	}
+	if !placed {
+		out = append(out, yamlField{"proxies", list})
+	}
+	return out
+}
+
+// clashTemplateProfile renders a Mihomo-format template for Mihomo, or for
+// Stash / Shadowrocket (slot), which get their auto groups written out;
+// Shadowrocket also gets its own node list (chained copies, no VLESS
+// Encryption or WireGuard).
+func clashTemplateProfile(content string, endpoints []Endpoint, slot string) (string, error) {
 	doc, err := parseClashTemplate(content)
 	if err != nil {
 		return "", err
 	}
 	root := doc.Content[0]
-	var rendered []Endpoint
-	var nodes []yamlNode
-	for _, e := range endpoints {
-		if p, ok := ClashProxy(e); ok {
-			rendered = append(rendered, e)
-			nodes = append(nodes, p)
-		}
-	}
-	landing, relay, chain := chainGroups(rendered)
-	proxies := []interface{}{}
-	for i, e := range rendered {
-		p := nodes[i]
-		if chain && e.ChainRole == ChainRoleLanding {
-			p = append(p, yamlField{"dialer-proxy", ChainRelayGroup})
-		}
-		proxies = append(proxies, p)
-	}
+	var proxies []interface{}
+	var names []string
 	var chainGroupNodes []interface{}
-	if chain {
-		chainGroupNodes = []interface{}{
-			yamlNode{{"name", ChainLandingGroup}, {"type", "select"}, {"proxies", toInterfaces(landing)}},
-			yamlNode{{"name", ChainRelayGroup}, {"type", "select"}, {"proxies", toInterfaces(relay)}},
-		}
+	if slot == TemplateShadowrocket {
+		proxies, names = shadowrocketProxies(endpoints)
+	} else {
+		proxies, names, chainGroupNodes = clashTemplateProxies(endpoints)
 	}
+	expand := slot == TemplateStash || slot == TemplateShadowrocket
 	groups, gi := tplMapGet(root, "proxy-groups")
 	if root.Style&yaml.FlowStyle != 0 || groups == nil || groups.Kind != yaml.SequenceNode || groups.Style&yaml.FlowStyle != 0 {
+		if expand && groups != nil && groups.Kind == yaml.SequenceNode {
+			for i, g := range groups.Content {
+				if x := expandedGroup(g, names); x != nil {
+					if n, err := tplValue(x); err == nil {
+						groups.Content[i] = n
+					}
+				}
+			}
+		}
 		return clashTemplateReencode(doc, proxies, chainGroupNodes)
 	}
 
@@ -386,14 +461,34 @@ func clashTemplateProfile(content string, endpoints []Endpoint) (string, error) 
 		add      []string
 	}
 	var edits []edit
+	indent := groups.Content[0].Column - 3
+	if indent < 0 {
+		indent = 0
+	}
+	groupLines := func(nodes []interface{}) []string {
+		block := marshalYAML(yamlNode{{"g", nodes}})
+		return reindent(block[strings.Index(block, "\n")+1:], indent)
+	}
+	if expand {
+		end := clashBlockEnd(root, gi, lines)
+		for i, g := range groups.Content {
+			x := expandedGroup(g, names)
+			if x == nil {
+				continue
+			}
+			from, to := g.Line-1, end
+			if i+1 < len(groups.Content) {
+				to = groups.Content[i+1].Line - 1
+			}
+			for to > from+1 && strings.TrimSpace(lines[to-1]) == "" {
+				to--
+			}
+			edits = append(edits, edit{from, to, groupLines([]interface{}{x})})
+		}
+	}
 	if len(chainGroupNodes) > 0 {
 		at := clashBlockEnd(root, gi, lines)
-		indent := groups.Content[0].Column - 3
-		if indent < 0 {
-			indent = 0
-		}
-		block := marshalYAML(yamlNode{{"g", chainGroupNodes}})
-		edits = append(edits, edit{at, at, reindent(block[strings.Index(block, "\n")+1:], indent)})
+		edits = append(edits, edit{at, at, groupLines(chainGroupNodes)})
 	}
 	proxyLines := []string{"proxies: []"}
 	if len(proxies) > 0 {
@@ -421,6 +516,36 @@ func clashTemplateProfile(content string, endpoints []Endpoint) (string, error) 
 		out += "\n"
 	}
 	return out, nil
+}
+
+// clashTemplateProxies renders Mihomo / Stash proxies, with the chain
+// groups when the chain applies.
+func clashTemplateProxies(endpoints []Endpoint) (proxies []interface{}, names []string, chainNodes []interface{}) {
+	var rendered []Endpoint
+	var nodes []yamlNode
+	for _, e := range endpoints {
+		if p, ok := ClashProxy(e); ok {
+			rendered = append(rendered, e)
+			nodes = append(nodes, p)
+		}
+	}
+	landing, relay, chain := chainGroups(rendered)
+	proxies = []interface{}{}
+	for i, e := range rendered {
+		p := nodes[i]
+		if chain && e.ChainRole == ChainRoleLanding {
+			p = append(p, yamlField{"dialer-proxy", ChainRelayGroup})
+		}
+		proxies = append(proxies, p)
+		names = append(names, e.Name)
+	}
+	if chain {
+		chainNodes = []interface{}{
+			yamlNode{{"name", ChainLandingGroup}, {"type", "select"}, {"proxies", toInterfaces(landing)}},
+			yamlNode{{"name", ChainRelayGroup}, {"type", "select"}, {"proxies", toInterfaces(relay)}},
+		}
+	}
+	return proxies, names, chainNodes
 }
 
 // clashTemplateReencode handles flow-style templates ({...} documents):
@@ -787,15 +912,15 @@ func surgeTemplateProfile(content string, endpoints []Endpoint) (string, error) 
 	return out, nil
 }
 
-// templateProfile renders endpoints into a template of the given kind.
-func templateProfile(kind, content string, endpoints []Endpoint, opts SubOptions) (string, error) {
-	switch kind {
-	case TemplateClash:
-		return clashTemplateProfile(content, endpoints)
+// templateProfile renders endpoints into a template for a client slot.
+func templateProfile(slot, content string, endpoints []Endpoint, opts SubOptions) (string, error) {
+	switch slot {
+	case TemplateClash, TemplateStash, TemplateShadowrocket:
+		return clashTemplateProfile(content, endpoints, slot)
 	case TemplateSingbox:
 		return singboxTemplateProfile(content, endpoints, opts.SingboxSnell)
 	case TemplateSurge:
 		return surgeTemplateProfile(content, endpoints)
 	}
-	return "", fmt.Errorf("不支持的模板格式 %s", kind)
+	return "", fmt.Errorf("不支持的模板格式 %s", slot)
 }

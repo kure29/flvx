@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -240,5 +241,85 @@ func TestSubscriptionSurgeTemplate(t *testing.T) {
 	}
 	if _, err := CheckTemplate(TemplateSurge, "[General]\n", nil); err == nil {
 		t.Fatal("a template without [Proxy Group] is rejected")
+	}
+}
+
+func TestSubscriptionStashAndShadowrocketTemplates(t *testing.T) {
+	tpl := `# 共用模板
+proxies: []
+proxy-groups:
+  - name: 🚀 节点选择
+    type: select
+    proxies: [🇭🇰 香港, DIRECT]
+  - name: 🇭🇰 香港
+    type: url-test
+    include-all: true
+    filter: "(?i)港|hk"
+    url: https://www.gstatic.com/generate_204
+    interval: 300 # 秒
+  - name: 🇸🇬 新加坡
+    type: select
+    include-all-proxies: true
+    filter: "新加坡"
+rules:
+  - MATCH,🚀 节点选择
+`
+	eps := namedEndpoints("香港 01", "HK 02", "美国 01")
+	opts := SubOptions{Templates: map[string]string{TemplateStash: tpl, TemplateShadowrocket: tpl}}
+	type profile struct {
+		Proxies []map[string]interface{} `yaml:"proxies"`
+		Groups  []map[string]interface{} `yaml:"proxy-groups"`
+		Rules   []string                 `yaml:"rules"`
+	}
+	for _, format := range []string{FormatStash, FormatShadowrocket} {
+		body, ct, err := Subscription(format, eps, opts)
+		if err != nil || !strings.HasPrefix(ct, "text/yaml") {
+			t.Fatalf("%s: %v %s", format, err, ct)
+		}
+		var cfg profile
+		if err := yaml.Unmarshal([]byte(body), &cfg); err != nil {
+			t.Fatalf("%s: %v\n%s", format, err, body)
+		}
+		hk, sg := cfg.Groups[1], cfg.Groups[2]
+		if fmt.Sprint(hk["proxies"]) != "[香港 01 HK 02]" || hk["include-all"] != nil || hk["filter"] != nil || hk["interval"] != 300 {
+			t.Fatalf("%s: auto group written out:\n%s", format, body)
+		}
+		// Nothing matches: DIRECT keeps the group valid.
+		if fmt.Sprint(sg["proxies"]) != "[DIRECT]" || len(cfg.Proxies) != 3 || len(cfg.Rules) != 1 {
+			t.Fatalf("%s: empty group / rest:\n%s", format, body)
+		}
+		if !strings.HasPrefix(body, "# 共用模板\n") || !strings.Contains(body, "  - name: 🚀 节点选择\n    type: select\n") {
+			t.Fatalf("%s: untouched parts stay as written:\n%s", format, body)
+		}
+	}
+	// Mihomo keeps include-all for the client.
+	opts.Templates[TemplateClash] = tpl
+	if body, _, _ := Subscription(FormatClash, eps, opts); !strings.Contains(body, "include-all: true") {
+		t.Fatalf("mihomo template changed:\n%s", body)
+	}
+
+	// Shadowrocket: chained copies named after their relay, no chain groups.
+	chain := chainOpts
+	chain.Templates = map[string]string{TemplateShadowrocket: "proxy-groups:\n  - {name: 选择, type: select, include-all: true}\nrules: [MATCH,选择]\n"}
+	body, _, err := Subscription(FormatShadowrocket, chainEndpoints(), chain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg profile
+	if err := yaml.Unmarshal([]byte(body), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Groups) != 1 || !strings.Contains(fmt.Sprint(cfg.Groups[0]["proxies"]), "美国 落地 01") || cfg.Proxies[0]["dialer-proxy"] != "香港 中转" {
+		t.Fatalf("shadowrocket chain:\n%s", body)
+	}
+}
+
+func TestCheckTemplateWarnsAboutMRS(t *testing.T) {
+	s, err := CheckTemplate(TemplateClash, `proxy-groups: [{name: a, type: select, include-all: true}]
+rule-providers:
+  cn: {type: http, behavior: domain, format: mrs, url: "https://example.com/cn.mrs"}
+`, nil)
+	if err != nil || len(s.Warnings) != 1 || !strings.Contains(s.Warnings[0], "mrs") {
+		t.Fatalf("mrs warning: %+v %v", s, err)
 	}
 }

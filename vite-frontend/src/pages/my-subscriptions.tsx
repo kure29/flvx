@@ -169,6 +169,7 @@ function SubscriptionCard({
             </div>
           )}
           <SubClientGrid
+            configClients={s.templates}
             link={(format) => link(s, format)}
             name={s.name}
             rules={s.rules}

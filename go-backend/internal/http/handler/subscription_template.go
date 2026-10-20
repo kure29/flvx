@@ -70,26 +70,27 @@ func (h *Handler) templateUsage() map[int64]int {
 // subOptions is the pipeline's options with its templates loaded.
 func (h *Handler) subOptions(p subPipeline) kernel.SubOptions {
 	opts := p.options()
-	for kind, id := range p.Templates {
-		if t, err := h.repo.GetSubscriptionTemplate(id); err == nil && t != nil && t.Kind == kind {
+	for slot, id := range p.Templates {
+		if t, err := h.repo.GetSubscriptionTemplate(id); err == nil && t != nil && t.Kind == kernel.TemplateKindOf(slot) {
 			if opts.Templates == nil {
 				opts.Templates = map[string]string{}
 			}
-			opts.Templates[kind] = t.Content
+			opts.Templates[slot] = t.Content
 		}
 	}
 	return opts
 }
 
 // checkPipelineTemplates rejects templates that are missing or of another
-// kind than the slot they are picked for.
+// kind than the client slot they are picked for (Stash and Shadowrocket
+// take Mihomo templates).
 func (h *Handler) checkPipelineTemplates(p subPipeline) error {
-	for kind, id := range p.Templates {
+	for slot, id := range p.Templates {
 		t, err := h.repo.GetSubscriptionTemplate(id)
 		if err != nil || t == nil {
 			return errText("所选模板不存在")
 		}
-		if t.Kind != kind {
+		if t.Kind != kernel.TemplateKindOf(slot) {
 			return errText("模板「" + t.Name + "」的格式和所选客户端不符")
 		}
 	}

@@ -638,10 +638,10 @@ func FormatForUserAgent(ua string) string {
 // Subscription renders every supported endpoint in the requested format and
 // returns the body with its content type.
 func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string, string, error) {
-	if kind := templateFor(format); kind != "" && strings.TrimSpace(opts.Templates[kind]) != "" {
-		tpl := opts.Templates[kind]
+	if slot := templateFor(format); slot != "" && strings.TrimSpace(opts.Templates[slot]) != "" {
+		tpl, kind := opts.Templates[slot], TemplateKindOf(slot)
 		endpoints = uniqueNamesExcept(ApplySubOptions(endpoints, opts), templateGroupNames(kind, tpl))
-		body, err := templateProfile(kind, tpl, endpoints, opts)
+		body, err := templateProfile(slot, tpl, endpoints, opts)
 		if err != nil {
 			return "", "", fmt.Errorf("订阅模板出错：%v", err)
 		}

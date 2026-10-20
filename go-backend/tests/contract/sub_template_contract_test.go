@@ -3,11 +3,13 @@ package contract_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"go-backend/internal/auth"
 	"go-backend/internal/http/response"
@@ -140,5 +142,55 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 	}
 	if res := post("/api/v1/subscription/template/delete", `{"id":`+clashID+`}`); res.Code != 0 {
 		t.Fatalf("delete: %+v", res)
+	}
+}
+
+// Stash and Shadowrocket take Mihomo templates, with the auto groups
+// written out; a Shadowrocket template makes users import a full config.
+func TestSubscriptionTemplateStashShadowrocketContract(t *testing.T) {
+	secret := "contract-jwt-secret"
+	router, r := setupContractRouter(t, secret)
+	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
+	post := func(path, body string) response.R { return kernelContractPost(t, router, admin, path, body) }
+
+	link := "ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:secret")) + "@198.51.100.20:8388#%E6%97%A5%E6%9C%AC%E8%90%BD%E5%9C%B0"
+	if res := post("/api/v1/inbound/import", `{"links":"`+link+`"}`); res.Code != 0 {
+		t.Fatalf("import: %+v", res)
+	}
+	clashID := jsonInt64(int64(post("/api/v1/subscription/template/save", `{"name":"共用","kind":"clash","content":`+jsonString(contractClashTpl)+`}`).Data.(map[string]interface{})["id"].(float64)))
+	sbID := jsonInt64(int64(post("/api/v1/subscription/template/save", `{"name":"sb","kind":"singbox","content":`+jsonString(`{"outbounds":[{"type":"selector","tag":"a","outbounds":["{all}"]}]}`)+`}`).Data.(map[string]interface{})["id"].(float64)))
+
+	if res := post("/api/v1/subscription/save", `{"name":"x","sourceAll":true,"options":{"templates":{"shadowrocket":`+sbID+`}}}`); res.Code == 0 {
+		t.Fatal("shadowrocket takes Mihomo templates only")
+	}
+	sub := post("/api/v1/subscription/save", `{"name":"我的","sourceAll":true,"options":{"templates":{"stash":`+clashID+`,"shadowrocket":`+clashID+`}}}`)
+	if sub.Code != 0 {
+		t.Fatalf("save: %+v", sub)
+	}
+	path := sub.Data.(map[string]interface{})["path"].(string)
+	subID := int64(sub.Data.(map[string]interface{})["id"].(float64))
+	for _, format := range []string{"stash", "shadowrocket"} {
+		body := getSub(t, router, path+"?format="+format, "").Body.String()
+		if !strings.Contains(body, "🌍 落地") || strings.Contains(body, "include-all") || !strings.Contains(body, "- \"日本落地\"") {
+			t.Fatalf("%s link writes the group out:\n%s", format, body)
+		}
+	}
+	if body := getSub(t, router, path+"?format=clash", "").Body.String(); strings.Contains(body, "🌍 落地") {
+		t.Fatalf("mihomo has no template here:\n%s", body)
+	}
+
+	// The assigned user's view tells the Shadowrocket button to import a config.
+	now := time.Now().UnixMilli()
+	if err := r.DB().Exec(`INSERT INTO user(id, user, pwd, role_id, exp_time, flow, in_flow, out_flow, flow_reset_time, num, created_time, updated_time, status)
+		VALUES(2, 'xiaoming', 'x', 1, 2727251700000, 99999, 0, 0, 1, 99999, ?, ?, 1)`, now, now).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := r.DB().Exec(`UPDATE subscription SET user_id = 2 WHERE id = ?`, subID).Error; err != nil {
+		t.Fatal(err)
+	}
+	user, _ := auth.GenerateToken(2, "xiaoming", 1, secret)
+	mine := kernelContractPost(t, router, user, "/api/v1/user/subscription/list", `{}`).Data.([]interface{})
+	if got := mine[0].(map[string]interface{})["templates"]; fmt.Sprint(got) != "[stash shadowrocket]" {
+		t.Fatalf("user view templates: %v", got)
 	}
 }

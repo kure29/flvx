@@ -28,6 +28,9 @@ type userSubscriptionView struct {
 	NextResetTime int64 `json:"nextResetTime"`
 	// Rules: routing rules are on, so some clients import a full config.
 	Rules bool `json:"rules"`
+	// Templates are the client slots rendered from a template (a
+	// Shadowrocket template, like rules, makes it import a full config).
+	Templates []string `json:"templates"`
 }
 
 func subStatus(s *model.Subscription, now time.Time) string {
@@ -52,7 +55,7 @@ func (h *Handler) userSubscriptionView(s *model.Subscription, rows []model.NodeI
 	v := userSubscriptionView{
 		ID: s.ID, Name: s.Name, Path: "/api/v1/open_api/sub/" + s.Token, Status: subStatus(s, now),
 		ExpireTime: s.ExpireTime, UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes,
-		TrafficLimit: s.TrafficLimit, ResetDay: s.ResetDay, Rules: pipe.Rules,
+		TrafficLimit: s.TrafficLimit, ResetDay: s.ResetDay, Rules: pipe.Rules, Templates: templateSlots(pipe),
 		NodeCount: len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
 	}
 	if s.ResetDay > 0 {
@@ -132,4 +135,14 @@ func (h *Handler) userSubscriptionIDs(req map[string]interface{}) (ids []int64, 
 		}
 	}
 	return ids, true, nil
+}
+
+func templateSlots(p subPipeline) []string {
+	out := []string{}
+	for _, slot := range kernel.TemplateSlots {
+		if p.Templates[slot] > 0 {
+			out = append(out, slot)
+		}
+	}
+	return out
 }

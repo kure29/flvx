@@ -3,7 +3,7 @@ import type {
   SubPipeline,
   SubPreview,
   SubTemplate,
-  SubTemplateKind,
+  SubTemplateSlot,
   SubPreviewItem,
   SubRuleGroup,
   SubscriptionDraft,
@@ -48,10 +48,10 @@ import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
 import { SubClientGrid } from "@/pages/subscription/client-grid";
 import {
-  TEMPLATE_KINDS,
+  TEMPLATE_SLOTS,
   TemplateGroups,
   TemplatesModal,
-  kindLabel,
+  slotLabel,
 } from "@/pages/subscription/templates";
 import { RenameRules } from "@/pages/subscription/rename-rules";
 import {
@@ -410,7 +410,7 @@ function Editor({
   onClose: () => void;
 }) {
   const [preview, setPreview] = useState<SubPreview | null>(null);
-  const [previewKind, setPreviewKind] = useState<SubTemplateKind | null>(null);
+  const [previewKind, setPreviewKind] = useState<SubTemplateSlot | null>(null);
   // Nodes to pick the chain from; loaded when the chain page opens and kept
   // while roles are picked (picking changes options, which drops preview).
   const [chainNodes, setChainNodes] = useState<SubPreviewItem[] | null>(null);
@@ -494,7 +494,7 @@ function Editor({
   };
   const picked = o.templates ?? {};
   const templateOn = Object.values(picked).some(Boolean);
-  const setTemplate = (kind: SubTemplateKind, id: number) =>
+  const setTemplate = (kind: SubTemplateSlot, id: number) =>
     setOpts({ templates: { ...picked, [kind]: id || undefined } });
   const chainOn =
     (o.chainLandingNames.length > 0 && o.chainRelayNames.length > 0) ||
@@ -875,8 +875,8 @@ function Editor({
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {TEMPLATE_KINDS.map(([kind, label]) => {
-                    const options = templates.filter((t) => t.kind === kind);
+                  {TEMPLATE_SLOTS.map(([kind, label, format]) => {
+                    const options = templates.filter((t) => t.kind === format);
 
                     return (
                       <div
@@ -910,7 +910,9 @@ function Editor({
                     );
                   })}
                   <p className="text-xs text-default-500">
-                    Stash、Shadowrocket、Loon、Quantumult X
+                    Stash、Shadowrocket 用 Mihomo 格式的模板（可以和 Mihomo
+                    共用），面板会把 include-all / filter
+                    展开成节点列表；Loon、Quantumult X
                     暂不支持模板，照旧用内置规则
                   </p>
                 </div>
@@ -919,7 +921,7 @@ function Editor({
             <Section
               hint={`给 mihomo、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点${
                 templateOn
-                  ? `。${TEMPLATE_KINDS.filter(([k]) => picked[k])
+                  ? `。${TEMPLATE_SLOTS.filter(([k]) => picked[k])
                       .map(([, l]) => l)
                       .join("、")} 已用模板，这里的设置对它们不生效`
                   : ""
@@ -1156,9 +1158,9 @@ function Editor({
             {preview?.templates &&
               Object.keys(preview.templates).length > 0 &&
               (() => {
-                const kinds = TEMPLATE_KINDS.filter(
+                const kinds = TEMPLATE_SLOTS.filter(
                   ([k]) => preview.templates?.[k],
-                );
+                ).map(([k, l]) => [k, l] as [SubTemplateSlot, string]);
                 const kind =
                   previewKind && preview.templates[previewKind]
                     ? previewKind
@@ -1178,7 +1180,7 @@ function Editor({
                       />
                     )}
                     <p className="text-xs text-default-500">
-                      {kindLabel(kind)} · 「{view.name}」
+                      {slotLabel(kind)} · 「{view.name}」
                     </p>
                     {view.error ? (
                       <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger dark:bg-danger-500/10">
@@ -1607,6 +1609,11 @@ export default function SubscriptionPage() {
                     复制订阅链接（自动识别客户端）
                   </Button>
                   <SubClientGrid
+                    configClients={Object.entries(
+                      detail.options.templates ?? {},
+                    )
+                      .filter(([, id]) => id)
+                      .map(([slot]) => slot)}
                     link={(format) => url(detail, format)}
                     name={detail.name}
                     rules={detail.options.rules}

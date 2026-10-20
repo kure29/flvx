@@ -12,17 +12,22 @@ export function SubClientGrid({
   link,
   name,
   rules,
+  configClients = [],
 }: {
   /** The subscription link for a ?format= value ("" for auto). */
   link: (format: string) => string;
   name: string;
   rules: boolean;
+  /** Clients rendered from a template: they get a full configuration too. */
+  configClients?: string[];
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {SUB_CLIENTS.map((c) => {
         const url = link(c.format);
-        const isConfig = rules && c.configImportURL !== undefined;
+        const isConfig =
+          c.configImportURL !== undefined &&
+          (rules || configClients.includes(c.key));
         const importURL = isConfig ? (c.configImportURL ?? null) : c.importURL;
         const open = () => {
           if (importURL) {

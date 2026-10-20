@@ -719,9 +719,11 @@ export interface SubPipeline {
   /** JavaScript `function operator(nodes)` run after the other steps. */
   script: string;
   /** Subscription template id per client kind; a kind without one gets the built-in profile. */
-  templates?: Partial<Record<SubTemplateKind, number>>;
+  templates?: Partial<Record<SubTemplateSlot, number>>;
 }
 export type SubTemplateKind = "clash" | "singbox" | "surge";
+/** Clients a subscription picks a template for; Stash and Shadowrocket take Mihomo ("clash") templates. */
+export type SubTemplateSlot = SubTemplateKind | "stash" | "shadowrocket";
 /** A user's own Mihomo / sing-box / Surge profile that subscriptions render into. */
 export interface SubTemplate {
   id: number;
@@ -862,6 +864,8 @@ export interface UserSubscription {
   nextResetTime: number;
   /** Routing rules on: some clients import a full config. */
   rules: boolean;
+  /** Clients rendered from a template (Shadowrocket then imports a full config). */
+  templates?: string[];
 }
 /** The subscriptions assigned to the logged-in user. */
 export const getMySubscriptions = () =>
@@ -921,7 +925,7 @@ export interface SubPreview {
   /** The picked templates' groups with these nodes. */
   templates?: Partial<
     Record<
-      SubTemplateKind,
+      SubTemplateSlot,
       {
         id: number;
         name: string;

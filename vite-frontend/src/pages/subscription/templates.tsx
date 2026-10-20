@@ -4,6 +4,7 @@ import type {
   SubTemplateDraft,
   SubTemplateGroup,
   SubTemplateKind,
+  SubTemplateSlot,
   SubTemplateSummary,
 } from "@/api";
 
@@ -34,6 +35,19 @@ export const TEMPLATE_KINDS: Array<[SubTemplateKind, string]> = [
   ["singbox", "sing-box"],
   ["surge", "Surge"],
 ];
+
+/** The clients a subscription picks templates for, and the format each takes. */
+export const TEMPLATE_SLOTS: Array<[SubTemplateSlot, string, SubTemplateKind]> =
+  [
+    ["clash", "Mihomo", "clash"],
+    ["singbox", "sing-box", "singbox"],
+    ["surge", "Surge", "surge"],
+    ["stash", "Stash", "clash"],
+    ["shadowrocket", "Shadowrocket", "clash"],
+  ];
+
+export const slotLabel = (s: SubTemplateSlot) =>
+  TEMPLATE_SLOTS.find(([key]) => key === s)?.[1] ?? s;
 
 export const kindLabel = (k: SubTemplateKind) =>
   TEMPLATE_KINDS.find(([key]) => key === k)?.[1] ?? k;

@@ -51,10 +51,15 @@ rules:
 
 ## 在订阅里使用
 
-编辑订阅 → **规则** → **订阅模板**，Mihomo、sing-box、Surge 各选一个模板：
+编辑订阅 → **规则** → **订阅模板**，Mihomo、sing-box、Surge、Stash、Shadowrocket 各选一个模板：
 
 - 选了模板的客户端拿到按模板生成的配置，下面的 **内置分组与规则** 对它不生效
-- 没选模板的客户端照旧用内置规则；Stash、Shadowrocket、Loon、Quantumult X 暂不支持模板
+- 没选模板的客户端照旧用内置规则；Loon、Quantumult X 暂不支持模板
+- **Stash、Shadowrocket** 用 Mihomo 格式的模板，可以和 Mihomo 共用同一个：
+  - 这两个客户端不一定认 `include-all` / `filter`，面板会把这类组展开成具体的节点列表（模板里原本写的成员排在前面），一个节点都匹配不到时放一个 `DIRECT`，避免客户端报空组
+  - 规则集要用 `yaml` 或 `text` 格式：`mrs` 只有 Mihomo 能读，模板检查时会提醒
+  - Shadowrocket 开了链式代理时，落地节点按中转各复制一份（“落地（经 中转）”），和不用模板时一样
+  - Shadowrocket 选了模板后下发的是完整配置，订阅详情里的 Shadowrocket 按钮会改为导入配置
 - 筛选、改名、加国旗、去重和脚本照常先执行，处理后的节点才放进模板
 - **预览** 页的 **模板策略组** 里能看到每个组收到了哪些节点
 
