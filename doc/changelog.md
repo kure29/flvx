@@ -4,6 +4,14 @@
 
 完整的提交记录见 [GitHub Releases](https://github.com/kure29/flyx/releases)。
 
+## 3.3.26
+
+2026-10-20
+
+- 中转支持 realm 转发引擎：端口转发隧道在编辑时可以把 **转发引擎** 选为 realm，入口节点会自动安装 realm 来跑这条隧道的转发，占用更低；TCP / UDP、多目标负载、Proxy Protocol 和流量统计照常可用，不支持限速和连接数限制，见 [realm 引擎](./guide/forward.md#realm-引擎)
+- 已有隧道可以随时切换引擎，面板会把转发规则迁移过去
+- **升级**：realm 引擎需要把节点 agent 升级到 3.3.26 及以上
+
 ## 3.3.25
 
 2026-10-20
