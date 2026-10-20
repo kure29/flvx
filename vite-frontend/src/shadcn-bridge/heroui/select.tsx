@@ -415,7 +415,11 @@ export function Select<T>({
           onChange={handleChange}
           onClick={onClick}
         >
-          <option value="">{placeholder ?? "请选择"}</option>
+          {/* Native pickers list every option: the placeholder only stands
+              in while nothing is chosen. */}
+          {singleValue === "" && !options.some((o) => o.key === "") && (
+            <option value="">{placeholder ?? "请选择"}</option>
+          )}
           {options.map((option) => (
             <option
               key={option.key}

@@ -44,7 +44,11 @@ const NET_CLASS: Record<string, string> = {
   "9929": "text-violet-600",
   CMIN2: "text-emerald-600",
   CMI: "text-teal-600",
+  CT: "text-default-500",
 };
+
+// IPv6 hops in AS4134 may be the 163 backbone or provincial ChinaNet.
+const NET_LABEL: Record<string, string> = { CT: "电信" };
 
 /** A return route as a small colored tag; short form for tight spaces. */
 export function RouteTag({
@@ -81,11 +85,11 @@ function HopRow({ hop }: { hop: NodeRouteHop }) {
   return (
     <div className="grid grid-cols-[2rem_1fr_auto] items-center gap-2 py-0.5 font-mono text-xs">
       <span className="text-default-400">{hop.ttl}</span>
-      <span className={hop.ip ? "" : "text-default-300"}>
+      <span className={`break-all ${hop.ip ? "" : "text-default-300"}`}>
         {hop.ip || "*"}
         {hop.net && (
           <span className={`ml-2 font-sans ${NET_CLASS[hop.net] ?? ""}`}>
-            {hop.net}
+            {NET_LABEL[hop.net] ?? hop.net}
           </span>
         )}
       </span>
@@ -188,6 +192,11 @@ export function RouteModal({
                   ) : (
                     <span className="text-xs text-default-400">未识别线路</span>
                   )}
+                  {p.family && (
+                    <span className="shrink-0 rounded bg-default-100 px-1 text-[10px] text-default-500">
+                      {p.family}
+                    </span>
+                  )}
                   {!p.error && (
                     <span className="ml-auto text-xs text-default-400">
                       {p.hops?.length ?? 0} 跳 {open === p.name ? "▴" : "▾"}
@@ -212,8 +221,9 @@ export function RouteModal({
           <p className="text-xs text-default-400">
             按经过的骨干网识别：59.43 段为 CN2（不经过 202.97 即 GIA），202.97
             为 163，219.158 为联通 4837，218.105 / 210.51 为联通
-            9929，223.118–223.121 为移动 CMI，其中归属 AS58807 的为
-            CMIN2。每天自动检测一次。
+            9929，223.118–223.121 为移动 CMI，其中归属 AS58807 的为 CMIN2；IPv6
+            回程按每一跳的归属网络（AS4809 为 CN2，AS4134 为电信
+            163）识别。每天自动检测一次。
           </p>
         </ModalBody>
         <ModalFooter>

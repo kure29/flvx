@@ -185,3 +185,63 @@ func TestTraceNodeRoutesAgainAfterAgentUpgrade(t *testing.T) {
 		t.Fatalf("after upgrade = %+v", got[node])
 	}
 }
+
+func TestIPv6RouteByOriginAS(t *testing.T) {
+	if got := asnQueryName("2001:db8::1"); got != "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.origin6.asn.cymru.com" {
+		t.Fatalf("IPv6 query name = %q", got)
+	}
+	if got := asnQueryName("223.120.22.9"); got != "9.22.120.223.origin.asn.cymru.com" {
+		t.Fatalf("IPv4 query name = %q", got)
+	}
+
+	old := hopASNLookup
+	t.Cleanup(func() { hopASNLookup = old })
+	asns := map[string]string{
+		"2400:4809::1": "4809", "2400:4809::2": "4809",
+		"240e:1::1": "4134", "240e:1::2": "4134",
+		"2408:9929::1": "9929", "2408:1::1": "4837",
+		"2402:5880::1": "58807",
+	}
+	byName := map[string]string{}
+	for ip, asn := range asns {
+		byName[asnQueryName(ip)] = asn
+	}
+	hopASNLookup = func(name string) ([]string, error) {
+		if asn, ok := byName[name]; ok {
+			return []string{asn + " | ::/32 | CN | apnic | 2010-01-01"}, nil
+		}
+		return nil, errors.New("not found")
+	}
+	hops := func(ips ...string) []routeHop {
+		out := make([]routeHop, len(ips))
+		for i, ip := range ips {
+			out[i] = routeHop{TTL: i + 1, IP: ip, Net: hopNet(ip)}
+		}
+		return out
+	}
+	for want, ips := range map[string][]string{
+		// CN2 first, provincial ChinaNet at the end: still GIA.
+		"电信 CN2 GIA": {"fe80::1", "2400:4809::1", "2400:4809::2", "240e:1::1"},
+		"电信 CN2 GT":  {"240e:1::1", "2400:4809::1", "240e:1::2"},
+		"电信 163":     {"2001:db8::7", "240e:1::1", "240e:1::2"},
+		"联通 9929":    {"2408:9929::1", "2408:1::1"},
+		"联通 4837":    {"2408:1::1"},
+		"移动 CMIN2":   {"2402:5880::1"},
+		"未识别":        {"fe80::1", "2001:db8::9"},
+	} {
+		if got := classifyRoute(hops(ips...)); got != want {
+			t.Errorf("%v: got %q, want %q", ips, got, want)
+		}
+	}
+
+	p := routePointFrom(latencyTarget{Name: "电信", Host: "ct.example.com"}, map[string]interface{}{
+		"ip": "240e:1::99", "reached": true,
+		"hops": []interface{}{map[string]interface{}{"ttl": 1, "ip": "2400:4809::1"}},
+	}, nil)
+	if p.Family != "IPv6" || p.Route != "电信 CN2 GIA" {
+		t.Fatalf("IPv6 point = %+v", p)
+	}
+	if e := routePointFrom(latencyTarget{Name: "电信"}, nil, errors.New("节点没有 IPv4 路由，目标没有 IPv6 地址")).Error; e != "节点只有 IPv6，测试点没有 IPv6 地址" {
+		t.Fatalf("error = %q", e)
+	}
+}

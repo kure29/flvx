@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 const (
@@ -20,9 +21,11 @@ const (
 	tracerouteRounds      = 2
 	maxConcurrentTraces   = 4
 	tracerouteICMPProtoV4 = 1
+	tracerouteICMPProtoV6 = 58
 )
 
-// TracerouteRequest asks the node for the route to a host (IPv4, ICMP).
+// TracerouteRequest asks the node for the route to a host (ICMP; IPv4, or
+// IPv6 when the node has no IPv4 route or the host no IPv4 address).
 type TracerouteRequest struct {
 	Host    string `json:"host"`
 	MaxHops int    `json:"maxHops"`
@@ -70,6 +73,72 @@ func (w *WebSocketReporter) handleTraceroute(data interface{}) (TracerouteRespon
 	return traceroute(host, maxHops)
 }
 
+// traceAddr picks the address to trace: IPv4 when the node can route to
+// it, else IPv6. routable reports whether the node has a route to an
+// address; tests replace it.
+func traceAddr(host string, addrs []net.IP) (net.IP, error) {
+	var v4, v6 net.IP
+	for _, a := range addrs {
+		if a.To4() != nil {
+			if v4 == nil {
+				v4 = a.To4()
+			}
+		} else if v6 == nil {
+			v6 = a
+		}
+	}
+	switch {
+	case v4 != nil && routable(v4):
+		return v4, nil
+	case v6 != nil && routable(v6):
+		return v6, nil
+	case v4 == nil && v6 == nil:
+		return nil, fmt.Errorf("DNS解析失败: %s 没有地址", host)
+	case v6 == nil:
+		return nil, fmt.Errorf("节点没有 IPv4 路由，目标没有 IPv6 地址")
+	case v4 == nil:
+		return nil, fmt.Errorf("节点没有 IPv6 路由，目标没有 IPv4 地址")
+	}
+	return nil, fmt.Errorf("节点没有到目标的路由")
+}
+
+// routable connects a UDP socket, which sends nothing but fails without a
+// route (no IPv6 / IPv4 on the node).
+var routable = func(ip net.IP) bool {
+	network := "udp4"
+	if ip.To4() == nil {
+		network = "udp6"
+	}
+	c, err := net.Dial(network, net.JoinHostPort(ip.String(), "33434"))
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
+}
+
+// traceProto holds what differs between ICMPv4 and ICMPv6 probes.
+type traceProto struct {
+	network, listen string
+	proto           int
+	echo, reply     icmp.Type
+	echoType        byte // echo request type in quoted probes
+	setTTL          func(conn *icmp.PacketConn, ttl int) error
+}
+
+var (
+	traceV4 = traceProto{
+		network: "ip4:icmp", listen: "0.0.0.0", proto: tracerouteICMPProtoV4,
+		echo: ipv4.ICMPTypeEcho, reply: ipv4.ICMPTypeEchoReply, echoType: byte(ipv4.ICMPTypeEcho),
+		setTTL: func(c *icmp.PacketConn, ttl int) error { return c.IPv4PacketConn().SetTTL(ttl) },
+	}
+	traceV6 = traceProto{
+		network: "ip6:ipv6-icmp", listen: "::", proto: tracerouteICMPProtoV6,
+		echo: ipv6.ICMPTypeEchoRequest, reply: ipv6.ICMPTypeEchoReply, echoType: byte(ipv6.ICMPTypeEchoRequest),
+		setTTL: func(c *icmp.PacketConn, ttl int) error { return c.IPv6PacketConn().SetHopLimit(ttl) },
+	}
+)
+
 // traceroute sends ICMP echoes with TTL 1..maxHops at once (twice, for
 // routers that drop one) and collects the Time Exceeded answers. It needs a
 // raw socket: root or CAP_NET_RAW.
@@ -79,24 +148,21 @@ func traceroute(host string, maxHops int) (TracerouteResponse, error) {
 	if err != nil {
 		return resp, fmt.Errorf("DNS解析失败: %v", err)
 	}
-	var dst net.IP
-	for _, a := range addrs {
-		if v4 := a.To4(); v4 != nil {
-			dst = v4
-			break
-		}
-	}
-	if dst == nil {
-		return resp, fmt.Errorf("目标没有 IPv4 地址")
+	dst, err := traceAddr(host, addrs)
+	if err != nil {
+		return resp, err
 	}
 	resp.IP = dst.String()
+	tp := traceV4
+	if dst.To4() == nil {
+		tp = traceV6
+	}
 
-	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	conn, err := icmp.ListenPacket(tp.network, tp.listen)
 	if err != nil {
 		return resp, fmt.Errorf("需要 root 或 NET_RAW 权限: %v", err)
 	}
 	defer conn.Close()
-	pc := conn.IPv4PacketConn()
 
 	id := rand.Intn(0xffff) + 1
 	var mu sync.Mutex
@@ -107,20 +173,21 @@ func traceroute(host string, maxHops int) (TracerouteResponse, error) {
 	send := func(ttl, round int) error {
 		seq := round*tracerouteMaxHops + ttl
 		msg := icmp.Message{
-			Type: ipv4.ICMPTypeEcho,
+			Type: tp.echo,
 			Body: &icmp.Echo{ID: id, Seq: seq, Data: []byte("flyx-trace")},
 		}
+		// The kernel fills in the ICMPv6 checksum.
 		b, err := msg.Marshal(nil)
 		if err != nil {
 			return err
 		}
-		if err := pc.SetTTL(ttl); err != nil {
+		if err := tp.setTTL(conn, ttl); err != nil {
 			return err
 		}
 		mu.Lock()
 		sent[seq] = time.Now()
 		mu.Unlock()
-		_, err = pc.WriteTo(b, nil, &net.IPAddr{IP: dst})
+		_, err = conn.WriteTo(b, &net.IPAddr{IP: dst})
 		return err
 	}
 
@@ -135,7 +202,7 @@ func traceroute(host string, maxHops int) (TracerouteResponse, error) {
 			if err != nil {
 				return
 			}
-			seq, reached, ok := matchTraceReply(buf[:n], id, dst)
+			seq, reached, ok := matchTraceReply(tp, buf[:n], id, dst)
 			if !ok {
 				continue
 			}
@@ -217,37 +284,46 @@ func traceroute(host string, maxHops int) (TracerouteResponse, error) {
 // matchTraceReply returns the probe sequence an ICMP message answers: an
 // echo reply from the target, or a Time Exceeded / Unreachable quoting our
 // echo to it.
-func matchTraceReply(b []byte, id int, dst net.IP) (seq int, reached bool, ok bool) {
-	m, err := icmp.ParseMessage(tracerouteICMPProtoV4, b)
+func matchTraceReply(tp traceProto, b []byte, id int, dst net.IP) (seq int, reached bool, ok bool) {
+	m, err := icmp.ParseMessage(tp.proto, b)
 	if err != nil {
 		return 0, false, false
 	}
 	switch body := m.Body.(type) {
 	case *icmp.Echo:
-		if m.Type == ipv4.ICMPTypeEchoReply && body.ID == id {
+		if m.Type == tp.reply && body.ID == id {
 			return body.Seq, true, true
 		}
 	case *icmp.TimeExceeded:
-		return quotedEcho(body.Data, id, dst)
+		return quotedEcho(tp, body.Data, id, dst)
 	case *icmp.DstUnreach:
-		seq, _, ok := quotedEcho(body.Data, id, dst)
+		seq, _, ok := quotedEcho(tp, body.Data, id, dst)
 		return seq, true, ok
 	}
 	return 0, false, false
 }
 
-// quotedEcho reads the original IPv4 header and echo header an ICMP error
+// quotedEcho reads the original IP header and echo header an ICMP error
 // carries.
-func quotedEcho(data []byte, id int, dst net.IP) (int, bool, bool) {
-	if len(data) < 20 {
-		return 0, false, false
+func quotedEcho(tp traceProto, data []byte, id int, dst net.IP) (int, bool, bool) {
+	var echo []byte
+	if tp.proto == tracerouteICMPProtoV6 {
+		// Fixed 40-byte IPv6 header; probes carry no extension headers.
+		if len(data) < 48 || data[0]>>4 != 6 || data[6] != tracerouteICMPProtoV6 || !net.IP(data[24:40]).Equal(dst) {
+			return 0, false, false
+		}
+		echo = data[40:]
+	} else {
+		if len(data) < 20 {
+			return 0, false, false
+		}
+		ihl := int(data[0]&0x0f) * 4
+		if ihl < 20 || len(data) < ihl+8 || !net.IP(data[16:20]).Equal(dst) {
+			return 0, false, false
+		}
+		echo = data[ihl:]
 	}
-	ihl := int(data[0]&0x0f) * 4
-	if ihl < 20 || len(data) < ihl+8 || !net.IP(data[16:20]).Equal(dst) {
-		return 0, false, false
-	}
-	echo := data[ihl:]
-	if echo[0] != byte(ipv4.ICMPTypeEcho) || int(binary.BigEndian.Uint16(echo[4:6])) != id {
+	if echo[0] != tp.echoType || int(binary.BigEndian.Uint16(echo[4:6])) != id {
 		return 0, false, false
 	}
 	return int(binary.BigEndian.Uint16(echo[6:8])), false, true

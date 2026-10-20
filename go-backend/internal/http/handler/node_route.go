@@ -48,6 +48,51 @@ func routeHopNet(ip string) string {
 	return ""
 }
 
+// IPv6 has no backbone-only prefixes, so IPv6 hops are named by origin AS.
+// AS4134 carries both the 163 backbone and provincial ChinaNet: it is "CT",
+// and classifyRoute tells CN2 GIA from GT by whether CT comes before CN2.
+var routeASNs = map[string]string{
+	"4809":  "CN2",
+	"4134":  "CT",
+	"9929":  "9929",
+	"4837":  "4837",
+	"58453": "CMI",
+	"58807": "CMIN2",
+}
+
+// hopNet names the network a hop belongs to, or "".
+func hopNet(ip string) string {
+	addr := net.ParseIP(ip)
+	switch {
+	case addr == nil:
+		return ""
+	case addr.To4() != nil:
+		return refineHopNet(ip, routeHopNet(ip))
+	case !addr.IsGlobalUnicast() || addr.IsPrivate():
+		return ""
+	}
+	return routeASNs[hopOriginASN(ip)]
+}
+
+// asnQueryName is the Team Cymru origin query for an address:
+// d.c.b.a.origin.asn.cymru.com, or the reversed nibbles of an IPv6 address
+// under origin6.asn.cymru.com.
+func asnQueryName(ip string) string {
+	addr := net.ParseIP(ip)
+	if addr == nil {
+		return ""
+	}
+	if v4 := addr.To4(); v4 != nil {
+		return fmt.Sprintf("%d.%d.%d.%d.origin.asn.cymru.com", v4[3], v4[2], v4[1], v4[0])
+	}
+	var b strings.Builder
+	v6 := addr.To16()
+	for i := len(v6) - 1; i >= 0; i-- {
+		fmt.Fprintf(&b, "%x.%x.", v6[i]&0x0f, v6[i]>>4)
+	}
+	return b.String() + "origin6.asn.cymru.com"
+}
+
 // China Mobile's international networks share address space, so CMI hops
 // are told apart by origin AS: AS58807 is CMIN2, AS58453 CMI. Team Cymru's
 // DNS service answers "58807 | 223.x.x.0/24 | HK | apnic | ..." for
@@ -72,11 +117,11 @@ func hopOriginASN(ip string) string {
 	if ok {
 		return asn
 	}
-	parts := strings.Split(ip, ".")
-	if len(parts) != 4 {
+	name := asnQueryName(ip)
+	if name == "" {
 		return ""
 	}
-	txt, err := hopASNLookup(parts[3] + "." + parts[2] + "." + parts[1] + "." + parts[0] + ".origin.asn.cymru.com")
+	txt, err := hopASNLookup(name)
 	if err != nil {
 		return "" // not cached, so a later trace asks again
 	}
@@ -107,17 +152,21 @@ func refineHopNet(ip, prefixNet string) string {
 // classifyRoute names a return route from the backbones its hops cross.
 func classifyRoute(hops []routeHop) string {
 	seen := make(map[string]bool)
+	ctBeforeCN2 := false
 	for _, h := range hops {
+		if h.Net == "CT" && !seen["CN2"] {
+			ctBeforeCN2 = true
+		}
 		if h.Net != "" {
 			seen[h.Net] = true
 		}
 	}
 	switch {
-	case seen["CN2"] && !seen["163"]:
+	case seen["CN2"] && !seen["163"] && !ctBeforeCN2:
 		return "电信 CN2 GIA"
 	case seen["CN2"]:
 		return "电信 CN2 GT"
-	case seen["163"]:
+	case seen["163"] || seen["CT"]:
 		return "电信 163"
 	case seen["9929"]:
 		return "联通 9929"
@@ -139,11 +188,13 @@ type routeHop struct {
 }
 
 type routePoint struct {
-	Name    string     `json:"name"`
-	Route   string     `json:"route,omitempty"`
-	Reached bool       `json:"reached"`
-	Hops    []routeHop `json:"hops,omitempty"`
-	Error   string     `json:"error,omitempty"`
+	Name    string `json:"name"`
+	Route   string `json:"route,omitempty"`
+	Reached bool   `json:"reached"`
+	// Family is "IPv6" when the route was traced over IPv6.
+	Family string     `json:"family,omitempty"`
+	Hops   []routeHop `json:"hops,omitempty"`
+	Error  string     `json:"error,omitempty"`
 	// host is the address traced, so an edited point is traced again.
 	host string
 }
@@ -199,6 +250,12 @@ func routePointFrom(t latencyTarget, data map[string]interface{}, err error) rou
 			p.Error = "节点 agent 版本过旧，升级后可检测回程"
 		case strings.Contains(msg, "NET_RAW"):
 			p.Error = "节点没有 root / NET_RAW 权限"
+		case strings.Contains(msg, "没有 IPv6 地址"):
+			p.Error = "节点只有 IPv6，测试点没有 IPv6 地址"
+		case strings.Contains(msg, "没有 IPv4 地址"):
+			p.Error = "测试点只有 IPv6 地址，节点没有 IPv6"
+		case strings.Contains(msg, "路由"):
+			p.Error = "节点到测试点没有路由"
 		case strings.Contains(msg, "DNS"):
 			p.Error = "域名解析失败"
 		default:
@@ -207,7 +264,11 @@ func routePointFrom(t latencyTarget, data map[string]interface{}, err error) rou
 		return p
 	}
 	p.Reached = asBool(data["reached"], false)
+	if addr := net.ParseIP(asString(data["ip"])); addr != nil && addr.To4() == nil {
+		p.Family = "IPv6"
+	}
 	rawHops, _ := data["hops"].([]interface{})
+	warmHopASNs(rawHops)
 	for _, raw := range rawHops {
 		m, ok := raw.(map[string]interface{})
 		if !ok {
@@ -221,11 +282,30 @@ func routePointFrom(t latencyTarget, data map[string]interface{}, err error) rou
 			TTL:   int(asInt64(m["ttl"], 0)),
 			IP:    ip,
 			RttMs: asFloat(m["rttMs"], 0),
-			Net:   refineHopNet(ip, routeHopNet(ip)),
+			Net:   hopNet(ip),
 		})
 	}
 	p.Route = classifyRoute(p.Hops)
 	return p
+}
+
+// warmHopASNs looks up the origin AS of a trace's IPv6 hops in parallel;
+// hopNet then reads them from the cache.
+func warmHopASNs(rawHops []interface{}) {
+	var wg sync.WaitGroup
+	for _, raw := range rawHops {
+		m, _ := raw.(map[string]interface{})
+		ip := asString(m["ip"])
+		if addr := net.ParseIP(ip); addr == nil || addr.To4() != nil || !addr.IsGlobalUnicast() || addr.IsPrivate() {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			hopOriginASN(ip)
+		}()
+	}
+	wg.Wait()
 }
 
 // traceNodeRoutes traces the given local online nodes (all when ids is

@@ -11,7 +11,6 @@ interface TunnelFormInput {
   forwardMode?: "agent" | "nftables";
   probeTargetHost?: string;
   probeTargetPort?: number;
-  engine?: string;
 }
 
 interface TunnelNodeInput {
@@ -215,14 +214,6 @@ export const validateTunnelForm = (
         errors.outNodeId = "隧道转发模式下，入口和出口不能有相同节点";
       }
     }
-  }
-
-  if (
-    form.type === 1 &&
-    form.engine === "realm" &&
-    form.forwardMode === "nftables"
-  ) {
-    errors.inNodeId = "nftables 节点不能使用 realm 引擎";
   }
 
   if (form.forwardMode === "nftables") {

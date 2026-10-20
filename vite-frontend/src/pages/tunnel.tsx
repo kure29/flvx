@@ -670,7 +670,12 @@ export default function TunnelPage({
         chainNodes: cleanedChainNodes,
         probeTargetHost,
         probeTargetPort,
-        engine: form.type === 1 ? form.engine || "" : "",
+        // nftables entries forward by themselves.
+        engine:
+          form.type === 1 &&
+          getTunnelForwardMode(form.inNodeId, nodes) !== "nftables"
+            ? form.engine || ""
+            : "",
       };
 
       const response = isEdit
