@@ -30,7 +30,7 @@ import {
 } from "@/shadcn-bridge/heroui/modal";
 
 export const TEMPLATE_KINDS: Array<[SubTemplateKind, string]> = [
-  ["clash", "Mihomo / Clash"],
+  ["clash", "Mihomo"],
   ["singbox", "sing-box"],
   ["surge", "Surge"],
 ];

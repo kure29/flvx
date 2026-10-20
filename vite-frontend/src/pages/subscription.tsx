@@ -917,7 +917,7 @@ function Editor({
               )}
             </Section>
             <Section
-              hint={`给 mihomo（Clash Meta 内核）、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点${
+              hint={`给 mihomo、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点${
                 templateOn
                   ? `。${TEMPLATE_KINDS.filter(([k]) => picked[k])
                       .map(([, l]) => l)

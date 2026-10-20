@@ -239,7 +239,7 @@ func parseClashTemplate(content string) (*yaml.Node, error) {
 		return nil, fmt.Errorf("YAML 格式错误：%v", err)
 	}
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
-		return nil, errors.New("模板应是一份 Mihomo / Clash 配置（YAML 对象）")
+		return nil, errors.New("模板应是一份 Mihomo 配置（YAML 对象）")
 	}
 	return &doc, nil
 }
