@@ -86,11 +86,6 @@ export function LatencyTargetsModal({
     );
 
   const save = async () => {
-    if (custom && points.length === 0) {
-      toast.error("至少选一个测试点");
-
-      return;
-    }
     setSaving(true);
     try {
       const res = await setNodeLatencyTargets({
@@ -244,6 +239,12 @@ export function LatencyTargetsModal({
                 })}
               </div>
             </div>
+          )}
+          {custom && pool.length > 0 && points.length === 0 && (
+            <p className="text-xs text-default-500">
+              一个都不选：{batch ? "这些节点" : "这台节点"}
+              不测延迟和回程，卡片上显示“不测延迟”。
+            </p>
           )}
           {batch && (
             <p className="text-xs text-warning-600">

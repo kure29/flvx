@@ -1151,16 +1151,30 @@ export default function NodePage() {
 
   const renderLatency = (node: Node, variant: "card" | "list") =>
     node.isRemote !== 1 && node.connectionStatus === "online" ? (
-      <LatencyCell
-        note={node.latencyTargets ? "自定义" : undefined}
-        probe={node.latency}
-        probing={probingIds.has(node.id)}
-        variant={variant}
-        onEditTargets={() => setTargetNodes([node])}
-        onProbe={() => probeNode(node.id)}
-        onShowRoute={() => setRouteNode(node)}
-        onShowTrend={() => setTrendNode(node)}
-      />
+      node.latencyTargets?.points.length === 0 ? (
+        <button
+          className="rounded-full bg-default-100 px-2 py-0.5 text-xs text-default-500 hover:text-default-700"
+          title="这台节点没选测试点，点此设置"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setTargetNodes([node]);
+          }}
+        >
+          不测延迟
+        </button>
+      ) : (
+        <LatencyCell
+          note={node.latencyTargets ? "自定义" : undefined}
+          probe={node.latency}
+          probing={probingIds.has(node.id)}
+          variant={variant}
+          onEditTargets={() => setTargetNodes([node])}
+          onProbe={() => probeNode(node.id)}
+          onShowRoute={() => setRouteNode(node)}
+          onShowTrend={() => setTrendNode(node)}
+        />
+      )
     ) : null;
 
   const handleDragEnd = async (event: DragEndEvent) => {

@@ -122,7 +122,7 @@ func (h *Handler) latencyPool() []latencyTarget {
 }
 
 // nodeTargetChoice is a node's own pick of reference points, stored on the
-// node as JSON.
+// node as JSON. No points means the node measures nothing.
 type nodeTargetChoice struct {
 	Points []string `json:"points"`
 	Pinned []string `json:"pinned"`
@@ -133,8 +133,14 @@ func parseNodeTargetChoice(raw string) *nodeTargetChoice {
 		return nil
 	}
 	var c nodeTargetChoice
-	if err := json.Unmarshal([]byte(raw), &c); err != nil || len(c.Points) == 0 {
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
 		return nil
+	}
+	if c.Points == nil {
+		c.Points = []string{}
+	}
+	if c.Pinned == nil {
+		c.Pinned = []string{}
 	}
 	return &c
 }
@@ -149,10 +155,14 @@ func containsString(list []string, s string) bool {
 }
 
 // targetsForNode returns the points a node measures, in pool order: its own
-// choice (with its own pinned points), or the defaults. A choice whose
-// points were all removed from the pool falls back to the defaults.
+// choice (with its own pinned points), or the defaults. An empty choice
+// measures nothing; one whose points were all removed from the pool falls
+// back to the defaults.
 func targetsForNode(pool []latencyTarget, rawChoice string) []latencyTarget {
 	if c := parseNodeTargetChoice(rawChoice); c != nil {
+		if len(c.Points) == 0 {
+			return nil
+		}
 		var own []latencyTarget
 		for _, t := range pool {
 			if containsString(c.Points, t.Name) {
@@ -200,6 +210,15 @@ func (s *nodeLatencyStore) replace(results map[int64]reachProbe, all bool) {
 	}
 	for id, p := range results {
 		s.results[id] = p
+	}
+}
+
+// drop forgets nodes that no longer measure anything.
+func (s *nodeLatencyStore) drop(ids []int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, id := range ids {
+		delete(s.results, id)
 	}
 }
 
@@ -403,7 +422,8 @@ func renamedTargets(prev, next []latencyTarget) map[string]string {
 }
 
 // syncNodeTargetChoices follows renames in the nodes' own choices and drops
-// removed points; a choice left empty follows the defaults again.
+// removed points; a choice left empty follows the defaults again (one that
+// was empty on purpose stays so).
 func (h *Handler) syncNodeTargetChoices(prev, next []latencyTarget) {
 	nodes, err := h.repo.ListMonitorNodes()
 	if err != nil {
@@ -428,7 +448,7 @@ func (h *Handler) syncNodeTargetChoices(prev, next []latencyTarget) {
 	}
 	for _, n := range nodes {
 		c := parseNodeTargetChoice(n.LatencyTargets)
-		if c == nil {
+		if c == nil || len(c.Points) == 0 {
 			continue
 		}
 		next := nodeTargetChoice{Points: carry(c.Points), Pinned: carry(c.Pinned)}
@@ -463,13 +483,15 @@ func (h *Handler) nodeLatencyTargetsSet(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	value := ""
+	measuresNothing := false
 	if req.Custom {
 		pool := h.latencyPool()
 		inPool := make(map[string]bool, len(pool))
 		for _, t := range pool {
 			inPool[t.Name] = true
 		}
-		var choice nodeTargetChoice
+		// No points is allowed: these nodes stop measuring.
+		choice := nodeTargetChoice{Points: []string{}, Pinned: []string{}}
 		for _, n := range req.Points {
 			if !inPool[n] {
 				response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("测试点不存在：%s", n)))
@@ -479,10 +501,7 @@ func (h *Handler) nodeLatencyTargetsSet(w http.ResponseWriter, r *http.Request) 
 				choice.Points = append(choice.Points, n)
 			}
 		}
-		if len(choice.Points) == 0 {
-			response.WriteJSON(w, response.ErrDefault("至少选一个测试点"))
-			return
-		}
+		measuresNothing = len(choice.Points) == 0
 		for _, n := range req.Pinned {
 			if containsString(choice.Points, n) && !containsString(choice.Pinned, n) {
 				choice.Pinned = append(choice.Pinned, n)
@@ -502,6 +521,9 @@ func (h *Handler) nodeLatencyTargetsSet(w http.ResponseWriter, r *http.Request) 
 	if err := h.repo.SetNodesLatencyTargets(req.IDs, value); err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
+	}
+	if measuresNothing {
+		h.nodeLatency.drop(req.IDs)
 	}
 	// Latency takes seconds, so the list the page reloads already shows the
 	// new points; traces take longer and follow in the background.

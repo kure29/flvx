@@ -38,6 +38,7 @@ func TestTargetsForNode(t *testing.T) {
 		"": "电信*,联通",
 		`{"points":["移动","电信"],"pinned":["移动"]}`: "电信,移动*",
 		`{"points":["已删除"]}`:                     "电信*,联通",
+		`{"points":[],"pinned":[]}`:              "",
 		`not json`:                               "电信*,联通",
 	} {
 		if got := names(targetsForNode(pool, raw)); got != want {
@@ -82,7 +83,6 @@ func TestNodeLatencyTargetsSet(t *testing.T) {
 
 	for body, want := range map[string]string{
 		`{"ids":[1],"custom":true,"points":["不存在"]}`: "测试点不存在",
-		`{"ids":[1],"custom":true,"points":[]}`:      "至少选一个",
 		`{"ids":[],"custom":false}`:                  "参数错误",
 	} {
 		if res := postTargets(t, h, body); res["code"].(float64) == 0 || !strings.Contains(res["msg"].(string), want) {
@@ -112,6 +112,18 @@ func TestNodeLatencyTargetsSet(t *testing.T) {
 	if got := nodeChoice(t, h, b); got != "" {
 		t.Fatalf("cleared choice = %q", got)
 	}
+
+	// No points: the node stops measuring and its old result goes away.
+	*calls = nil
+	if res := postTargets(t, h, `{"ids":[`+itoa(a)+`],"custom":true,"points":[]}`); res["code"].(float64) != 0 {
+		t.Fatalf("none: %v", res)
+	}
+	if got := nodeChoice(t, h, a); got != `{"points":[],"pinned":[]}` {
+		t.Fatalf("stored %s", got)
+	}
+	if _, ok := h.nodeLatency.get(a); ok || len(*calls) != 0 {
+		t.Fatalf("a node measuring nothing still has a result / was measured: %v", *calls)
+	}
 }
 
 func TestSyncNodeTargetChoicesFollowsRenames(t *testing.T) {
@@ -122,6 +134,10 @@ func TestSyncNodeTargetChoicesFollowsRenames(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := r.SetNodesLatencyTargets([]int64{b}, `{"points":["移动"],"pinned":[]}`); err != nil {
+		t.Fatal(err)
+	}
+	none := mustCreateLatencyNode(t, r, "none", 1, 0)
+	if err := r.SetNodesLatencyTargets([]int64{none}, `{"points":[],"pinned":[]}`); err != nil {
 		t.Fatal(err)
 	}
 	prev := h.latencyPool()
@@ -141,6 +157,9 @@ func TestSyncNodeTargetChoicesFollowsRenames(t *testing.T) {
 	}
 	if got := nodeChoice(t, h, b); got != "" {
 		t.Fatalf("a choice left empty follows the defaults, got %s", got)
+	}
+	if got := nodeChoice(t, h, none); got != `{"points":[],"pinned":[]}` {
+		t.Fatalf("a node measuring nothing on purpose keeps it, got %s", got)
 	}
 }
 
