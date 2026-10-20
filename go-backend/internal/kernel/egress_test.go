@@ -110,9 +110,11 @@ func TestIPv6OnlyAlongsideIPv4AndAutomatic(t *testing.T) {
 				routeKey, obKey, inKey = "routing", "outboundTag", "inboundTag"
 			}
 			rules := cfg[routeKey].(map[string]interface{})["rules"].([]interface{})
-			want := []string{"reject", "reject", "ipv6-in-1-flvx-u7", "ipv6-in-1-direct", "ipv4-in-2-flvx-u7", "ipv4-in-2-direct", "flvx-u7"}
+			// Each strict inbound rejects the other family right before
+			// its direct rules.
+			want := []string{"reject", "ipv6-in-1-flvx-u7", "ipv6-in-1-direct", "reject", "ipv4-in-2-flvx-u7", "ipv4-in-2-direct", "flvx-u7"}
 			if kt == TypeXray {
-				want[0], want[1] = "block", "block"
+				want[0], want[3] = "block", "block"
 			}
 			if got := ruleOutbounds(rules, obKey); !reflect.DeepEqual(got, want) {
 				t.Fatalf("mixed policies must stay scoped ahead of user-wide routing: %v", got)
@@ -165,9 +167,7 @@ func TestIPv6OnlySplitChainAndAdvancedConfiguration(t *testing.T) {
 			}
 			for _, address := range []string{"192.0.2.1", "::ffff:192.0.2.1"} {
 				in.Via = &Endpoint{Host: address, Port: 8388, Proxy: Proxy{"type": "ss", "server": address, "port": 8388, "cipher": "aes-128-gcm", "password": "x"}}
-				if _, err := Render(kt, []Inbound{in}); err == nil {
-					t.Fatalf("IPv4 next hop %s must be refused", address)
-				}
+				assertUnreachableChainBlocked(t, kt, in)
 			}
 			in.Via = nil
 			for _, extra := range []string{`{"tag":"custom"}`, `{"detour":"in-2"}`} {
@@ -213,17 +213,16 @@ func TestIPv4OnlySplitAndChain(t *testing.T) {
 				routeKey, obKey = "routing", "outboundTag"
 			}
 			rules := cfg[routeKey].(map[string]interface{})["rules"].([]interface{})
-			if kt == TypeSingbox && rules[1].(map[string]interface{})["action"] != "sniff" {
+			if kt == TypeSingbox && rules[0].(map[string]interface{})["action"] != "sniff" {
 				t.Fatal("protocol sniffing must still run before split rules")
 			}
+			assertFamilyBlocksOnlyDirect(t, kt, rules, obKey, "ipv4-in-1-")
 			targets := strings.Join(ruleOutbounds(rules, obKey), ",")
 			if strings.Contains(targets, ",direct,") || !strings.HasSuffix(targets, "via-1-u7,via-1,flvx-u7") {
 				t.Fatalf("split direct must use scoped dialer and default must retain chain: %s", targets)
 			}
 			in.Via = &Endpoint{Host: "2001:db8::1", Port: 8388, Proxy: Proxy{"type": "ss", "server": "2001:db8::1", "port": 8388, "cipher": "aes-128-gcm", "password": "x"}}
-			if _, err := Render(kt, []Inbound{in}); err == nil {
-				t.Fatal("an IPv6 next hop must be refused")
-			}
+			assertUnreachableChainBlocked(t, kt, in)
 		})
 	}
 }
@@ -400,5 +399,67 @@ func TestPreferredEgressSplitAndChain(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// assertUnreachableChainBlocked: a next hop outside the inbound's family
+// rejects that inbound's chained traffic; the rest of the node still renders.
+func assertUnreachableChainBlocked(t *testing.T, kt string, in Inbound) {
+	t.Helper()
+	other := Inbound{ID: 9, Protocol: ProtocolVLESS, Port: 9443, Settings: Settings{UUID: "00000000-0000-4000-8000-000000000009"}}
+	cfg := renderJSON(t, kt, []Inbound{in, other})
+	routeKey, obKey := "route", "outbound"
+	if kt == TypeXray {
+		routeKey, obKey = "routing", "outboundTag"
+	}
+	targets := ruleOutbounds(cfg[routeKey].(map[string]interface{})["rules"].([]interface{}), obKey)
+	for _, tag := range targets {
+		if tag == "via-1" || tag == "via-1-u7" {
+			t.Fatalf("traffic still routed to an unreachable next hop: %v", targets)
+		}
+	}
+	if !strings.Contains(strings.Join(targets, ","), map[bool]string{true: "block", false: "reject"}[kt == TypeXray]) {
+		t.Fatalf("chained traffic must be rejected: %v", targets)
+	}
+}
+
+// assertFamilyBlocksOnlyDirect: every other-family block sits right before
+// a rule leaving through the inbound's own direct dialer, so traffic handed
+// to a next hop is never filtered.
+func assertFamilyBlocksOnlyDirect(t *testing.T, kt string, rules []interface{}, obKey, directPrefix string) {
+	t.Helper()
+	for i, r := range rules {
+		m := r.(map[string]interface{})
+		isFamilyBlock := m["ip_version"] != nil || (kt == TypeXray && m[obKey] == "block" && m["ip"] != nil)
+		if !isFamilyBlock {
+			continue
+		}
+		if i+1 >= len(rules) {
+			t.Fatalf("family block %d is last", i)
+		}
+		next, _ := rules[i+1].(map[string]interface{})[obKey].(string)
+		if !strings.HasPrefix(next, directPrefix) {
+			t.Fatalf("family block %d precedes %q, not a direct rule", i, next)
+		}
+	}
+}
+
+func TestOutboundIPPolicyKeepsLocalResolver(t *testing.T) {
+	in := Inbound{ID: 1, Protocol: ProtocolVLESS, Port: 8443, Settings: Settings{UUID: "00000000-0000-4000-8000-000000000000"},
+		OutboundIPStrategy: OutboundIPv4Only}
+	r, err := RenderWith(TypeSingbox, []Inbound{in}, RenderOptions{SingboxPreferGoDNS: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(r.Files[0].Content), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	servers := cfg["dns"].(map[string]interface{})["servers"].([]interface{})
+	if len(servers) != 2 || servers[0].(map[string]interface{})["tag"] != "flvx-local-resolver" || servers[1].(map[string]interface{})["tag"] != ipv4ResolverTag {
+		t.Fatalf("policy resolvers must be added to the local one: %v", servers)
+	}
+	if cfg["route"].(map[string]interface{})["default_domain_resolver"] != "flvx-local-resolver" {
+		t.Fatal("automatic dialers must keep the local default resolver")
 	}
 }

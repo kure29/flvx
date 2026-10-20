@@ -91,9 +91,15 @@ func applyOutboundIPPolicies(kernelType string, cfg obj, inbounds []Inbound, pre
 			byTag[tag] = ob
 		}
 	}
-	var prefix, fallback []interface{}
+	var fallback []interface{}
 	var resolvers []interface{}
 	resolverAdded := map[string]bool{}
+	// blockBefore[i] is a strict-mode rule that rejects the other family
+	// right before rules[i], a rule that leaves through a direct outbound.
+	blockBefore := map[int]obj{}
+	// Proxy outbounds whose literal server is outside the inbound's family:
+	// their rules reject, like a chain whose target is gone.
+	unreachable := map[string]bool{}
 	for _, in := range restricted {
 		preferred := isOutboundIPPreference(in.OutboundIPStrategy)
 		family, blockedFamily := 4, 6
@@ -111,13 +117,7 @@ func applyOutboundIPPolicies(kernelType string, cfg obj, inbounds []Inbound, pre
 		tags := singboxInboundTags(in)
 		if kernelType == TypeXray {
 			tags = []string{in.Tag()}
-			if !preferred {
-				prefix = append(prefix, obj{"type": "field", inboundKey: tags, "ip": []string{blockedCIDR}, outboundKey: "block"})
-			}
 		} else {
-			if !preferred {
-				prefix = append(prefix, obj{inboundKey: tags, "ip_version": blockedFamily, "action": "reject"})
-			}
 			if !resolverAdded[resolverTag] {
 				resolver := obj{"type": "local", "tag": resolverTag}
 				if preferGoDNS {
@@ -171,11 +171,43 @@ func applyOutboundIPPolicies(kernelType string, cfg obj, inbounds []Inbound, pre
 			}
 			return nil
 		}
+		// The policy covers the local socket only: traffic sent on to a
+		// next hop may reach either family there, so strict modes reject the
+		// other family only on the way out through a direct outbound.
+		familyBlock := func(rule obj) obj {
+			block := obj{}
+			for k, v := range rule {
+				block[k] = v
+			}
+			if kernelType != TypeXray {
+				delete(block, outboundKey)
+				block["ip_version"], block["action"] = blockedFamily, "reject"
+				return block
+			}
+			block[outboundKey] = "block"
+			ips, ok := rule["ip"].([]string)
+			if !ok {
+				block["ip"] = []string{blockedCIDR}
+				return block
+			}
+			// A rule matching listed CIDRs only needs its other-family ones.
+			var other []string
+			for _, cidr := range ips {
+				if ip, _, err := net.ParseCIDR(cidr); err == nil && (ip.To4() == nil) == (blockedFamily == 6) {
+					other = append(other, cidr)
+				}
+			}
+			if len(other) == 0 {
+				return nil
+			}
+			block["ip"] = other
+			return block
+		}
 		// Chain/split proxy outbounds are already unique to this inbound.
 		for tag, ob := range byTag {
 			if tag == chainTag(in) || strings.HasPrefix(tag, chainTag(in)+"-") {
 				if err := patch(ob); err != nil {
-					return err
+					unreachable[tag] = true
 				}
 			}
 		}
@@ -202,15 +234,41 @@ func applyOutboundIPPolicies(kernelType string, cfg obj, inbounds []Inbound, pre
 			clones[sourceTag] = tag
 			return tag
 		}
-		for _, value := range rules {
+		for i, value := range rules {
 			rule := value.(obj)
-			if containsInboundTag(rule[inboundKey], tags) {
-				if tag, ok := rule[outboundKey].(string); ok {
-					rule[outboundKey] = directTag(tag)
+			if !containsInboundTag(rule[inboundKey], tags) {
+				continue
+			}
+			tag, ok := rule[outboundKey].(string)
+			if !ok {
+				continue
+			}
+			if unreachable[tag] {
+				if kernelType == TypeXray {
+					rule[outboundKey] = "block"
+				} else {
+					delete(rule, outboundKey)
+					rule["action"] = "reject"
+				}
+				continue
+			}
+			if direct := directTag(tag); direct != tag {
+				rule[outboundKey] = direct
+				if !preferred {
+					if block := familyBlock(rule); block != nil {
+						blockBefore[i] = block
+					}
 				}
 			}
 		}
 		if in.Via == nil {
+			if !preferred {
+				rule := obj{inboundKey: tags}
+				if kernelType == TypeXray {
+					rule["type"] = "field"
+				}
+				fallback = append(fallback, familyBlock(rule))
+			}
 			for _, id := range in.countedUsers() {
 				user := interface{}([]string{User{ID: id}.Name()})
 				if kernelType == TypeXray {
@@ -231,23 +289,35 @@ func applyOutboundIPPolicies(kernelType string, cfg obj, inbounds []Inbound, pre
 	}
 	// User-wide rules must stay after the new inbound-scoped fallbacks.
 	var preprocess, scoped, shared []interface{}
-	for _, value := range rules {
+	for i, value := range rules {
 		rule := value.(obj)
 		if rule["action"] == "sniff" {
 			preprocess = append(preprocess, value)
 		} else if rule[inboundKey] == nil {
 			shared = append(shared, value)
 		} else {
+			if block := blockBefore[i]; block != nil {
+				scoped = append(scoped, block)
+			}
 			scoped = append(scoped, value)
 		}
 	}
-	route["rules"] = append(append(append(append(prefix, preprocess...), scoped...), fallback...), shared...)
+	route["rules"] = append(append(append(preprocess, scoped...), fallback...), shared...)
 	if kernelType == TypeSingbox {
 		route["final"] = "direct"
-		// Automatic/shared dialers still need an unambiguous resolver when
-		// different inbound policies add more than one local DNS server.
-		route["default_domain_resolver"] = resolvers[0].(obj)["tag"]
-		cfg["dns"] = obj{"servers": resolvers}
+		// Added to the servers already there (the default local resolver);
+		// automatic/shared dialers keep an existing default, else get the
+		// first policy resolver so they are never ambiguous.
+		dns, _ := cfg["dns"].(obj)
+		if dns == nil {
+			dns = obj{}
+			cfg["dns"] = dns
+		}
+		servers, _ := dns["servers"].([]interface{})
+		dns["servers"] = append(servers, resolvers...)
+		if _, ok := route["default_domain_resolver"]; !ok {
+			route["default_domain_resolver"] = resolvers[0].(obj)["tag"]
+		}
 	}
 	cfg["outbounds"] = outbounds
 	if kernelType == TypeXray {

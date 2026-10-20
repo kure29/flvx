@@ -160,9 +160,13 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 		if listen == "" {
 			listen = "::"
 		}
+		// Backups made before the per-inbound policy have none; an unknown
+		// value would fail rendering the whole kernel, so it becomes auto.
 		strategy := i.OutboundIPStrategy
-		if strategy == "" {
-			strategy = "auto" // Backups made before the per-inbound policy.
+		switch strategy {
+		case "auto", "ipv4_only", "ipv6_only", "prefer_ipv4", "prefer_ipv6":
+		default:
+			strategy = "auto"
 		}
 		item := model.NodeInbound{
 			ID: i.ID, KernelID: i.KernelID, NodeID: i.NodeID, Name: i.Name, Protocol: i.Protocol,
