@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"go-backend/internal/http/response"
@@ -36,6 +37,8 @@ type reachProbe struct {
 	LatencyMs int64  `json:"latencyMs,omitempty"`
 	Error     string `json:"error,omitempty"`
 	CheckedAt int64  `json:"checkedAt"`
+	// From is where the check ran when not from the panel server.
+	From string `json:"from,omitempty"`
 	// Points is a node's latency to each reference point (node_latency.go).
 	Points []latencyPoint `json:"points,omitempty"`
 }
@@ -146,22 +149,62 @@ func reachProbeHost(row *model.NodeInbound, builtNode func(row *model.NodeInboun
 	return firstNonEmpty(strings.TrimSpace(row.ShareHost), ip)
 }
 
-func probeInboundAt(ctx context.Context, host string, port int) reachProbe {
+// reachDial dials an inbound from the panel server; tests replace it.
+var reachDial = func(ctx context.Context, addr string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: reachProbeTimeout}
+	return dialer.DialContext(ctx, "tcp", addr)
+}
+
+// errPanelNoRoute: the panel server has no route to the address at all,
+// typically an IPv6-only node while the panel (or its Docker network) has
+// no IPv6. That says nothing about the node, so it is not reported down.
+var errPanelNoRoute = errors.New("面板服务器没有到该地址的网络（通常是面板没有 IPv6）")
+
+// panelNoRoute: no route to the network (Docker without IPv6), no usable
+// source address, or IPv6 switched off on the panel host.
+func panelNoRoute(err error) bool {
+	return errors.Is(err, syscall.ENETUNREACH) || errors.Is(err, syscall.EADDRNOTAVAIL) ||
+		errors.Is(err, syscall.EAFNOSUPPORT)
+}
+
+func probeInboundAt(ctx context.Context, host string, port int) (reachProbe, error) {
 	now := time.Now()
 	if host == "" {
-		return reachProbe{Skipped: true, CheckedAt: now.UnixMilli()}
+		return reachProbe{Skipped: true, CheckedAt: now.UnixMilli()}, nil
 	}
-	dialer := net.Dialer{Timeout: reachProbeTimeout}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	conn, err := reachDial(ctx, net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
-		return reachProbe{Error: probeErrorText(err), CheckedAt: time.Now().UnixMilli()}
+		if panelNoRoute(err) {
+			return reachProbe{Skipped: true, Error: errPanelNoRoute.Error(), CheckedAt: time.Now().UnixMilli()}, errPanelNoRoute
+		}
+		return reachProbe{Error: probeErrorText(err), CheckedAt: time.Now().UnixMilli()}, nil
 	}
 	_ = conn.Close()
 	latency := time.Since(now).Milliseconds()
 	if latency < 1 {
 		latency = 1
 	}
-	return reachProbe{OK: true, LatencyMs: latency, CheckedAt: time.Now().UnixMilli()}
+	return reachProbe{OK: true, LatencyMs: latency, CheckedAt: time.Now().UnixMilli()}, nil
+}
+
+// probeInboundFromNode is the fallback when the panel cannot route to a
+// built inbound: its own node dials the address. That confirms the kernel
+// listens there, not that outside clients get through a firewall.
+func (h *Handler) probeInboundFromNode(nodeID int64, host string, port int) reachProbe {
+	const from = "节点自检（面板没有 IPv6）"
+	data, err := nodeLatencyPing(h, nodeID, host, port)
+	now := time.Now().UnixMilli()
+	if err != nil {
+		return reachProbe{Skipped: true, Error: errPanelNoRoute.Error(), From: from, CheckedAt: now}
+	}
+	if !asBool(data["success"], false) {
+		return reachProbe{Error: "无法连接", From: from, CheckedAt: now}
+	}
+	latency := int64(asFloat(data["averageTime"], 0) + 0.5)
+	if latency < 1 {
+		latency = 1
+	}
+	return reachProbe{OK: true, LatencyMs: latency, From: from, CheckedAt: now}
 }
 
 func probeErrorText(err error) string {
@@ -228,7 +271,10 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 		go func(row model.NodeInbound) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			p := probeInboundAt(ctx, hosts[row.ID], row.Port)
+			p, err := probeInboundAt(ctx, hosts[row.ID], row.Port)
+			if errors.Is(err, errPanelNoRoute) && !isExternalInbound(&row) {
+				p = h.probeInboundFromNode(row.NodeID, hosts[row.ID], row.Port)
+			}
 			mu.Lock()
 			results[row.ID] = p
 			mu.Unlock()
@@ -244,8 +290,9 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 	for _, t := range h.reachProbes.track(byID, results) {
 		addr := net.JoinHostPort(hosts[t.row.ID], strconv.Itoa(t.row.Port))
 		if t.down {
+			from := firstNonEmpty(results[t.row.ID].From, "面板服务器")
 			h.notify(notifyEventInboundDown, "节点连不上",
-				fmt.Sprintf("节点：%s\n地址：%s\n原因：%s（从面板服务器检测）", t.row.Name, addr, t.err))
+				fmt.Sprintf("节点：%s\n地址：%s\n原因：%s（从%s检测）", t.row.Name, addr, t.err, from))
 		} else {
 			h.notify(notifyEventInboundDown, "节点已恢复",
 				fmt.Sprintf("节点：%s\n地址：%s", t.row.Name, addr))
