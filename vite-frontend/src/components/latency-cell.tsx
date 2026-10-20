@@ -181,10 +181,29 @@ function Tile({
       </span>
       {/* Always its own line so tiles line up whatever the width. */}
       {point.route && point.route !== "未识别" && (
-        <span className="mt-0.5">
+        <span className="mt-0.5 flex items-center gap-1">
           <RouteTag short route={point.route} />
+          <V6Route point={point} />
         </span>
       )}
+    </span>
+  );
+}
+
+/** A dual-stack node's IPv6 route, shown only when it differs from IPv4. */
+function V6Route({ point }: { point: InboundProbePoint }) {
+  if (
+    !point.routeV6 ||
+    point.routeV6 === "未识别" ||
+    point.routeV6 === point.route
+  ) {
+    return null;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <span className="text-[10px] opacity-70">v6</span>
+      <RouteTag short route={point.routeV6} />
     </span>
   );
 }
@@ -330,8 +349,11 @@ export function LatencyCell({
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-                    <span className="truncate">{p.name}</span>
-                    <RouteTag short route={p.route} />
+                    <span className="shrink-0">{p.name}</span>
+                    <span className="flex min-w-0 flex-wrap items-center gap-1">
+                      <RouteTag short route={p.route} />
+                      <V6Route point={p} />
+                    </span>
                   </span>
                   <span className="shrink-0 font-mono text-xs">
                     <span className={TONE[pointTone(p)][0].split(" ")[1]}>

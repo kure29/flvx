@@ -49,6 +49,8 @@ type latencyPoint struct {
 	Error     string  `json:"error,omitempty"`
 	// Route names the return route to this point (node_route.go).
 	Route string `json:"route,omitempty"`
+	// RouteV6 is a dual-stack node's IPv6 return route.
+	RouteV6 string `json:"routeV6,omitempty"`
 }
 
 // parseLatencyTargets validates and normalizes the configured reference

@@ -41,7 +41,7 @@ func TestTraceNodeRoutes(t *testing.T) {
 	old := nodeTraceroute
 	t.Cleanup(func() { nodeTraceroute = old })
 	calls := 0
-	nodeTraceroute = func(_ *Handler, _ int64, host string) (map[string]interface{}, error) {
+	nodeTraceroute = func(_ *Handler, _ int64, host string, _ int) (map[string]interface{}, error) {
 		calls++
 		if host == "cu.example.com" {
 			return nil, errors.New("未知命令类型: Traceroute")
@@ -60,7 +60,9 @@ func TestTraceNodeRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 || len(results) != 1 {
+	// The traced point is tried again over IPv6; this fake answers over
+	// IPv4 like an old agent, so there is no IPv6 leg.
+	if calls != 3 || len(results) != 1 || results[node].Points[0].IPv6 != nil {
 		t.Fatalf("calls=%d results=%v", calls, results)
 	}
 	got := results[node]
@@ -72,10 +74,10 @@ func TestTraceNodeRoutes(t *testing.T) {
 	}
 
 	// Fresh traces are not repeated; force traces again.
-	if _, err := h.traceNodeRoutes(context.Background(), nil, false); err != nil || calls != 2 {
+	if _, err := h.traceNodeRoutes(context.Background(), nil, false); err != nil || calls != 3 {
 		t.Fatalf("fresh trace repeated: calls=%d err=%v", calls, err)
 	}
-	if _, err := h.traceNodeRoutes(context.Background(), []int64{node}, true); err != nil || calls != 4 {
+	if _, err := h.traceNodeRoutes(context.Background(), []int64{node}, true); err != nil || calls != 6 {
 		t.Fatalf("forced trace: calls=%d err=%v", calls, err)
 	}
 
@@ -158,7 +160,7 @@ func TestTraceNodeRoutesAgainAfterAgentUpgrade(t *testing.T) {
 	old := nodeTraceroute
 	t.Cleanup(func() { nodeTraceroute = old })
 	upgraded := false
-	nodeTraceroute = func(*Handler, int64, string) (map[string]interface{}, error) {
+	nodeTraceroute = func(*Handler, int64, string, int) (map[string]interface{}, error) {
 		if !upgraded {
 			return nil, errors.New("未知命令类型: Traceroute")
 		}
@@ -243,5 +245,47 @@ func TestIPv6RouteByOriginAS(t *testing.T) {
 	}
 	if e := routePointFrom(latencyTarget{Name: "电信"}, nil, errors.New("节点没有 IPv4 路由，目标没有 IPv6 地址")).Error; e != "节点只有 IPv6，测试点没有 IPv6 地址" {
 		t.Fatalf("error = %q", e)
+	}
+}
+
+func TestTraceNodeRoutesDualStack(t *testing.T) {
+	h, r := setupLatencyHandler(t, `[{"name":"电信","host":"ct.example.com","port":80,"enabled":true}]`)
+	node := mustCreateLatencyNode(t, r, "dual", 1, 0)
+	old, oldLookup := nodeTraceroute, hopASNLookup
+	t.Cleanup(func() { nodeTraceroute, hopASNLookup = old, oldLookup })
+	hopASNLookup = func(name string) ([]string, error) {
+		if name == asnQueryName("240e:1::1") {
+			return []string{"4134 | 240e::/20 | CN | apnic | 2010-01-01"}, nil
+		}
+		return nil, errors.New("not found")
+	}
+	nodeTraceroute = func(_ *Handler, _ int64, _ string, family int) (map[string]interface{}, error) {
+		if family == 6 {
+			return map[string]interface{}{"ip": "240e:e9::1", "reached": true,
+				"hops": []interface{}{map[string]interface{}{"ttl": 1.0, "ip": "240e:1::1"}}}, nil
+		}
+		return map[string]interface{}{"ip": "203.0.113.9", "reached": true,
+			"hops": []interface{}{map[string]interface{}{"ttl": 1.0, "ip": "59.43.180.1"}}}, nil
+	}
+	results, err := h.traceNodeRoutes(context.Background(), nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pt := results[node].Points[0]
+	if pt.Route != "电信 CN2 GIA" || pt.IPv6 == nil || pt.IPv6.Family != "IPv6" || pt.IPv6.Route != "电信 163" {
+		t.Fatalf("dual-stack point = %+v / %+v", pt, pt.IPv6)
+	}
+	p := h.withRoutes(node, latencyProbe([]latencyPoint{{Name: "电信", OK: true}}, 1))
+	if p.Points[0].Route != "电信 CN2 GIA" || p.Points[0].RouteV6 != "电信 163" {
+		t.Fatalf("withRoutes = %+v", p.Points)
+	}
+
+	// An IPv6 route change is reported on its own line.
+	next := results[node]
+	changed := *next.Points[0].IPv6
+	changed.Route = "电信 CN2 GIA"
+	next.Points = []routePoint{{Name: "电信", Route: "电信 CN2 GIA", IPv6: &changed}}
+	if got := routeChanges(results[node], next); len(got) != 1 || got[0] != "电信（IPv6）：电信 163 → 电信 CN2 GIA" {
+		t.Fatalf("routeChanges = %v", got)
 	}
 }

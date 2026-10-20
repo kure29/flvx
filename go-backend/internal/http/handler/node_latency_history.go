@@ -175,19 +175,24 @@ func (h *Handler) alertLatency(results map[int64]reachProbe, names map[int64]str
 // routeChanges lists the points whose identified line changed between two
 // traces; unidentified or failed traces are not a change.
 func routeChanges(prev, next nodeRoute) []string {
-	before := make(map[string]string, len(prev.Points))
+	known := func(p *routePoint) bool { return p != nil && p.Error == "" && p.Route != "" && p.Route != "未识别" }
+	before := make(map[string]string, len(prev.Points)*2)
 	for _, p := range prev.Points {
-		if p.Error == "" && p.Route != "" && p.Route != "未识别" {
+		if known(&p) {
 			before[p.Name] = p.Route
+		}
+		if known(p.IPv6) {
+			before[p.Name+"/v6"] = p.IPv6.Route
 		}
 	}
 	var out []string
 	for _, p := range next.Points {
-		was, ok := before[p.Name]
-		if !ok || p.Error != "" || p.Route == "" || p.Route == "未识别" || p.Route == was {
-			continue
+		if was, ok := before[p.Name]; ok && known(&p) && p.Route != was {
+			out = append(out, fmt.Sprintf("%s：%s → %s", p.Name, was, p.Route))
 		}
-		out = append(out, fmt.Sprintf("%s：%s → %s", p.Name, was, p.Route))
+		if was, ok := before[p.Name+"/v6"]; ok && known(p.IPv6) && p.IPv6.Route != was {
+			out = append(out, fmt.Sprintf("%s（IPv6）：%s → %s", p.Name, was, p.IPv6.Route))
+		}
 	}
 	return out
 }

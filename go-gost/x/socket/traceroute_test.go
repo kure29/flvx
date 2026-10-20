@@ -45,7 +45,7 @@ func TestMatchTraceReply(t *testing.T) {
 }
 
 func TestTracerouteLoopback(t *testing.T) {
-	resp, err := traceroute("127.0.0.1", 5)
+	resp, err := traceroute("127.0.0.1", 5, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "NET_RAW") {
 			t.Skip("no raw socket permission")
@@ -98,26 +98,26 @@ func TestTraceAddr(t *testing.T) {
 	both := []net.IP{v6, v4}
 
 	routable = func(net.IP) bool { return true }
-	if ip, err := traceAddr("h", both); err != nil || !ip.Equal(v4) {
+	if ip, err := traceAddr("h", both, 0); err != nil || !ip.Equal(v4) {
 		t.Fatalf("dual stack should trace IPv4: %v %v", ip, err)
 	}
 	// IPv6-only node.
 	routable = func(ip net.IP) bool { return ip.To4() == nil }
-	if ip, err := traceAddr("h", both); err != nil || !ip.Equal(v6) {
+	if ip, err := traceAddr("h", both, 0); err != nil || !ip.Equal(v6) {
 		t.Fatalf("IPv6-only node should trace IPv6: %v %v", ip, err)
 	}
-	if _, err := traceAddr("h", []net.IP{v4}); err == nil || !strings.Contains(err.Error(), "没有 IPv6 地址") {
+	if _, err := traceAddr("h", []net.IP{v4}, 0); err == nil || !strings.Contains(err.Error(), "没有 IPv6 地址") {
 		t.Fatalf("IPv4-only target from IPv6-only node: %v", err)
 	}
 	// IPv4-only node, IPv6-only target.
 	routable = func(ip net.IP) bool { return ip.To4() != nil }
-	if _, err := traceAddr("h", []net.IP{v6}); err == nil || !strings.Contains(err.Error(), "没有 IPv4 地址") {
+	if _, err := traceAddr("h", []net.IP{v6}, 0); err == nil || !strings.Contains(err.Error(), "没有 IPv4 地址") {
 		t.Fatalf("IPv6-only target from IPv4-only node: %v", err)
 	}
 }
 
 func TestTracerouteLoopbackV6(t *testing.T) {
-	resp, err := traceroute("::1", 5)
+	resp, err := traceroute("::1", 5, 0)
 	if err != nil {
 		if strings.Contains(err.Error(), "NET_RAW") || strings.Contains(err.Error(), "路由") {
 			t.Skipf("no IPv6 raw socket here: %v", err)
@@ -126,5 +126,25 @@ func TestTracerouteLoopbackV6(t *testing.T) {
 	}
 	if !resp.Reached || len(resp.Hops) != 1 || resp.Hops[0].IP != "::1" {
 		t.Fatalf("loopback trace = %+v", resp)
+	}
+}
+
+func TestTraceAddrFamily(t *testing.T) {
+	orig := routable
+	defer func() { routable = orig }()
+	v4, v6 := net.ParseIP("203.0.113.9"), net.ParseIP("2001:db8::9")
+	routable = func(net.IP) bool { return true }
+	if ip, err := traceAddr("h", []net.IP{v4, v6}, 6); err != nil || !ip.Equal(v6) {
+		t.Fatalf("family 6 must trace IPv6 on a dual-stack node: %v %v", ip, err)
+	}
+	if ip, err := traceAddr("h", []net.IP{v6, v4}, 4); err != nil || !ip.Equal(v4) {
+		t.Fatalf("family 4 must trace IPv4: %v %v", ip, err)
+	}
+	if _, err := traceAddr("h", []net.IP{v4}, 6); err == nil || !strings.Contains(err.Error(), "没有 IPv6 地址") {
+		t.Fatalf("IPv4-only target over IPv6: %v", err)
+	}
+	routable = func(ip net.IP) bool { return ip.To4() != nil }
+	if _, err := traceAddr("h", []net.IP{v4, v6}, 6); err == nil || !strings.Contains(err.Error(), "没有 IPv6 路由") {
+		t.Fatalf("IPv4-only node over IPv6: %v", err)
 	}
 }

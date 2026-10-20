@@ -783,6 +783,8 @@ export interface InboundProbePoint {
   error?: string;
   /** Return route to this point, e.g. "电信 CN2 GIA". */
   route?: string;
+  /** The IPv6 return route of a dual-stack node, when traced. */
+  routeV6?: string;
 }
 
 export interface NodeRouteHop {
@@ -801,6 +803,8 @@ export interface NodeRoutePoint {
   family?: string;
   hops?: NodeRouteHop[];
   error?: string;
+  /** A dual-stack node's IPv6 trace to the same point. */
+  ipv6?: NodeRoutePoint;
 }
 
 export interface LatencyTrendPoint {

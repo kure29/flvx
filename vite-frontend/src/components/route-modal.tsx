@@ -175,48 +175,72 @@ export function RouteModal({
               还没有检测结果，点下方按钮检测
             </p>
           ) : (
-            route.points.map((p) => (
-              <div key={p.name} className="rounded-lg border border-divider">
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-                  type="button"
-                  onClick={() => setOpen(open === p.name ? null : p.name)}
-                >
-                  <span className="shrink-0 font-medium">{p.name}</span>
-                  {p.error ? (
-                    <span className="min-w-0 text-xs text-rose-600">
-                      {p.error}
-                    </span>
-                  ) : p.route && p.route !== "未识别" ? (
-                    <RouteTag route={p.route} />
-                  ) : (
-                    <span className="text-xs text-default-400">未识别线路</span>
+            route.points.map((p) => {
+              // A dual-stack node traces each point over both families.
+              const legs = p.ipv6
+                ? [
+                    { key: `${p.name}/v4`, label: "IPv4", leg: p },
+                    { key: `${p.name}/v6`, label: "IPv6", leg: p.ipv6 },
+                  ]
+                : [{ key: p.name, label: p.family, leg: p }];
+
+              return (
+                <div key={p.name} className="rounded-lg border border-divider">
+                  {p.ipv6 && (
+                    <div className="px-3 pt-2 text-sm font-medium">
+                      {p.name}
+                    </div>
                   )}
-                  {p.family && (
-                    <span className="shrink-0 rounded bg-default-100 px-1 text-[10px] text-default-500">
-                      {p.family}
-                    </span>
-                  )}
-                  {!p.error && (
-                    <span className="ml-auto text-xs text-default-400">
-                      {p.hops?.length ?? 0} 跳 {open === p.name ? "▴" : "▾"}
-                    </span>
-                  )}
-                </button>
-                {open === p.name && p.hops && (
-                  <div className="border-t border-divider px-3 py-2">
-                    {p.hops.map((h) => (
-                      <HopRow key={h.ttl} hop={h} />
-                    ))}
-                    {!p.reached && (
-                      <p className="pt-1 text-xs text-default-400">
-                        目标没有回应，只显示到最后一个有回应的路由器
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
+                  {legs.map(({ key, label, leg }) => (
+                    <div key={key}>
+                      <button
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                        type="button"
+                        onClick={() => setOpen(open === key ? null : key)}
+                      >
+                        {!p.ipv6 && (
+                          <span className="shrink-0 font-medium">{p.name}</span>
+                        )}
+                        {label && (
+                          <span className="w-9 shrink-0 rounded bg-default-100 px-1 text-center text-[10px] text-default-500">
+                            {label}
+                          </span>
+                        )}
+                        {leg.error ? (
+                          <span className="min-w-0 text-xs text-rose-600">
+                            {leg.error}
+                          </span>
+                        ) : leg.route && leg.route !== "未识别" ? (
+                          <RouteTag route={leg.route} />
+                        ) : (
+                          <span className="text-xs text-default-400">
+                            未识别线路
+                          </span>
+                        )}
+                        {!leg.error && (
+                          <span className="ml-auto text-xs text-default-400">
+                            {leg.hops?.length ?? 0} 跳{" "}
+                            {open === key ? "▴" : "▾"}
+                          </span>
+                        )}
+                      </button>
+                      {open === key && leg.hops && (
+                        <div className="border-t border-divider px-3 py-2">
+                          {leg.hops.map((h) => (
+                            <HopRow key={h.ttl} hop={h} />
+                          ))}
+                          {!leg.reached && (
+                            <p className="pt-1 text-xs text-default-400">
+                              目标没有回应，只显示到最后一个有回应的路由器
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })
           )}
           <p className="text-xs text-default-400">
             按经过的骨干网识别：59.43 段为 CN2（不经过 202.97 即 GIA），202.97

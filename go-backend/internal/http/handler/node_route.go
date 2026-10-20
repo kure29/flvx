@@ -194,7 +194,10 @@ type routePoint struct {
 	// Family is "IPv6" when the route was traced over IPv6.
 	Family string     `json:"family,omitempty"`
 	Hops   []routeHop `json:"hops,omitempty"`
-	Error  string     `json:"error,omitempty"`
+	// IPv6 is a dual-stack node's IPv6 route to the same point, traced
+	// next to the IPv4 one.
+	IPv6  *routePoint `json:"ipv6,omitempty"`
+	Error string      `json:"error,omitempty"`
 	// host is the address traced, so an edited point is traced again.
 	host string
 }
@@ -231,10 +234,13 @@ func (s *nodeRouteStore) set(nodeID int64, r nodeRoute) {
 }
 
 // nodeTraceroute runs one Traceroute from a node; tests replace it.
-var nodeTraceroute = func(h *Handler, nodeID int64, host string) (map[string]interface{}, error) {
-	res, err := h.sendNodeCommandWithTimeout(nodeID, "Traceroute", map[string]interface{}{
-		"host": host,
-	}, routeCommandTimeout, false, false)
+// family 4 / 6 asks for that IP version only, 0 lets the node pick.
+var nodeTraceroute = func(h *Handler, nodeID int64, host string, family int) (map[string]interface{}, error) {
+	payload := map[string]interface{}{"host": host}
+	if family != 0 {
+		payload["family"] = family
+	}
+	res, err := h.sendNodeCommandWithTimeout(nodeID, "Traceroute", payload, routeCommandTimeout, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -308,6 +314,21 @@ func warmHopASNs(rawHops []interface{}) {
 	wg.Wait()
 }
 
+// traceIPv6Leg traces a point again over IPv6 after an IPv4 trace. Nodes or
+// points without IPv6 have no IPv6 leg; an old agent that ignores the
+// family answers over IPv4 again, which is dropped.
+func traceIPv6Leg(h *Handler, nodeID int64, t latencyTarget) *routePoint {
+	data, err := nodeTraceroute(h, nodeID, t.Host, 6)
+	if err != nil {
+		return nil
+	}
+	leg := routePointFrom(t, data, nil)
+	if leg.Family != "IPv6" {
+		return nil
+	}
+	return &leg
+}
+
 // traceNodeRoutes traces the given local online nodes (all when ids is
 // empty) to every enabled reference point. With force false it skips nodes
 // whose last trace is fresh and covers the current points.
@@ -364,8 +385,11 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 			r := nodeRoute{Points: make([]routePoint, len(targets)), agent: agent}
 			// One trace at a time per node keeps the agent's raw socket quiet.
 			for i, t := range targets {
-				data, err := nodeTraceroute(h, nodeID, t.Host)
+				data, err := nodeTraceroute(h, nodeID, t.Host, 0)
 				r.Points[i] = routePointFrom(t, data, err)
+				if r.Points[i].Error == "" && r.Points[i].Family == "" {
+					r.Points[i].IPv6 = traceIPv6Leg(h, nodeID, t)
+				}
 				if r.Points[i].Error != "" {
 					r.failed = true
 				}
@@ -411,13 +435,17 @@ func (h *Handler) withRoutes(nodeID int64, p reachProbe) reachProbe {
 	if !ok || len(p.Points) == 0 {
 		return p
 	}
-	routes := make(map[string]string, len(r.Points))
+	byName := make(map[string]routePoint, len(r.Points))
 	for _, rp := range r.Points {
-		routes[rp.Name] = rp.Route
+		byName[rp.Name] = rp
 	}
 	points := make([]latencyPoint, len(p.Points))
 	for i, pt := range p.Points {
-		pt.Route = routes[pt.Name]
+		rp := byName[pt.Name]
+		pt.Route, pt.RouteV6 = rp.Route, ""
+		if rp.IPv6 != nil && rp.IPv6.Error == "" {
+			pt.RouteV6 = rp.IPv6.Route
+		}
 		points[i] = pt
 	}
 	p.Points = points

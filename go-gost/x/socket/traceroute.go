@@ -29,6 +29,9 @@ const (
 type TracerouteRequest struct {
 	Host    string `json:"host"`
 	MaxHops int    `json:"maxHops"`
+	// Family 4 or 6 traces only over that IP version (dual-stack nodes
+	// report both routes); 0 picks as above.
+	Family int `json:"family,omitempty"`
 }
 
 // TracerouteHop is one TTL; IP is empty when no router answered.
@@ -70,13 +73,16 @@ func (w *WebSocketReporter) handleTraceroute(data interface{}) (TracerouteRespon
 	if maxHops <= 0 || maxHops > tracerouteMaxHops {
 		maxHops = tracerouteMaxHops
 	}
-	return traceroute(host, maxHops)
+	if req.Family != 0 && req.Family != 4 && req.Family != 6 {
+		return TracerouteResponse{}, fmt.Errorf("无效的 IP 版本: %d", req.Family)
+	}
+	return traceroute(host, maxHops, req.Family)
 }
 
 // traceAddr picks the address to trace: IPv4 when the node can route to
 // it, else IPv6. routable reports whether the node has a route to an
 // address; tests replace it.
-func traceAddr(host string, addrs []net.IP) (net.IP, error) {
+func traceAddr(host string, addrs []net.IP, family int) (net.IP, error) {
 	var v4, v6 net.IP
 	for _, a := range addrs {
 		if a.To4() != nil {
@@ -86,6 +92,24 @@ func traceAddr(host string, addrs []net.IP) (net.IP, error) {
 		} else if v6 == nil {
 			v6 = a
 		}
+	}
+	switch family {
+	case 4:
+		if v4 == nil {
+			return nil, fmt.Errorf("目标没有 IPv4 地址")
+		}
+		if !routable(v4) {
+			return nil, fmt.Errorf("节点没有 IPv4 路由")
+		}
+		return v4, nil
+	case 6:
+		if v6 == nil {
+			return nil, fmt.Errorf("目标没有 IPv6 地址")
+		}
+		if !routable(v6) {
+			return nil, fmt.Errorf("节点没有 IPv6 路由")
+		}
+		return v6, nil
 	}
 	switch {
 	case v4 != nil && routable(v4):
@@ -142,13 +166,13 @@ var (
 // traceroute sends ICMP echoes with TTL 1..maxHops at once (twice, for
 // routers that drop one) and collects the Time Exceeded answers. It needs a
 // raw socket: root or CAP_NET_RAW.
-func traceroute(host string, maxHops int) (TracerouteResponse, error) {
+func traceroute(host string, maxHops, family int) (TracerouteResponse, error) {
 	resp := TracerouteResponse{Host: host}
 	addrs, err := net.LookupIP(host)
 	if err != nil {
 		return resp, fmt.Errorf("DNS解析失败: %v", err)
 	}
-	dst, err := traceAddr(host, addrs)
+	dst, err := traceAddr(host, addrs, family)
 	if err != nil {
 		return resp, err
 	}
