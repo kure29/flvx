@@ -45,9 +45,12 @@ type Subscription struct {
 	ResetDay         int    `gorm:"column:reset_day;not null;default:0"`
 	TrafficResetTime int64  `gorm:"column:traffic_reset_time;not null;default:0"`
 	Remark           string `gorm:"type:text;not null;default:''"`
-	Inx              int    `gorm:"not null;default:0"`
-	CreatedTime      int64  `gorm:"column:created_time;not null"`
-	UpdatedTime      int64  `gorm:"column:updated_time;not null"`
+	// UserID is the panel user the subscription is assigned to (0 = none):
+	// they see it under 订阅 in their panel and may reset its link.
+	UserID      int64 `gorm:"column:user_id;not null;default:0;index"`
+	Inx         int   `gorm:"not null;default:0"`
+	CreatedTime int64 `gorm:"column:created_time;not null"`
+	UpdatedTime int64 `gorm:"column:updated_time;not null"`
 }
 
 func (Subscription) TableName() string { return "subscription" }

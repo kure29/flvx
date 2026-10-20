@@ -746,6 +746,9 @@ export interface SubscriptionItem {
   /** Day of month (1-28) the traffic resets; 0 = never. */
   resetDay: number;
   overQuota: boolean;
+  /** Panel user it is assigned to; 0 = none. */
+  userId: number;
+  userName?: string;
 }
 export interface SubscriptionDraft {
   id?: number;
@@ -760,6 +763,8 @@ export interface SubscriptionDraft {
   remark: string;
   trafficLimit: number;
   resetDay: number;
+  /** Panel user to assign it to; 0 = none. */
+  userId?: number;
 }
 export interface SubPreviewItem {
   name: string;
@@ -781,6 +786,31 @@ export const deleteSubscription = (id: number) =>
   Network.post("/subscription/delete", { id });
 export const resetSubscription = (id: number) =>
   Network.post<SubscriptionItem>("/subscription/reset", { id });
+/** A subscription as the user it is assigned to sees it. */
+export interface UserSubscription {
+  id: number;
+  name: string;
+  path: string;
+  status: "ok" | "disabled" | "expired" | "over_quota";
+  expireTime: number;
+  nodeCount: number;
+  uploadBytes: number;
+  downloadBytes: number;
+  /** Bytes; 0 = unlimited. */
+  trafficLimit: number;
+  /** Day of month the traffic resets; 0 = never. */
+  resetDay: number;
+  /** Next monthly reset (ms); 0 = none. */
+  nextResetTime: number;
+  /** Routing rules on: some clients import a full config. */
+  rules: boolean;
+}
+/** The subscriptions assigned to the logged-in user. */
+export const getMySubscriptions = () =>
+  Network.post<UserSubscription[]>("/user/subscription/list");
+/** Gives one of the user's subscriptions a new link and credentials. */
+export const resetMySubscription = (id: number) =>
+  Network.post<UserSubscription>("/user/subscription/reset", { id });
 export interface RemoteSourceItem {
   id: number;
   name: string;

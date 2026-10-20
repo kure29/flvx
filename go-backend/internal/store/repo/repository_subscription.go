@@ -142,6 +142,33 @@ func (r *Repository) ListSubscriptions() ([]model.Subscription, error) {
 	return out, err
 }
 
+// ListUserSubscriptions lists the subscriptions assigned to a panel user.
+func (r *Repository) ListUserSubscriptions(userID int64) ([]model.Subscription, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var out []model.Subscription
+	err := r.db.Where("user_id = ?", userID).Order("inx ASC, id ASC").Find(&out).Error
+	return out, err
+}
+
+// UserNames maps panel user ids to their names.
+func (r *Repository) UserNames() (map[int64]string, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	// Separate column names get quoted: user is reserved in PostgreSQL.
+	var users []model.User
+	if err := r.db.Select("id", "user").Find(&users).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[int64]string, len(users))
+	for _, u := range users {
+		out[u.ID] = u.User
+	}
+	return out, nil
+}
+
 func (r *Repository) GetSubscription(id int64) (*model.Subscription, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")

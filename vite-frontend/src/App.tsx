@@ -33,6 +33,7 @@ const LimitPage = lazy(() => import("@/pages/limit"));
 const InboundPage = lazy(() => import("@/pages/inbound"));
 const RelayPage = lazy(() => import("@/pages/relay"));
 const SubscriptionPage = lazy(() => import("@/pages/subscription"));
+const MySubscriptionsPage = lazy(() => import("@/pages/my-subscriptions"));
 const ConfigPage = lazy(() => import("@/pages/config"));
 const PanelSharingPage = lazy(() => import("@/pages/panel-sharing"));
 
@@ -210,6 +211,14 @@ function App() {
             </ProtectedRoute>
           }
           path="/forward"
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <MySubscriptionsPage />
+            </ProtectedRoute>
+          }
+          path="/my-subscriptions"
         />
         <Route
           element={

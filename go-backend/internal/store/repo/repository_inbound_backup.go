@@ -82,7 +82,7 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 			SourceAll: sub.SourceAll, InboundIDs: sub.InboundIDs, SourceIDs: sub.SourceIDs, Options: sub.Options, ExpireTime: sub.ExpireTime,
 			Enabled: sub.Enabled, Remark: sub.Remark, Inx: sub.Inx, CreatedTime: sub.CreatedTime,
 			UploadBytes: sub.UploadBytes, DownloadBytes: sub.DownloadBytes, TrafficLimit: sub.TrafficLimit,
-			ResetDay: sub.ResetDay, TrafficResetTime: sub.TrafficResetTime,
+			ResetDay: sub.ResetDay, TrafficResetTime: sub.TrafficResetTime, UserID: sub.UserID,
 		})
 	}
 	return out, nil
@@ -216,7 +216,7 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 			SourceAll: sb.SourceAll, InboundIDs: sb.InboundIDs, SourceIDs: sb.SourceIDs, Options: sb.Options, ExpireTime: sb.ExpireTime,
 			Enabled: sb.Enabled, Remark: sb.Remark, Inx: sb.Inx, CreatedTime: sb.CreatedTime, UpdatedTime: now,
 			UploadBytes: sb.UploadBytes, DownloadBytes: sb.DownloadBytes, TrafficLimit: sb.TrafficLimit,
-			ResetDay: sb.ResetDay, TrafficResetTime: sb.TrafficResetTime,
+			ResetDay: sb.ResetDay, TrafficResetTime: sb.TrafficResetTime, UserID: sb.UserID,
 		}
 		// Every subscription has its own credentials (older backups may
 		// carry owner-credential ones).

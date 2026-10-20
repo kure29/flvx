@@ -453,6 +453,8 @@ type SubscriptionBackup struct {
 	TrafficLimit     int64 `json:"trafficLimit,omitempty"`
 	ResetDay         int   `json:"resetDay,omitempty"`
 	TrafficResetTime int64 `json:"trafficResetTime,omitempty"`
+	// UserID is the panel user it is assigned to.
+	UserID int64 `json:"userId,omitempty"`
 }
 
 type SubUserBackup struct {

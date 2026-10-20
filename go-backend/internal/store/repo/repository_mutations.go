@@ -182,6 +182,11 @@ func (r *Repository) DeleteUserCascade(userID int64) error {
 		if err := tx.Where("user_id = ?", userID).Delete(&model.UserQuota{}).Error; err != nil {
 			return err
 		}
+		// Assigned subscriptions stay (they may be in use); they just
+		// become unassigned.
+		if err := tx.Model(&model.Subscription{}).Where("user_id = ?", userID).Update("user_id", 0).Error; err != nil {
+			return err
+		}
 		return tx.Where("id = ?", userID).Delete(&model.User{}).Error
 	})
 }

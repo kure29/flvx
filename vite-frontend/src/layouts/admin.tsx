@@ -21,6 +21,7 @@ import { safeLogout } from "@/utils/logout";
 import { siteConfig } from "@/config/site";
 import { useMobileBreakpoint } from "@/hooks/useMobileBreakpoint";
 import { getAdminFlag } from "@/utils/session";
+import { useHasMySubscriptions } from "@/hooks/use-has-my-subscriptions";
 
 interface MenuItem {
   path: string;
@@ -52,6 +53,7 @@ export default function AdminLayout({
     () => localStorage.getItem("sidebar_collapsed") === "true",
   );
   const [isAdmin, setIsAdmin] = useState(() => getAdminFlag());
+  const hasMySubs = useHasMySubscriptions(isAdmin);
   const [monitorAllowed, setMonitorAllowed] = useState<boolean | null>(null);
   const [monitorAccessReason, setMonitorAccessReason] = useState<string | null>(
     null,
@@ -90,6 +92,18 @@ export default function AdminLayout({
           />
         </svg>
       ),
+      userOnly: true,
+    },
+    {
+      path: "/my-subscriptions",
+      label: "订阅",
+      icon: (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M5 3a1 1 0 000 2c5.523 0 10 4.477 10 10a1 1 0 102 0C17 8.373 11.627 3 5 3z" />
+          <path d="M4 9a1 1 0 011-1 7 7 0 017 7 1 1 0 11-2 0 5 5 0 00-5-5 1 1 0 01-1-1zM3 15a2 2 0 114 0 2 2 0 01-4 0z" />
+        </svg>
+      ),
+      // Shown once the user has subscriptions assigned.
       userOnly: true,
     },
     {
@@ -389,6 +403,7 @@ export default function AdminLayout({
   // 过滤菜单项（根据权限）
   const filteredMenuItems = menuItems
     .filter((item) => (isAdmin ? !item.userOnly : !item.adminOnly))
+    .filter((item) => item.path !== "/my-subscriptions" || hasMySubs)
     .map((item) =>
       isAdmin && item.adminLabel ? { ...item, label: item.adminLabel } : item,
     );

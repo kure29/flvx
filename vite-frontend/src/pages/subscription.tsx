@@ -6,7 +6,7 @@ import type {
   SubscriptionDraft,
   SubscriptionItem,
 } from "@/api";
-import type { InboundApiItem } from "@/api/types";
+import type { InboundApiItem, UserApiItem } from "@/api/types";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -14,6 +14,7 @@ import { ChevronDown, Copy, X } from "lucide-react";
 
 import {
   deleteSubscription,
+  getAllUsers,
   getInboundList,
   getRemoteSources,
   getSubscriptions,
@@ -42,7 +43,7 @@ import {
 } from "@/shadcn-bridge/heroui/modal";
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
-import { SUB_CLIENTS } from "@/pages/subscription/clients";
+import { SubClientGrid } from "@/pages/subscription/client-grid";
 import { RenameRules } from "@/pages/subscription/rename-rules";
 import {
   EditorTabs,
@@ -340,6 +341,7 @@ function draftFrom(s?: SubscriptionItem): Draft {
       trafficLimit: 0,
       limitGB: "",
       resetDay: 0,
+      userId: 0,
     };
   }
 
@@ -358,6 +360,7 @@ function draftFrom(s?: SubscriptionItem): Draft {
     trafficLimit: s.trafficLimit,
     limitGB: gbText(s.trafficLimit),
     resetDay: s.resetDay,
+    userId: s.userId ?? 0,
   };
 }
 
@@ -382,6 +385,8 @@ function Editor({
   sources,
   regions,
   ruleGroups,
+  users,
+  userSubCount,
   saving,
   onSave,
   onClose,
@@ -390,6 +395,10 @@ function Editor({
   setDraft: (d: Draft) => void;
   inbounds: InboundApiItem[];
   sources: RemoteSourceItem[];
+  /** Panel users a subscription can be assigned to. */
+  users: UserApiItem[];
+  /** How many subscriptions each user already has. */
+  userSubCount: Map<number, number>;
   regions: string[];
   ruleGroups: SubRuleGroup[];
   saving: boolean;
@@ -560,6 +569,34 @@ function Editor({
                 有独立的 UUID /
                 密码：停用、到期或流量用完后从节点上删除，已导入的配置也连不上
               </p>
+              <div className="space-y-1">
+                <label className="text-sm font-medium" htmlFor="sub-user">
+                  分配给用户（可选）
+                </label>
+                <select
+                  className="block h-10 w-full rounded-lg border border-divider bg-background px-2 text-sm"
+                  id="sub-user"
+                  value={draft.userId ?? 0}
+                  onChange={(e) => set({ userId: Number(e.target.value) })}
+                >
+                  <option value={0}>不分配（只发链接）</option>
+                  {users.map((u) => {
+                    const n =
+                      (userSubCount.get(u.id) ?? 0) -
+                      (draft.id && draft.userId === u.id ? 1 : 0);
+
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.user}
+                        {n > 0 ? `（已有 ${n} 个订阅）` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-xs text-default-500">
+                  分配后，该用户登录面板就能在「订阅」里看到它：导入客户端、查看流量和到期、自己重置链接
+                </p>
+              </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="sub-expire">
                   到期日期
@@ -1112,16 +1149,28 @@ export default function SubscriptionPage() {
   const [confirm, setConfirm] = useState<"reset" | "delete" | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
   const [resettingTraffic, setResettingTraffic] = useState(false);
+  const [users, setUsers] = useState<UserApiItem[]>([]);
+  const userSubCount = useMemo(() => {
+    const m = new Map<number, number>();
+
+    for (const s of subs) {
+      if (s.userId) m.set(s.userId, (m.get(s.userId) ?? 0) + 1);
+    }
+
+    return m;
+  }, [subs]);
 
   const load = useCallback(async () => {
     try {
-      const [subRes, inRes, srcRes] = await Promise.all([
+      const [subRes, inRes, srcRes, userRes] = await Promise.all([
         getSubscriptions(),
         getInboundList(),
         getRemoteSources(),
+        getAllUsers().catch(() => null),
       ]);
 
       if (srcRes.code === 0) setSources(srcRes.data ?? []);
+      if (userRes?.code === 0) setUsers(userRes.data ?? []);
 
       if (subRes.code === 0 && subRes.data) {
         setSubs(subRes.data.items ?? []);
@@ -1310,6 +1359,11 @@ export default function SubscriptionPage() {
         ["节点", `${s.nodeCount} 个`],
         ["来源", sourceText(s)],
         ["到期", s.expireTime ? expiryLabel(s.expireTime) : "永不过期"],
+        ...(s.userId
+          ? ([["用户", s.userName || `#${s.userId}`]] as Array<
+              [string, string]
+            >)
+          : []),
         ...(s.remark ? ([["备注", s.remark]] as Array<[string, string]>) : []),
       ]}
       status={
@@ -1352,6 +1406,7 @@ export default function SubscriptionPage() {
           {stateChip(s)}
         </div>
         <div className="truncate text-xs text-default-500">
+          {s.userId ? `👤 ${s.userName || `#${s.userId}`} · ` : ""}
           {s.nodeCount} 个节点 · {sourceText(s)}
           {s.expireTime ? ` · ${expiryLabel(s.expireTime)}` : ""}
           {s.remark ? ` · ${s.remark}` : ""}
@@ -1468,60 +1523,11 @@ export default function SubscriptionPage() {
                   >
                     复制订阅链接（自动识别客户端）
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SUB_CLIENTS.map((c) => {
-                      const link = url(detail, c.format);
-                      const isConfig =
-                        detail.options.rules && c.configImportURL !== undefined;
-                      const importURL = isConfig
-                        ? (c.configImportURL ?? null)
-                        : c.importURL;
-                      const open = () => {
-                        if (importURL) {
-                          window.location.href = importURL(link, detail.name);
-                        } else {
-                          copyText(
-                            link,
-                            isConfig
-                              ? `${c.label}配置链接已复制，在 App 的配置里从 URL 下载`
-                              : `${c.label}订阅已复制`,
-                          );
-                        }
-                      };
-
-                      return (
-                        <div
-                          key={c.key}
-                          className="relative flex h-14 items-center rounded-xl border border-divider transition-colors hover:bg-default-100"
-                        >
-                          <button
-                            className="h-full min-w-0 flex-1 truncate pl-3 pr-9 text-left text-sm font-medium"
-                            title={
-                              importURL
-                                ? `导入到 ${c.label}`
-                                : isConfig
-                                  ? `复制 ${c.label} 配置链接`
-                                  : "复制通用订阅"
-                            }
-                            type="button"
-                            onClick={open}
-                          >
-                            {c.label}
-                          </button>
-                          <button
-                            aria-label={`复制 ${c.label} 订阅链接`}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-default-400 hover:bg-default-200 hover:text-default-600"
-                            type="button"
-                            onClick={() =>
-                              copyText(link, `${c.label} 订阅已复制`)
-                            }
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <SubClientGrid
+                    link={(format) => url(detail, format)}
+                    name={detail.name}
+                    rules={detail.options.rules}
+                  />
                   <p className="text-center text-xs text-default-400">
                     点客户端直接导入，右侧按钮复制链接
                   </p>
@@ -1595,6 +1601,8 @@ export default function SubscriptionPage() {
                 saving={saving}
                 setDraft={setDraft}
                 sources={sources}
+                userSubCount={userSubCount}
+                users={users}
                 onClose={onClose}
                 onSave={save}
               />

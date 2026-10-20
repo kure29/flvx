@@ -428,6 +428,21 @@ type subscriptionView struct {
 	TrafficLimit  int64 `json:"trafficLimit"`
 	ResetDay      int   `json:"resetDay"`
 	OverQuota     bool  `json:"overQuota"`
+	// UserID / UserName: the panel user it is assigned to (0 = none).
+	UserID   int64  `json:"userId"`
+	UserName string `json:"userName,omitempty"`
+}
+
+// withUserName fills in the assigned user's name.
+func (h *Handler) withUserName(v subscriptionView, names map[int64]string) subscriptionView {
+	if v.UserID == 0 {
+		return v
+	}
+	if names == nil {
+		names, _ = h.repo.UserNames()
+	}
+	v.UserName = names[v.UserID]
+	return v
 }
 
 func (h *Handler) subscriptionView(s *model.Subscription, rows []model.NodeInbound, now time.Time) subscriptionView {
@@ -460,7 +475,7 @@ func (h *Handler) subscriptionView(s *model.Subscription, rows []model.NodeInbou
 		ExpireTime: s.ExpireTime, Enabled: s.Enabled == 1, Active: subActive(s, now), Remark: s.Remark,
 		NodeCount:   len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
 		UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes, TrafficLimit: s.TrafficLimit,
-		ResetDay: s.ResetDay, OverQuota: subOverQuota(s),
+		ResetDay: s.ResetDay, OverQuota: subOverQuota(s), UserID: s.UserID,
 	}
 }
 
@@ -489,9 +504,10 @@ func (h *Handler) subscriptionList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
+	names, _ := h.repo.UserNames()
 	items := make([]subscriptionView, 0, len(subs))
 	for i := range subs {
-		items = append(items, h.subscriptionView(&subs[i], rows, now))
+		items = append(items, h.withUserName(h.subscriptionView(&subs[i], rows, now), names))
 	}
 	response.WriteJSON(w, response.OK(map[string]interface{}{
 		"items":      items,
@@ -514,6 +530,8 @@ type subscriptionRequest struct {
 	// TrafficLimit is in bytes (0 = unlimited); ResetDay 1-28 (0 = never).
 	TrafficLimit int64 `json:"trafficLimit"`
 	ResetDay     int   `json:"resetDay"`
+	// UserID assigns it to a panel user (0 = none).
+	UserID int64 `json:"userId"`
 }
 
 // validate checks the request and returns the inbound ids it selects.
@@ -579,6 +597,15 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
+	if req.UserID < 0 {
+		req.UserID = 0
+	}
+	if req.UserID > 0 {
+		if u, err := h.repo.GetUserByID(req.UserID); err != nil || u == nil {
+			response.WriteJSON(w, response.ErrDefault("所选用户不存在"))
+			return
+		}
+	}
 
 	now := time.Now()
 	var s *model.Subscription
@@ -613,6 +640,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		_ = h.repo.MarkSubscriptionResetTime(s.ID, s.TrafficResetTime)
 	}
 	s.ResetDay = req.ResetDay
+	s.UserID = req.UserID
 	if req.Enabled != nil {
 		s.Enabled = boolToInt(*req.Enabled)
 	}
@@ -626,7 +654,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 	if isShare(s) {
 		push = append(push, subInboundIDs(s, rows)...)
 	}
-	h.respondAfterSubPush(w, push, h.subscriptionView(s, rows, now))
+	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, rows, now), nil))
 }
 
 func (h *Handler) respondAfterSubPush(w http.ResponseWriter, inboundIDs []int64, data interface{}) {
@@ -672,21 +700,31 @@ func (h *Handler) subscriptionReset(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("订阅不存在"))
 		return
 	}
+	rows, push, err := h.resetSubscriptionLink(s)
+	if err != nil {
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
+	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, rows, time.Now()), nil))
+}
+
+// resetSubscriptionLink gives a subscription a new token and credentials,
+// returning the inbounds whose kernels must drop the old ones.
+func (h *Handler) resetSubscriptionLink(s *model.Subscription) ([]model.NodeInbound, []int64, error) {
 	s.Token = randomHex(16)
 	if isShare(s) {
 		s.UUID, s.Password = newUUID(), randomHex(16)
 	}
 	s.UpdatedTime = time.Now().UnixMilli()
 	if err := h.repo.SaveSubscription(s); err != nil {
-		response.WriteJSON(w, response.Err(-2, err.Error()))
-		return
+		return nil, nil, err
 	}
 	rows, _ := h.repo.ListNodeInbounds()
 	var push []int64
 	if isShare(s) {
 		push = subInboundIDs(s, rows)
 	}
-	h.respondAfterSubPush(w, push, h.subscriptionView(s, rows, time.Now()))
+	return rows, push, nil
 }
 
 // subscriptionResetTraffic zeroes a share subscription's traffic and puts
