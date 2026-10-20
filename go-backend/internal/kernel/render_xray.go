@@ -43,6 +43,9 @@ func renderXray(inbounds []Inbound) (string, error) {
 	if len(rules) > 0 {
 		cfg["routing"] = obj{"rules": rules}
 	}
+	if err := applyOutboundIPPolicies(TypeXray, cfg, inbounds, false); err != nil {
+		return "", err
+	}
 	return marshalConfig(cfg)
 }
 

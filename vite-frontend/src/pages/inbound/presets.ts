@@ -121,6 +121,12 @@ export interface InboundForm {
   whitelistExtra: string;
   /** Chained outbound inbound id; "" leaves directly. */
   outboundId: string;
+  outboundIpStrategy:
+    | "auto"
+    | "ipv4_only"
+    | "ipv6_only"
+    | "prefer_ipv4"
+    | "prefer_ipv6";
   splitRules: SplitRuleForm[];
   enabled: boolean;
 }
@@ -358,6 +364,7 @@ export function emptyForm(
     relayWhitelist: false,
     whitelistExtra: "",
     outboundId: "",
+    outboundIpStrategy: "auto",
     splitRules: [],
     enabled: true,
   };
@@ -462,6 +469,7 @@ export function formFromItem(item: InboundApiItem): InboundForm {
     relayWhitelist: item.relayWhitelist,
     whitelistExtra: item.whitelistExtra,
     outboundId: item.outboundId ? String(item.outboundId) : "",
+    outboundIpStrategy: item.outboundIpStrategy || "auto",
     splitRules: splitFormFromItem(item),
     enabled: item.enabled,
   };
@@ -632,6 +640,7 @@ export function toPayload(form: InboundForm): InboundMutationPayload {
     relayWhitelist: form.relayWhitelist,
     whitelistExtra: form.relayWhitelist ? form.whitelistExtra.trim() : "",
     outboundId: Number(form.outboundId) || 0,
+    outboundIpStrategy: form.outboundIpStrategy,
     splitRules: splitPayload(form.splitRules),
     enabled: form.enabled,
   };

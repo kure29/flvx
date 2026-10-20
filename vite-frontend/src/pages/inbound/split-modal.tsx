@@ -8,6 +8,7 @@ import { splitFormFromItem, splitPayload } from "./presets";
 import { DROP_NOTICE, savedDespiteDrop } from "./save-recovery";
 import { ruleFromTarget, ruleTarget, SplitRulesEditor } from "./split-rules";
 import { TargetButton, TargetPicker } from "./target-picker";
+import { OutboundIPSelect } from "./outbound-ip-select";
 
 import { updateInboundSplit } from "@/api";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -81,6 +82,9 @@ function SplitForm({
     splitFormFromItem(item),
   );
   const [saving, setSaving] = useState(false);
+  const [outboundIpStrategy, setOutboundIpStrategy] = useState(
+    item.outboundIpStrategy || "auto",
+  );
   // Which picker is open: the default exit or rule i.
   const [picking, setPicking] = useState<"default" | number | null>(null);
 
@@ -102,6 +106,7 @@ function SplitForm({
         id: item.id,
         outboundId: Number(outboundId) || 0,
         splitRules: splitPayload(rules) ?? [],
+        outboundIpStrategy,
       });
 
       if (res.code !== 0) {
@@ -137,6 +142,11 @@ function SplitForm({
         </p>
       </ModalHeader>
       <ModalBody className="space-y-5">
+        <OutboundIPSelect
+          kernelType={item.kernelType}
+          value={outboundIpStrategy}
+          onChange={setOutboundIpStrategy}
+        />
         <section className="space-y-2">
           <p className="text-sm font-medium">默认出口</p>
           <TargetButton

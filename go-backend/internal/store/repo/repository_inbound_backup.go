@@ -37,7 +37,7 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 			RelayOnly: i.RelayOnly, AcceptProxyProtocol: i.AcceptProxyProtocol,
 			RelayWhitelist: i.RelayWhitelist, WhitelistExtra: i.WhitelistExtra, Enabled: i.Enabled,
 			UploadBytes: i.UploadBytes, DownloadBytes: i.DownloadBytes, Inx: i.Inx,
-			CreatedTime: i.CreatedTime, SourceID: i.SourceID, OutboundID: i.OutboundID, SplitRules: i.SplitRules,
+			CreatedTime: i.CreatedTime, SourceID: i.SourceID, OutboundID: i.OutboundID, SplitRules: i.SplitRules, OutboundIPStrategy: i.OutboundIPStrategy,
 		})
 	}
 
@@ -78,7 +78,7 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 	}
 	for _, t := range templates {
 		out.Templates = append(out.Templates, model.TemplateBackup{
-			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL, CreatedTime: t.CreatedTime,
+			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL, BuilderConfig: t.BuilderConfig, CreatedTime: t.CreatedTime,
 		})
 	}
 	var subs []model.Subscription
@@ -144,12 +144,12 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 	// Templates keep their ids: subscription options refer to them.
 	for _, t := range b.Templates {
 		item := model.SubscriptionTemplate{
-			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL,
+			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL, BuilderConfig: t.BuilderConfig,
 			CreatedTime: t.CreatedTime, UpdatedTime: now,
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "kind", "content", "source_url", "updated_time"}),
+			DoUpdates: clause.AssignmentColumns([]string{"name", "kind", "content", "source_url", "builder_config", "updated_time"}),
 		}).Create(&item).Error; err != nil {
 			return 0, err
 		}
@@ -160,6 +160,14 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 		if listen == "" {
 			listen = "::"
 		}
+		// Backups made before the per-inbound policy have none; an unknown
+		// value would fail rendering the whole kernel, so it becomes auto.
+		strategy := i.OutboundIPStrategy
+		switch strategy {
+		case "auto", "ipv4_only", "ipv6_only", "prefer_ipv4", "prefer_ipv6":
+		default:
+			strategy = "auto"
+		}
 		item := model.NodeInbound{
 			ID: i.ID, KernelID: i.KernelID, NodeID: i.NodeID, Name: i.Name, Protocol: i.Protocol,
 			Listen: listen, Port: i.Port, Transport: i.Transport, Security: i.Security,
@@ -168,7 +176,7 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 			RelayWhitelist: i.RelayWhitelist, WhitelistExtra: i.WhitelistExtra, Enabled: i.Enabled,
 			UploadBytes: i.UploadBytes, DownloadBytes: i.DownloadBytes, Inx: i.Inx,
 			CreatedTime: i.CreatedTime, UpdatedTime: now, SourceID: i.SourceID, OutboundID: i.OutboundID,
-			SplitRules: i.SplitRules,
+			SplitRules: i.SplitRules, OutboundIPStrategy: strategy,
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "id"}},
@@ -176,7 +184,7 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 				"kernel_id", "node_id", "name", "protocol", "listen", "port", "transport", "security",
 				"settings", "extra", "share_host", "remark", "relay_only", "accept_proxy_protocol",
 				"relay_whitelist", "whitelist_extra", "enabled", "upload_bytes", "download_bytes",
-				"inx", "updated_time", "source_id", "outbound_id", "split_rules",
+				"inx", "updated_time", "source_id", "outbound_id", "split_rules", "outbound_ip_strategy",
 			}),
 		}).Create(&item).Error; err != nil {
 			return 0, err

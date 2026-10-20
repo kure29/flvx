@@ -56,7 +56,8 @@ type NodeInbound struct {
 	// direct.
 	OutboundID int64 `gorm:"column:outbound_id;not null;default:0;index"`
 	// SplitRules are the 分流 rules (JSON list of kernel.SplitRule).
-	SplitRules string `gorm:"column:split_rules;type:text;not null;default:''"`
+	SplitRules         string `gorm:"column:split_rules;type:text;not null;default:''"`
+	OutboundIPStrategy string `gorm:"column:outbound_ip_strategy;type:varchar(20);not null;default:'auto'"`
 }
 
 func (NodeInbound) TableName() string { return "node_inbound" }

@@ -75,8 +75,9 @@ type SubscriptionTemplate struct {
 	ID   int64  `gorm:"primaryKey;autoIncrement"`
 	Name string `gorm:"type:varchar(100);not null"`
 	// Kind is kernel.TemplateClash, TemplateSingbox or TemplateSurge.
-	Kind    string `gorm:"type:varchar(20);not null"`
-	Content string `gorm:"type:text;not null;default:''"`
+	Kind          string `gorm:"type:varchar(20);not null"`
+	Content       string `gorm:"type:text;not null;default:''"`
+	BuilderConfig string `gorm:"column:builder_config;type:text;not null;default:''"`
 	// SourceURL: the content is downloaded from here once a day; empty for
 	// pasted templates.
 	SourceURL   string `gorm:"column:source_url;type:text;not null;default:''"`

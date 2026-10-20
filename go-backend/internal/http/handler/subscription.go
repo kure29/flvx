@@ -79,7 +79,7 @@ func (p *subPipeline) normalize() error {
 	if p.Sort != "name" {
 		p.Sort = ""
 	}
-	if p.Lines != "relay" && p.Lines != "direct" {
+	if p.Lines != "relay" && p.Lines != "direct" && p.Lines != "prefer_relay" {
 		p.Lines = ""
 	}
 	if p.Regions == nil {
@@ -816,7 +816,8 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		view := map[string]interface{}{"id": t.ID, "name": t.Name}
-		if summary, err := kernel.CheckTemplate(t.Kind, t.Content, names); err != nil {
+		content, _ := effectiveTemplate(t)
+		if summary, err := kernel.CheckTemplate(t.Kind, content, names); err != nil {
 			view["error"] = err.Error()
 		} else {
 			view["groups"], view["warnings"] = summary.Groups, summary.Warnings

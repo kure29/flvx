@@ -142,7 +142,7 @@ func (h *Handler) validateChain(row model.NodeInbound, kernelType string) error 
 // kernelCaps is what a kernel version can do, for config and chain checks.
 func kernelCaps(version string) kernel.RenderOptions {
 	modern := !versionBelow(version, 1, 14)
-	return kernel.RenderOptions{SingboxHTTPClient: modern, SingboxSnell: modern}
+	return kernel.RenderOptions{SingboxHTTPClient: modern, SingboxSnell: modern, SingboxPreferGoDNS: !versionBelow(version, 1, 13)}
 }
 
 // validateChainFor is validateChain for an installed kernel version ("" is
@@ -166,6 +166,9 @@ func (h *Handler) validateChainFor(row model.NodeInbound, kernelType, version st
 		e, err := h.chainEndpoint(target, row.NodeID)
 		if err != nil {
 			return fmt.Errorf("%s：%v", what, err)
+		}
+		if err := kernel.ValidateOutboundIPServer(row.OutboundIPStrategy, e.Host); err != nil {
+			return fmt.Errorf("%s：%w", what, err)
 		}
 		if err := kernel.CheckChainWith(kernelType, e, caps); err != nil {
 			return fmt.Errorf("%s：%v", what, err)
@@ -372,9 +375,10 @@ func (h *Handler) inboundSplitSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ID         int64              `json:"id"`
-		OutboundID int64              `json:"outboundId"`
-		SplitRules []kernel.SplitRule `json:"splitRules"`
+		ID                 int64              `json:"id"`
+		OutboundID         int64              `json:"outboundId"`
+		SplitRules         []kernel.SplitRule `json:"splitRules"`
+		OutboundIPStrategy *string            `json:"outboundIpStrategy"`
 	}
 	if err := decodeJSON(r.Body, &req); err != nil {
 		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
@@ -388,6 +392,22 @@ func (h *Handler) inboundSplitSave(w http.ResponseWriter, r *http.Request) {
 	k, err := h.repo.GetNodeKernel(row.KernelID)
 	if err != nil || k == nil {
 		response.WriteJSON(w, response.ErrDefault("内核不存在"))
+		return
+	}
+	if req.OutboundIPStrategy != nil {
+		strategy, err := kernel.NormalizeOutboundIPStrategy(k.KernelType, *req.OutboundIPStrategy)
+		if err != nil {
+			response.WriteJSON(w, response.ErrDefault(err.Error()))
+			return
+		}
+		row.OutboundIPStrategy = strategy
+	}
+	if err := validateOutboundIPVersion(k.KernelType, k.Version, row.OutboundIPStrategy); err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
+	if err := kernel.ValidateOutboundIPExtra(k.KernelType, row.OutboundIPStrategy, json.RawMessage(row.Extra)); err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
 	prevTargets := outboundTargets(*row)

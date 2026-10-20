@@ -52,6 +52,9 @@ type RenderOptions struct {
 	// SingboxSnell lets sing-box dial Snell targets (chained outbounds and
 	// 分流 targets); sing-box 1.14+.
 	SingboxSnell bool
+	// SingboxPreferGoDNS bypasses systemd-resolved DBus in local DNS
+	// resolvers; supported by sing-box 1.13+.
+	SingboxPreferGoDNS bool
 }
 
 // Render produces the kernel configuration for the given enabled inbounds.
@@ -65,6 +68,11 @@ func RenderWith(kernelType string, inbounds []Inbound, opts RenderOptions) (Rend
 	sorted := make([]Inbound, len(inbounds))
 	copy(sorted, inbounds)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
+	for _, in := range sorted {
+		if err := ValidateOutboundIPExtra(kernelType, in.OutboundIPStrategy, in.Extra); err != nil {
+			return Rendered{}, err
+		}
+	}
 
 	var out Rendered
 	switch kernelType {

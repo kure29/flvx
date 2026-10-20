@@ -104,7 +104,8 @@ type inboundView struct {
 	OutboundName    string `json:"outboundName,omitempty"`
 	OutboundMissing bool   `json:"outboundMissing,omitempty"`
 	// SplitRules are the inbound's 分流 rules.
-	SplitRules []kernel.SplitRule `json:"splitRules"`
+	SplitRules         []kernel.SplitRule `json:"splitRules"`
+	OutboundIPStrategy string             `json:"outboundIpStrategy"`
 }
 
 // kernelSecurityView hides the self-signed private material and DNS API
@@ -119,6 +120,7 @@ type kernelSecurityView struct {
 }
 
 type inboundRequest struct {
+	OutboundIPStrategy  *string            `json:"outboundIpStrategy"`
 	ID                  int64              `json:"id"`
 	NodeID              int64              `json:"nodeId"`
 	KernelType          string             `json:"kernelType"`
@@ -145,7 +147,7 @@ type inboundRequest struct {
 
 func inboundFromModel(row model.NodeInbound) (kernel.Inbound, error) {
 	in := kernel.Inbound{ID: row.ID, Protocol: row.Protocol, Listen: row.Listen, Port: row.Port,
-		AcceptProxyProtocol: row.AcceptProxyProtocol == 1}
+		AcceptProxyProtocol: row.AcceptProxyProtocol == 1, OutboundIPStrategy: row.OutboundIPStrategy}
 	if err := unmarshalOptional(row.Settings, &in.Settings); err != nil {
 		return in, fmt.Errorf("入站 %d settings 损坏: %v", row.ID, err)
 	}
@@ -188,6 +190,7 @@ func applyInboundToModel(in kernel.Inbound, row *model.NodeInbound) error {
 	row.Transport = string(transport)
 	row.Security = string(security)
 	row.Extra = string(in.Extra)
+	row.OutboundIPStrategy = in.OutboundIPStrategy
 	return nil
 }
 
@@ -541,37 +544,38 @@ func (h *Handler) inboundList(w http.ResponseWriter, r *http.Request) {
 		}
 		k := kernelByID[row.KernelID]
 		v := inboundView{
-			ID:             row.ID,
-			KernelID:       row.KernelID,
-			KernelType:     k.KernelType,
-			KernelStatus:   k.Status,
-			External:       isExternalInbound(&row),
-			NodeID:         row.NodeID,
-			Name:           row.Name,
-			Protocol:       row.Protocol,
-			Listen:         row.Listen,
-			Port:           row.Port,
-			Network:        in.NetworkOn(k.KernelType),
-			Settings:       in.Settings,
-			Transport:      in.Transport,
-			Security:       kernelSecurityView{Security: in.Security, ACMEDNSSet: in.Security.ACMEDNSKey != ""},
-			Extra:          row.Extra,
-			ShareHost:      row.ShareHost,
-			Remark:         row.Remark,
-			RelayOnly:      row.RelayOnly == 1,
-			RelayCount:     relayCounts[row.ID],
-			AcceptProxy:    row.AcceptProxyProtocol == 1,
-			Whitelist:      row.RelayWhitelist == 1,
-			WhitelistExtra: row.WhitelistExtra,
-			Enabled:        row.Enabled == 1,
-			UploadBytes:    row.UploadBytes,
-			DownloadBytes:  row.DownloadBytes,
-			CreatedTime:    row.CreatedTime,
-			UpdatedTime:    row.UpdatedTime,
-			SourceID:       row.SourceID,
-			SourceName:     sourceNames[row.SourceID],
-			OutboundID:     row.OutboundID,
-			SplitRules:     rowSplitRules(row),
+			ID:                 row.ID,
+			KernelID:           row.KernelID,
+			KernelType:         k.KernelType,
+			KernelStatus:       k.Status,
+			External:           isExternalInbound(&row),
+			NodeID:             row.NodeID,
+			Name:               row.Name,
+			Protocol:           row.Protocol,
+			Listen:             row.Listen,
+			Port:               row.Port,
+			Network:            in.NetworkOn(k.KernelType),
+			Settings:           in.Settings,
+			Transport:          in.Transport,
+			Security:           kernelSecurityView{Security: in.Security, ACMEDNSSet: in.Security.ACMEDNSKey != ""},
+			Extra:              row.Extra,
+			ShareHost:          row.ShareHost,
+			Remark:             row.Remark,
+			RelayOnly:          row.RelayOnly == 1,
+			RelayCount:         relayCounts[row.ID],
+			AcceptProxy:        row.AcceptProxyProtocol == 1,
+			Whitelist:          row.RelayWhitelist == 1,
+			WhitelistExtra:     row.WhitelistExtra,
+			Enabled:            row.Enabled == 1,
+			UploadBytes:        row.UploadBytes,
+			DownloadBytes:      row.DownloadBytes,
+			CreatedTime:        row.CreatedTime,
+			UpdatedTime:        row.UpdatedTime,
+			SourceID:           row.SourceID,
+			SourceName:         sourceNames[row.SourceID],
+			OutboundID:         row.OutboundID,
+			SplitRules:         rowSplitRules(row),
+			OutboundIPStrategy: row.OutboundIPStrategy,
 		}
 		if v.SplitRules == nil {
 			v.SplitRules = []kernel.SplitRule{}
@@ -672,16 +676,24 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 	}
 
 	in := kernel.Inbound{
-		ID:        row.ID,
-		Protocol:  req.Protocol,
-		Listen:    req.Listen,
-		Port:      req.Port,
-		Settings:  req.Settings,
-		Transport: req.Transport,
-		Security:  req.Security,
-		Extra:     json.RawMessage(strings.TrimSpace(req.Extra)),
+		OutboundIPStrategy: row.OutboundIPStrategy,
+		ID:                 row.ID,
+		Protocol:           req.Protocol,
+		Listen:             req.Listen,
+		Port:               req.Port,
+		Settings:           req.Settings,
+		Transport:          req.Transport,
+		Security:           req.Security,
+		Extra:              json.RawMessage(strings.TrimSpace(req.Extra)),
 
 		AcceptProxyProtocol: req.AcceptProxyProtocol,
+	}
+	if req.OutboundIPStrategy != nil {
+		in.OutboundIPStrategy = *req.OutboundIPStrategy
+	}
+	if err := validateOutboundIPVersion(k.KernelType, k.Version, in.OutboundIPStrategy); err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
 	}
 	allowExtra, err := kernel.ParseAllowList(req.WhitelistExtra)
 	if err != nil {
@@ -704,6 +716,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("自动申请证书需要 sing-box 1.14 及以上，节点安装的是 %s", k.Version)))
 		return
 	}
+	row.OutboundIPStrategy = in.OutboundIPStrategy
 	prevTargets := outboundTargets(row)
 	if err := h.setInboundRouting(&row, k.KernelType, k.Version, req.OutboundID, req.SplitRules); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
@@ -1194,6 +1207,9 @@ func (h *Handler) buildKernelApplyPayloadWith(k *model.NodeKernel, realmOverride
 		if row.Enabled != 1 {
 			continue
 		}
+		if err := validateOutboundIPVersion(k.KernelType, k.Version, row.OutboundIPStrategy); err != nil {
+			return nil, "", err
+		}
 		in, err := inboundFromModel(row)
 		if err != nil {
 			return nil, "", err
@@ -1222,9 +1238,10 @@ func (h *Handler) buildKernelApplyPayloadWith(k *model.NodeKernel, realmOverride
 		proxy = proxyURL
 	}
 	rendered, err := kernel.RenderWith(k.KernelType, inbounds, kernel.RenderOptions{
-		RuleSetMirror:     proxy,
-		SingboxHTTPClient: kernelCaps(k.Version).SingboxHTTPClient,
-		SingboxSnell:      kernelCaps(k.Version).SingboxSnell,
+		RuleSetMirror:      proxy,
+		SingboxHTTPClient:  kernelCaps(k.Version).SingboxHTTPClient,
+		SingboxSnell:       kernelCaps(k.Version).SingboxSnell,
+		SingboxPreferGoDNS: kernelCaps(k.Version).SingboxPreferGoDNS,
 	})
 	if err != nil {
 		return nil, "", err
@@ -1355,8 +1372,8 @@ func (h *Handler) kernelVersions(w http.ResponseWriter, r *http.Request) {
 }
 
 // versionBelow reports whether a concrete "x.y[.z]" version is older than
-// major.minor; "latest" and unparsable versions are not.
-func versionBelow(version string, major, minor int) bool {
+// major.minor (or major.minor.patch); "latest" and unparsable versions are not.
+func versionBelow(version string, major, minor int, patch ...int) bool {
 	parts := strings.SplitN(strings.TrimPrefix(version, "v"), ".", 3)
 	if len(parts) < 2 {
 		return false
@@ -1366,7 +1383,20 @@ func versionBelow(version string, major, minor int) bool {
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	return ma < major || (ma == major && mi < minor)
+	if ma != major {
+		return ma < major
+	}
+	if mi != minor {
+		return mi < minor
+	}
+	if len(patch) == 0 {
+		return false
+	}
+	if len(parts) < 3 {
+		return patch[0] > 0
+	}
+	pa, err := strconv.Atoi(parts[2])
+	return err == nil && pa < patch[0]
 }
 
 // snellMajor returns the protocol major version a Snell binary serves.
@@ -1403,6 +1433,9 @@ func (h *Handler) checkKernelVersionFits(kernelID int64, kernelType, version str
 		return err
 	}
 	for _, row := range rows {
+		if err := validateOutboundIPVersion(kernelType, version, row.OutboundIPStrategy); err != nil {
+			return fmt.Errorf("入站 %s：%v", row.Name, err)
+		}
 		in, err := inboundFromModel(row)
 		if err != nil {
 			continue

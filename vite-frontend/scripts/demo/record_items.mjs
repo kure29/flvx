@@ -25,6 +25,7 @@ for (const k of (Array.isArray(kernels) ? kernels : kernels.items ?? [])) await 
 for (const u of users) { await call("POST", "user/groups", { id: u.id }); await call("POST", "tunnel/user/list", { userId: u.id }); }
 await call("GET", "monitor/tunnels"); await call("GET", "monitor/tunnels/quality");
 await call("POST", "inbound/sub/info", { reset: false });
+await call("POST", "subscription/template/catalog");
 rec.recordedAt = now;
 fs.writeFileSync(file, JSON.stringify(rec));
 console.log(Object.keys(rec.admin).length, "admin paths");

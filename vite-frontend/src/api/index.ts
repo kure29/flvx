@@ -696,7 +696,7 @@ export const batchToggleInbounds = (ids: number[], enabled: boolean) =>
     enabled,
   });
 export interface SubPipeline {
-  lines: "" | "relay" | "direct";
+  lines: "" | "relay" | "direct" | "prefer_relay";
   regions: string[];
   protocols: string[];
   include: string;
@@ -721,11 +721,45 @@ export interface SubPipeline {
   /** Subscription template id per client kind; a kind without one gets the built-in profile. */
   templates?: Partial<Record<SubTemplateSlot, number>>;
 }
+export interface SubTemplateServiceGroup {
+  key: string;
+  name: string;
+  target: string;
+  members: string[];
+}
+export interface SubTemplateBuilder {
+  serviceGroups?: boolean;
+  version: 1;
+  preset: "minimal" | "balanced" | "full" | "custom";
+  groups: Array<{ name: string; type: "select" | "url-test"; filter: string }>;
+  rules: Array<{
+    type:
+      | "category"
+      | "domain"
+      | "domain_suffix"
+      | "domain_keyword"
+      | "ip_cidr";
+    value: string;
+    target: string;
+  }>;
+  final: string;
+}
+export interface SubTemplateCategory {
+  key: string;
+  name: string;
+  icon: string;
+  target: string;
+  presets: string[];
+}
+export const getSubTemplateCatalog = () =>
+  Network.post<SubTemplateCategory[]>("/subscription/template/catalog");
+
 export type SubTemplateKind = "clash" | "singbox" | "surge";
 /** Clients a subscription picks a template for; Stash and Shadowrocket take Mihomo ("clash") templates. */
 export type SubTemplateSlot = SubTemplateKind | "stash" | "shadowrocket";
 /** A user's own Mihomo / sing-box / Surge profile that subscriptions render into. */
 export interface SubTemplate {
+  builder?: SubTemplateBuilder;
   id: number;
   name: string;
   kind: SubTemplateKind;
@@ -757,6 +791,7 @@ export interface SubTemplateSummary {
   warnings: string[];
 }
 export interface SubTemplateDraft {
+  builder?: SubTemplateBuilder;
   id?: number;
   name: string;
   kind: SubTemplateKind;
@@ -769,6 +804,7 @@ export const checkSubTemplate = (
   data: Omit<SubTemplateDraft, "id" | "name"> & { subscriptionId?: number },
 ) =>
   Network.post<{
+    serviceGroups: SubTemplateServiceGroup[];
     summary: SubTemplateSummary;
     autoGroups: number;
     sample: string;
@@ -982,6 +1018,12 @@ export const updateInboundSplit = (data: {
   id: number;
   outboundId: number;
   splitRules: SplitRule[];
+  outboundIpStrategy?:
+    | "auto"
+    | "ipv4_only"
+    | "ipv6_only"
+    | "prefer_ipv4"
+    | "prefer_ipv6";
 }) => Network.post("/inbound/split", data);
 export const toggleInbound = (id: number, enabled: boolean) =>
   Network.post("/inbound/toggle", { id, enabled });

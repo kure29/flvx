@@ -246,6 +246,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/subscription/source/refresh", h.remoteSourceRefresh)
 	mux.HandleFunc("/api/v1/subscription/source/delete", h.remoteSourceDelete)
 	mux.HandleFunc("/api/v1/subscription/preview", h.subscriptionPreview)
+	mux.HandleFunc("/api/v1/subscription/template/catalog", h.subscriptionTemplateCatalog)
 	mux.HandleFunc("/api/v1/subscription/template/list", h.subscriptionTemplateList)
 	mux.HandleFunc("/api/v1/subscription/template/check", h.subscriptionTemplateCheck)
 	mux.HandleFunc("/api/v1/subscription/template/save", h.subscriptionTemplateSave)

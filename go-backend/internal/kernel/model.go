@@ -122,14 +122,15 @@ type Security struct {
 
 // Inbound is the kernel-independent description of one listening service.
 type Inbound struct {
-	ID        int64           `json:"id"`
-	Protocol  string          `json:"protocol"`
-	Listen    string          `json:"listen"`
-	Port      int             `json:"port"`
-	Settings  Settings        `json:"settings"`
-	Transport Transport       `json:"transport"`
-	Security  Security        `json:"security"`
-	Extra     json.RawMessage `json:"extra,omitempty"`
+	ID                 int64           `json:"id"`
+	Protocol           string          `json:"protocol"`
+	Listen             string          `json:"listen"`
+	OutboundIPStrategy string          `json:"outboundIpStrategy,omitempty"`
+	Port               int             `json:"port"`
+	Settings           Settings        `json:"settings"`
+	Transport          Transport       `json:"transport"`
+	Security           Security        `json:"security"`
+	Extra              json.RawMessage `json:"extra,omitempty"`
 	// AcceptProxyProtocol makes the inbound require a PROXY protocol header
 	// (sent by relay forwards) so the kernel sees the real client address.
 	AcceptProxyProtocol bool `json:"acceptProxyProtocol,omitempty"`
@@ -239,6 +240,11 @@ func Normalize(kernelType string, in *Inbound) error {
 	if !ok || !info.Implemented {
 		return fmt.Errorf("暂不支持内核 %s", kernelType)
 	}
+	strategy, err := NormalizeOutboundIPStrategy(kernelType, in.OutboundIPStrategy)
+	if err != nil {
+		return err
+	}
+	in.OutboundIPStrategy = strategy
 
 	in.Protocol = strings.ToLower(strings.TrimSpace(in.Protocol))
 	proto, ok := info.protocol(in.Protocol)
@@ -280,7 +286,7 @@ func Normalize(kernelType string, in *Inbound) error {
 		return errors.New("WireGuard 走 UDP，不支持获取真实 IP（PROXY protocol）")
 	}
 
-	if err := normalizeExtra(in); err != nil {
+	if err := normalizeExtra(kernelType, in); err != nil {
 		return err
 	}
 	if err := normalizeTransport(&in.Transport); err != nil {
@@ -310,7 +316,7 @@ func Normalize(kernelType string, in *Inbound) error {
 	return nil
 }
 
-func normalizeExtra(in *Inbound) error {
+func normalizeExtra(kernelType string, in *Inbound) error {
 	raw := strings.TrimSpace(string(in.Extra))
 	if raw == "" || raw == "null" || raw == "{}" {
 		in.Extra = nil
@@ -324,7 +330,7 @@ func normalizeExtra(in *Inbound) error {
 		return errors.New("高级配置必须是 JSON 对象")
 	}
 	in.Extra = json.RawMessage(raw)
-	return nil
+	return ValidateOutboundIPExtra(kernelType, in.OutboundIPStrategy, in.Extra)
 }
 
 func normalizeTransport(t *Transport) error {

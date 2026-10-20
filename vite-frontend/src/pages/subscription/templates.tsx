@@ -1,5 +1,7 @@
 import type {
   SubscriptionItem,
+  SubTemplateBuilder,
+  SubTemplateCategory,
   SubTemplate,
   SubTemplateDraft,
   SubTemplateGroup,
@@ -19,6 +21,11 @@ import {
   saveSubTemplate,
 } from "@/api";
 import { ListRow } from "@/components/page-kit";
+import {
+  TemplateBuilder,
+  TemplateRulePreview,
+  newTemplateBuilder,
+} from "@/pages/subscription/template-builder";
 import { Segmented } from "@/pages/subscription/controls";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Input, Textarea } from "@/shadcn-bridge/heroui/input";
@@ -250,6 +257,8 @@ export function TemplateGroups({
 }
 
 type Check = {
+  serviceGroups: import("@/api").SubTemplateServiceGroup[];
+  builder?: SubTemplateBuilder;
   summary: SubTemplateSummary;
   autoGroups: number;
   sample: string;
@@ -261,6 +270,7 @@ const blank = (kind: SubTemplateKind = "clash"): SubTemplateDraft => ({
   kind,
   content: "",
   sourceUrl: "",
+  builder: newTemplateBuilder(),
 });
 
 function Editor({
@@ -280,7 +290,13 @@ function Editor({
   onDeleted: (id: number) => void;
 }) {
   const [draft, setDraft] = useState(initial);
-  const [fromUrl, setFromUrl] = useState(Boolean(initial.sourceUrl));
+  const [catalog, setCatalog] = useState<SubTemplateCategory[]>([]);
+  const checkSequence = useRef(0);
+  const [mode, setMode] = useState<"builder" | "paste" | "url">(
+    initial.builder ? "builder" : initial.sourceUrl ? "url" : "paste",
+  );
+  const fromUrl = mode === "url";
+  const building = mode === "builder";
   const [sampleId, setSampleId] = useState(subscriptions[0]?.id ?? 0);
   const [check, setCheck] = useState<Check | null>(null);
   const [checking, setChecking] = useState(false);
@@ -289,32 +305,39 @@ function Editor({
   // The cursor in the content box, once the user has put it there.
   const cursor = useRef<number | null>(null);
   const set = (patch: Partial<SubTemplateDraft>) => {
+    checkSequence.current++;
+    setChecking(false);
     setDraft((d) => ({ ...d, ...patch }));
     setCheck(null);
   };
 
   const runCheck = async () => {
+    const sequence = ++checkSequence.current;
+
     setChecking(true);
     try {
       const res = await checkSubTemplate({
         kind: draft.kind,
         content: fromUrl ? "" : draft.content,
         sourceUrl: fromUrl ? draft.sourceUrl : "",
+        builder: building ? draft.builder : undefined,
         subscriptionId: sampleId || undefined,
       });
 
+      if (sequence !== checkSequence.current) return;
       if (res.code !== 0 || !res.data) {
         toast.error(res.msg || "检查失败");
         setCheck(null);
 
         return;
       }
-      setCheck(res.data);
-      if (fromUrl) setDraft((d) => ({ ...d, content: res.data!.content }));
+      setCheck({ ...res.data, builder: building ? draft.builder : undefined });
+      if (fromUrl || building)
+        setDraft((d) => ({ ...d, content: res.data!.content }));
     } catch {
-      toast.error("检查失败");
+      if (sequence === checkSequence.current) toast.error("检查失败");
     } finally {
-      setChecking(false);
+      if (sequence === checkSequence.current) setChecking(false);
     }
   };
 
@@ -324,6 +347,7 @@ function Editor({
       const res = await saveSubTemplate({
         ...draft,
         sourceUrl: fromUrl ? draft.sourceUrl.trim() : "",
+        builder: building ? draft.builder : undefined,
       });
 
       if (res.code !== 0 || !res.data) {
@@ -338,6 +362,38 @@ function Editor({
     } finally {
       setSaving(false);
     }
+  };
+
+  const changeMode = async (next: "builder" | "paste" | "url") => {
+    checkSequence.current++;
+    if (building && next !== "builder") {
+      setChecking(true);
+      try {
+        const res = await checkSubTemplate({
+          kind: draft.kind,
+          content: "",
+          sourceUrl: "",
+          builder: draft.builder,
+        });
+
+        if (res.code !== 0 || !res.data) {
+          toast.error(res.msg || "生成配置失败，请检查规则");
+
+          return;
+        }
+        setDraft((d) => ({ ...d, content: res.data!.content }));
+      } catch {
+        toast.error("生成配置失败");
+
+        return;
+      } finally {
+        setChecking(false);
+      }
+    }
+    if (next === "builder" && !draft.builder)
+      setDraft((d) => ({ ...d, builder: newTemplateBuilder() }));
+    setCheck(null);
+    setMode(next);
   };
 
   const refresh = async () => {
@@ -388,7 +444,10 @@ function Editor({
         ? ""
         : "\n";
 
-    set({ content: before + lead + snippet + trail + after });
+    set({
+      content: before + lead + snippet + trail + after,
+      builder: undefined,
+    });
     cursor.current = null;
     toast.success(`已插入「${name}」，记得在选择组里引用它`);
   };
@@ -411,41 +470,60 @@ function Editor({
         </button>
         <h2 className="text-lg font-bold">{saved ? "编辑模板" : "新建模板"}</h2>
       </ModalHeader>
-      <ModalBody className="space-y-4">
-        <Input
-          label="名称"
-          placeholder="例如 我的分流 / ACL4SSR 精简版"
-          value={draft.name}
-          variant="bordered"
-          onChange={(e) => set({ name: e.target.value })}
-        />
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium">格式</p>
-          <Segmented
-            options={TEMPLATE_KINDS}
-            value={draft.kind}
-            onChange={(kind) => set({ kind })}
+      <ModalBody className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input
+            label="名称"
+            placeholder="例如 我的分流 / ACL4SSR 精简版"
+            value={draft.name}
+            variant="bordered"
+            onChange={(e) => set({ name: e.target.value })}
           />
-          <p className="text-xs text-default-500">
-            节点进策略组的写法：{AUTO_HINT[draft.kind]}
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">格式</p>
+            <Segmented
+              options={TEMPLATE_KINDS}
+              value={draft.kind}
+              onChange={(kind) => set({ kind })}
+            />
+          </div>
         </div>
+        {(!building || draft.kind === "singbox") && (
+          <p className="text-xs text-default-500">
+            {building
+              ? "生成的 sing-box 模板适用于 1.12 及以上版本"
+              : `节点进策略组的写法：${AUTO_HINT[draft.kind]}`}
+          </p>
+        )}
         <div className="space-y-1.5">
-          <p className="text-sm font-medium">内容</p>
+          <p className="text-sm font-medium">编辑方式</p>
           <Segmented
             options={[
-              ["paste", "粘贴"],
+              ["builder", "选择规则"],
+              ["paste", "源码编辑"],
               ["url", "从网址获取"],
             ]}
-            value={fromUrl ? "url" : "paste"}
+            value={mode}
             onChange={(v) => {
-              setFromUrl(v === "url");
-              setCheck(null);
+              void changeMode(v);
             }}
           />
         </div>
 
-        {fromUrl ? (
+        {building && draft.builder ? (
+          <div className="space-y-3">
+            {initial.content && !initial.builder && (
+              <p className="text-xs text-default-500">
+                原有源码不会自动转换为规则选项，保存时将按下面的选择重新生成配置。
+              </p>
+            )}
+            <TemplateBuilder
+              value={draft.builder}
+              onCatalog={setCatalog}
+              onChange={(builder) => set({ builder })}
+            />
+          </div>
+        ) : fromUrl ? (
           <div className="space-y-2">
             <Input
               placeholder="https://raw.githubusercontent.com/.../config.yaml"
@@ -493,7 +571,7 @@ function Editor({
                         content: draft.content,
                         sourceUrl: "",
                       });
-                      setFromUrl(false);
+                      setMode("paste");
                       toast("已复制为本地模板，保存后生效", { icon: "📋" });
                     }}
                   >
@@ -523,7 +601,7 @@ function Editor({
                   className="ml-auto text-xs text-primary"
                   type="button"
                   onClick={() => {
-                    set({ content: EXAMPLES[draft.kind] });
+                    set({ content: EXAMPLES[draft.kind], builder: undefined });
                     cursor.current = null;
                   }}
                 >
@@ -541,7 +619,7 @@ function Editor({
               variant="bordered"
               wrap="off"
               onChange={(e) => {
-                set({ content: e.target.value });
+                set({ content: e.target.value, builder: undefined });
                 keepCursor(e);
               }}
               onClick={keepCursor}
@@ -559,7 +637,7 @@ function Editor({
               value={sampleId}
               onChange={(e) => {
                 setSampleId(Number(e.target.value));
-                setCheck(null);
+                set({});
               }}
             >
               <option value={0}>全部节点</option>
@@ -571,29 +649,83 @@ function Editor({
             </select>
             <Button
               className="ml-auto"
-              isDisabled={fromUrl ? !draft.sourceUrl.trim() : !draft.content}
+              isDisabled={
+                building
+                  ? !draft.builder
+                  : fromUrl
+                    ? !draft.sourceUrl.trim()
+                    : !draft.content
+              }
               isLoading={checking}
               size="sm"
               variant="flat"
               onPress={runCheck}
             >
-              {fromUrl ? "获取并检查" : "检查"}
+              {building ? "生成并预览" : fromUrl ? "获取并检查" : "检查"}
             </Button>
           </div>
           {check ? (
             <>
-              <p className="text-xs">
-                识别到 <b>{check.summary.groups.length}</b> 个策略组，其中{" "}
-                <b>{check.autoGroups}</b> 个自动收节点；规则{" "}
-                {check.summary.rules} 条
-                {check.summary.providers > 0 &&
-                  `，规则集 ${check.summary.providers} 个`}
-                。按「{check.sample}」的 {check.nodes} 个节点预演：
-              </p>
-              <TemplateGroups
-                groups={check.summary.groups}
-                warnings={check.summary.warnings}
-              />
+              {check.builder ? (
+                <>
+                  <p className="text-xs">
+                    以下规则按顺序匹配，未命中时走兜底。共生成{" "}
+                    {check.summary.rules} 条客户端规则
+                    {check.summary.providers > 0
+                      ? `、${check.summary.providers} 个规则集`
+                      : ""}
+                    。
+                  </p>
+                  <TemplateRulePreview
+                    catalog={catalog}
+                    serviceGroups={check.serviceGroups}
+                    value={check.builder}
+                  />
+                </>
+              ) : (
+                <p className="text-xs">
+                  识别到 <b>{check.summary.groups.length}</b> 个策略组，其中{" "}
+                  <b>{check.autoGroups}</b> 个自动收节点；规则{" "}
+                  {check.summary.rules} 条
+                  {check.summary.providers > 0 &&
+                    `，规则集 ${check.summary.providers} 个`}
+                  。按「{check.sample}」的 {check.nodes} 个节点预演：
+                </p>
+              )}
+              {building && (
+                <details className="rounded-lg border border-divider p-2">
+                  <summary className="cursor-pointer text-xs">
+                    查看生成的配置
+                  </summary>
+                  <Textarea
+                    readOnly
+                    classNames={{ input: "font-mono text-xs" }}
+                    minRows={10}
+                    value={draft.content}
+                    variant="bordered"
+                    wrap="off"
+                  />
+                </details>
+              )}
+              {check.builder ? (
+                <details className="space-y-2 rounded-lg border border-divider p-2">
+                  <summary className="cursor-pointer text-xs">
+                    代理节点详情 · {check.sample}（{check.nodes} 个节点）
+                  </summary>
+                  <p className="text-xs text-default-500">
+                    规则选择“代理”时，由节点选择或自动测速决定使用哪个节点。这里不改变规则的匹配顺序。
+                  </p>
+                  <TemplateGroups
+                    groups={check.summary.groups}
+                    warnings={check.summary.warnings}
+                  />
+                </details>
+              ) : (
+                <TemplateGroups
+                  groups={check.summary.groups}
+                  warnings={check.summary.warnings}
+                />
+              )}
               {autoGroups.some((g) => g.filterError) && (
                 <p className="text-xs text-default-400">
                   标“由客户端按过滤条件收节点”的组用了面板预览不了的正则写法，客户端照常生效
@@ -602,7 +734,9 @@ function Editor({
             </>
           ) : (
             <p className="text-xs text-default-400">
-              检查格式，并看看每个策略组能收到哪些节点
+              {building
+                ? "生成配置并查看规则的分流去向，可展开代理节点详情。"
+                : "检查格式，并看看每个策略组能收到哪些节点"}
             </p>
           )}
         </div>
@@ -626,7 +760,17 @@ function Editor({
         <Button variant="light" onPress={onBack}>
           取消
         </Button>
-        <Button color="primary" isLoading={saving} onPress={save}>
+        <Button
+          color="primary"
+          isDisabled={
+            checking ||
+            (building &&
+              draft.builder?.preset !== "custom" &&
+              !draft.builder?.rules.length)
+          }
+          isLoading={saving}
+          onPress={save}
+        >
           保存
         </Button>
       </ModalFooter>
@@ -711,8 +855,7 @@ export function TemplatesModal({
                   <div className="space-y-2 py-6 text-center text-sm text-default-500">
                     <p>还没有模板</p>
                     <p className="text-xs">
-                      可以粘贴自己的配置，或者填 GitHub
-                      上现成模板的网址；在订阅的「规则」页里选用
+                      可以选择规则快速创建模板，也支持源码编辑和网址导入；在订阅的「规则」页里选用
                     </p>
                   </div>
                 ) : (
@@ -727,7 +870,9 @@ export function TemplatesModal({
                       meta={[
                         t.sourceUrl
                           ? `网址 · ${t.lastError ? "上次更新失败" : `${ago(t.lastFetch)}更新`}`
-                          : "粘贴",
+                          : t.builder
+                            ? "规则编辑器"
+                            : "源码",
                         `${t.groups} 个策略组`,
                         t.usedBy > 0 ? `${t.usedBy} 个订阅在用` : "未使用",
                       ].join(" · ")}
@@ -741,6 +886,7 @@ export function TemplatesModal({
                             kind: t.kind,
                             content: t.content,
                             sourceUrl: t.sourceUrl,
+                            builder: t.builder,
                           },
                           saved: t,
                         })
