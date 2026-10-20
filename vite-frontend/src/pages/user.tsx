@@ -1,3 +1,5 @@
+import type { SubscriptionItem } from "@/api";
+
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { parseDate } from "@internationalized/date";
@@ -43,6 +45,7 @@ import {
 } from "@/types";
 import {
   getAllUsers,
+  getSubscriptions,
   createUser,
   updateUser,
   deleteUser,
@@ -183,6 +186,63 @@ const normalizeUserTunnelItem = (item: Partial<UserTunnel>): UserTunnel => {
   };
 };
 
+/**
+ * The subscriptions assigned to the user being edited. A subscription has
+ * one user: picking one that belongs to someone else moves it here.
+ */
+function SubscriptionPicker({
+  subscriptions,
+  selected,
+  userId,
+  onChange,
+}: {
+  subscriptions: SubscriptionItem[];
+  selected: number[];
+  userId?: number;
+  onChange: (ids: number[]) => void;
+}) {
+  if (subscriptions.length === 0) return null;
+  const owner = (s: SubscriptionItem) =>
+    s.userId && s.userId !== userId ? s.userName || `#${s.userId}` : "";
+  const moved = subscriptions.filter(
+    (s) => selected.includes(s.id) && owner(s),
+  );
+
+  return (
+    <div className="space-y-1">
+      <Select
+        dropdownPlacement="top"
+        label="订阅（可选）"
+        placeholder="选择分配给该用户的订阅"
+        selectedKeys={new Set(selected.map(String))}
+        selectionMode="multiple"
+        onSelectionChange={(keys) =>
+          onChange(Array.from(keys as Set<string>).map(Number))
+        }
+      >
+        {subscriptions.map((s) => (
+          <SelectItem
+            key={s.id.toString()}
+            textValue={owner(s) ? `${s.name}（当前属于 ${owner(s)}）` : s.name}
+          >
+            {s.name}
+          </SelectItem>
+        ))}
+      </Select>
+      {moved.length > 0 ? (
+        <p className="text-xs text-warning">
+          {moved.map((s) => `「${s.name}」`).join("、")}
+          会从 {[...new Set(moved.map(owner))].join("、")} 转给该用户
+        </p>
+      ) : (
+        <p className="text-xs text-default-500">
+          分配后，该用户登录面板就能在「订阅」里导入客户端、查看流量和到期、自己重置链接
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function UserPage() {
   // 状态管理
   const [users, setUsers] = useState<User[]>([]);
@@ -303,6 +363,16 @@ export default function UserPage() {
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
   const [speedLimits, setSpeedLimits] = useState<SpeedLimit[]>([]);
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
+  const userSubCount = useMemo(() => {
+    const m = new Map<number, number>();
+
+    for (const s of subscriptions) {
+      if (s.userId) m.set(s.userId, (m.get(s.userId) ?? 0) + 1);
+    }
+
+    return m;
+  }, [subscriptions]);
 
   const noLimitSpeedLimitIds = useMemo(() => {
     return new Set(
@@ -374,6 +444,14 @@ export default function UserPage() {
     },
     [pagination.current, pagination.size],
   );
+
+  const loadSubscriptions = useCallback(async () => {
+    try {
+      const res = await getSubscriptions();
+
+      if (res.code === 0) setSubscriptions(res.data?.items ?? []);
+    } catch {}
+  }, []);
 
   const loadTunnels = useCallback(async () => {
     try {
@@ -466,7 +544,14 @@ export default function UserPage() {
     void loadSpeedLimits();
     void loadUserGroups();
     void loadMonitorPermissions();
-  }, [loadMonitorPermissions, loadSpeedLimits, loadTunnels, loadUserGroups]);
+    void loadSubscriptions();
+  }, [
+    loadMonitorPermissions,
+    loadSpeedLimits,
+    loadSubscriptions,
+    loadTunnels,
+    loadUserGroups,
+  ]);
 
   useEffect(() => {
     if (searchDebounceRef.current) {
@@ -520,6 +605,7 @@ export default function UserPage() {
       flowResetTime: 0,
       maxConn: 0,
       groupIds: [],
+      subscriptionIds: [],
     });
     onUserModalOpen();
   };
@@ -554,6 +640,9 @@ export default function UserPage() {
       flowResetTime: user.flowResetTime ?? 0,
       maxConn: user.maxConn ?? 0,
       groupIds: currentGroupIds,
+      subscriptionIds: subscriptions
+        .filter((s) => s.userId === user.id)
+        .map((s) => s.id),
     });
     onUserModalOpen();
   };
@@ -627,6 +716,7 @@ export default function UserPage() {
       if (response.code === 0) {
         toast.success(isEdit ? "更新成功" : "创建成功");
         onUserModalClose();
+        void loadSubscriptions();
         const responseUser = normalizeUserItem((response as any).data || {});
 
         if (
@@ -1055,6 +1145,9 @@ export default function UserPage() {
             const meta = [
               `已用 ${formatFlow(calculateUserTotalUsedFlow(user))} / ${formatFlowLimit(user.flow, user.flowMiB)}`,
               `规则 ${user.num}`,
+              ...(userSubCount.get(user.id)
+                ? [`订阅 ${userSubCount.get(user.id)}`]
+                : []),
               user.expTime ? `到期 ${formatDate(user.expTime)}` : "永久",
             ];
 
@@ -1462,6 +1555,15 @@ export default function UserPage() {
                 ))}
               </Select>
             )}
+
+            <SubscriptionPicker
+              selected={userForm.subscriptionIds ?? []}
+              subscriptions={subscriptions}
+              userId={userForm.id}
+              onChange={(ids) =>
+                setUserForm((prev) => ({ ...prev, subscriptionIds: ids }))
+              }
+            />
           </ModalBody>
           <ModalFooter>
             <Button onPress={onUserModalClose}>取消</Button>

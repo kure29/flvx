@@ -530,8 +530,6 @@ type subscriptionRequest struct {
 	// TrafficLimit is in bytes (0 = unlimited); ResetDay 1-28 (0 = never).
 	TrafficLimit int64 `json:"trafficLimit"`
 	ResetDay     int   `json:"resetDay"`
-	// UserID assigns it to a panel user (0 = none).
-	UserID int64 `json:"userId"`
 }
 
 // validate checks the request and returns the inbound ids it selects.
@@ -597,16 +595,6 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	if req.UserID < 0 {
-		req.UserID = 0
-	}
-	if req.UserID > 0 {
-		if u, err := h.repo.GetUserByID(req.UserID); err != nil || u == nil {
-			response.WriteJSON(w, response.ErrDefault("所选用户不存在"))
-			return
-		}
-	}
-
 	now := time.Now()
 	var s *model.Subscription
 	var before []int64
@@ -640,7 +628,6 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		_ = h.repo.MarkSubscriptionResetTime(s.ID, s.TrafficResetTime)
 	}
 	s.ResetDay = req.ResetDay
-	s.UserID = req.UserID
 	if req.Enabled != nil {
 		s.Enabled = boolToInt(*req.Enabled)
 	}

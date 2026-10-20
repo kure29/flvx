@@ -48,6 +48,8 @@ export interface UserForm {
   flowResetTime: number;
   maxConn?: number;
   groupIds?: number[];
+  /** The subscriptions assigned to the user (sent on save). */
+  subscriptionIds?: number[];
 }
 
 export interface UserTunnel {

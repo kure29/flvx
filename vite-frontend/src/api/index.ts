@@ -763,8 +763,6 @@ export interface SubscriptionDraft {
   remark: string;
   trafficLimit: number;
   resetDay: number;
-  /** Panel user to assign it to; 0 = none. */
-  userId?: number;
 }
 export interface SubPreviewItem {
   name: string;

@@ -152,6 +152,27 @@ func (r *Repository) ListUserSubscriptions(userID int64) ([]model.Subscription, 
 	return out, err
 }
 
+// AssignUserSubscriptions makes ids exactly the subscriptions assigned to
+// userID: they move to it (from whoever had them), its others are unassigned.
+func (r *Repository) AssignUserSubscriptions(userID int64, ids []int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		clear := tx.Model(&model.Subscription{}).Where("user_id = ?", userID)
+		if len(ids) > 0 {
+			clear = clear.Where("id NOT IN ?", ids)
+		}
+		if err := clear.Update("user_id", 0).Error; err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		return tx.Model(&model.Subscription{}).Where("id IN ?", ids).Update("user_id", userID).Error
+	})
+}
+
 // UserNames maps panel user ids to their names.
 func (r *Repository) UserNames() (map[int64]string, error) {
 	if r == nil || r.db == nil {

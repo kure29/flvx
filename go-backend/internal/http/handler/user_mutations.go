@@ -63,6 +63,11 @@ func (h *Handler) userCreate(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
+	subIDs, assignSubs, err := h.userSubscriptionIDs(req)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
 	userID, err := h.repo.CreateUser(username, hashedPassword, roleID, expTime, flow, flowResetTime, num, status, maxConn, now, flowMiB)
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
@@ -91,6 +96,12 @@ func (h *Handler) userCreate(w http.ResponseWriter, r *http.Request) {
 			for _, gid := range groupIDs {
 				_ = h.syncPermissionsByUserGroup(gid)
 			}
+		}
+	}
+	if assignSubs {
+		if err := h.repo.AssignUserSubscriptions(userID, subIDs); err != nil {
+			response.WriteJSON(w, response.Err(-2, err.Error()))
+			return
 		}
 	}
 
@@ -170,6 +181,12 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UnixMilli()
 	maxConn := asInt(req["maxConn"], 0)
 
+	subIDs, assignSubs, err := h.userSubscriptionIDs(req)
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
+
 	pwd := asString(req["pwd"])
 	if strings.TrimSpace(pwd) == "" {
 		if err := h.repo.UpdateUserWithoutPassword(id, username, flow, num, expTime, flowResetTime, status, maxConn, now, flowMiB); err != nil {
@@ -189,6 +206,12 @@ func (h *Handler) userUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.repo.PropagateUserFlowToTunnels(id, flow, num, expTime, flowResetTime, flowMiB)
+	if assignSubs {
+		if err := h.repo.AssignUserSubscriptions(id, subIDs); err != nil {
+			response.WriteJSON(w, response.Err(-2, err.Error()))
+			return
+		}
+	}
 	if hasDailyQuota || hasMonthlyQuota {
 		dailyQuotaGB := asInt64(req["dailyQuotaGB"], 0)
 		monthlyQuotaGB := asInt64(req["monthlyQuotaGB"], 0)

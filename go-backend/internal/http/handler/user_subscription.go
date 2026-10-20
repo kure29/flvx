@@ -116,3 +116,20 @@ func (h *Handler) userSubscriptionReset(w http.ResponseWriter, r *http.Request) 
 	}
 	h.respondAfterSubPush(w, push, h.userSubscriptionView(s, rows, time.Now()))
 }
+
+// userSubscriptionIDs reads the subscriptionIds of a user create / update
+// request: the subscriptions the user should have. ok is false when the
+// request leaves them alone.
+func (h *Handler) userSubscriptionIDs(req map[string]interface{}) (ids []int64, ok bool, err error) {
+	raw, ok := req["subscriptionIds"]
+	if !ok || raw == nil {
+		return nil, false, nil
+	}
+	ids = asInt64Slice(raw)
+	for _, id := range ids {
+		if s, err := h.repo.GetSubscription(id); err != nil || s == nil {
+			return nil, false, errText("订阅不存在")
+		}
+	}
+	return ids, true, nil
+}

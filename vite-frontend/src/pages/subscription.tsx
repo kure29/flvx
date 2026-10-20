@@ -6,7 +6,7 @@ import type {
   SubscriptionDraft,
   SubscriptionItem,
 } from "@/api";
-import type { InboundApiItem, UserApiItem } from "@/api/types";
+import type { InboundApiItem } from "@/api/types";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -14,7 +14,6 @@ import { ChevronDown, Copy, X } from "lucide-react";
 
 import {
   deleteSubscription,
-  getAllUsers,
   getInboundList,
   getRemoteSources,
   getSubscriptions,
@@ -341,7 +340,6 @@ function draftFrom(s?: SubscriptionItem): Draft {
       trafficLimit: 0,
       limitGB: "",
       resetDay: 0,
-      userId: 0,
     };
   }
 
@@ -360,7 +358,6 @@ function draftFrom(s?: SubscriptionItem): Draft {
     trafficLimit: s.trafficLimit,
     limitGB: gbText(s.trafficLimit),
     resetDay: s.resetDay,
-    userId: s.userId ?? 0,
   };
 }
 
@@ -385,8 +382,6 @@ function Editor({
   sources,
   regions,
   ruleGroups,
-  users,
-  userSubCount,
   saving,
   onSave,
   onClose,
@@ -395,10 +390,6 @@ function Editor({
   setDraft: (d: Draft) => void;
   inbounds: InboundApiItem[];
   sources: RemoteSourceItem[];
-  /** Panel users a subscription can be assigned to. */
-  users: UserApiItem[];
-  /** How many subscriptions each user already has. */
-  userSubCount: Map<number, number>;
   regions: string[];
   ruleGroups: SubRuleGroup[];
   saving: boolean;
@@ -569,34 +560,6 @@ function Editor({
                 有独立的 UUID /
                 密码：停用、到期或流量用完后从节点上删除，已导入的配置也连不上
               </p>
-              <div className="space-y-1">
-                <label className="text-sm font-medium" htmlFor="sub-user">
-                  分配给用户（可选）
-                </label>
-                <select
-                  className="block h-10 w-full rounded-lg border border-divider bg-background px-2 text-sm"
-                  id="sub-user"
-                  value={draft.userId ?? 0}
-                  onChange={(e) => set({ userId: Number(e.target.value) })}
-                >
-                  <option value={0}>不分配（只发链接）</option>
-                  {users.map((u) => {
-                    const n =
-                      (userSubCount.get(u.id) ?? 0) -
-                      (draft.id && draft.userId === u.id ? 1 : 0);
-
-                    return (
-                      <option key={u.id} value={u.id}>
-                        {u.user}
-                        {n > 0 ? `（已有 ${n} 个订阅）` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-xs text-default-500">
-                  分配后，该用户登录面板就能在「订阅」里看到它：导入客户端、查看流量和到期、自己重置链接
-                </p>
-              </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="sub-expire">
                   到期日期
@@ -1149,28 +1112,15 @@ export default function SubscriptionPage() {
   const [confirm, setConfirm] = useState<"reset" | "delete" | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
   const [resettingTraffic, setResettingTraffic] = useState(false);
-  const [users, setUsers] = useState<UserApiItem[]>([]);
-  const userSubCount = useMemo(() => {
-    const m = new Map<number, number>();
-
-    for (const s of subs) {
-      if (s.userId) m.set(s.userId, (m.get(s.userId) ?? 0) + 1);
-    }
-
-    return m;
-  }, [subs]);
-
   const load = useCallback(async () => {
     try {
-      const [subRes, inRes, srcRes, userRes] = await Promise.all([
+      const [subRes, inRes, srcRes] = await Promise.all([
         getSubscriptions(),
         getInboundList(),
         getRemoteSources(),
-        getAllUsers().catch(() => null),
       ]);
 
       if (srcRes.code === 0) setSources(srcRes.data ?? []);
-      if (userRes?.code === 0) setUsers(userRes.data ?? []);
 
       if (subRes.code === 0 && subRes.data) {
         setSubs(subRes.data.items ?? []);
@@ -1601,8 +1551,6 @@ export default function SubscriptionPage() {
                 saving={saving}
                 setDraft={setDraft}
                 sources={sources}
-                userSubCount={userSubCount}
-                users={users}
                 onClose={onClose}
                 onSave={save}
               />

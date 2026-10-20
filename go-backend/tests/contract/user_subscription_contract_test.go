@@ -29,19 +29,66 @@ func TestUserSubscriptionsContract(t *testing.T) {
 	aqiang, _ := auth.GenerateToken(3, "aqiang", 1, secret)
 
 	save := kernelContractPost(t, router, admin, "/api/v1/subscription/save",
-		`{"name":"小明 · 手机","sourceAll":true,"userId":2,"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`)
+		`{"name":"小明 · 手机","sourceAll":true,"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`)
 	if save.Code != 0 {
 		t.Fatalf("save: %+v", save)
 	}
-	saved := save.Data.(map[string]interface{})
-	subID := int64(saved["id"].(float64))
-	if saved["userId"].(float64) != 2 || saved["userName"] != "xiaoming" {
-		t.Fatalf("assigned view: %v", saved)
-	}
+	subID := int64(save.Data.(map[string]interface{})["id"].(float64))
 	other := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"别人的","sourceAll":true}`)
 	otherID := int64(other.Data.(map[string]interface{})["id"].(float64))
-	if bad := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"x","sourceAll":true,"userId":99}`); bad.Code == 0 {
-		t.Fatal("assigning a missing user must fail")
+	names := map[int]string{2: "xiaoming", 3: "aqiang", 99: "nobody"}
+	ids := func(list ...int64) string {
+		out := make([]string, len(list))
+		for i, id := range list {
+			out[i] = jsonInt64(id)
+		}
+		return "[" + strings.Join(out, ",") + "]"
+	}
+	// Subscriptions are assigned in 用户管理 → 编辑: the user update carries them.
+	assign := func(user int, list ...int64) int {
+		return kernelContractPost(t, router, admin, "/api/v1/user/update",
+			`{"id":`+jsonInt64(int64(user))+`,"user":"`+names[user]+`","flow":99999,"num":99999,"expTime":2727251700000,"subscriptionIds":`+ids(list...)+`}`).Code
+	}
+	owner := func(id int64) int64 {
+		return mustQueryInt64(t, r, `SELECT user_id FROM subscription WHERE id = ?`, id)
+	}
+	if assign(99, subID) == 0 || assign(2, 12345) == 0 {
+		t.Fatal("assigning to a missing user or a missing subscription must fail")
+	}
+	if res := kernelContractPost(t, router, xiaoming, "/api/v1/user/update", `{"id":2,"user":"xiaoming","subscriptionIds":[]}`); res.Code == 0 {
+		t.Fatal("users cannot assign subscriptions")
+	}
+	// aqiang has otherID; giving xiaoming both moves it, then dropping it
+	// from the list unassigns it.
+	if assign(3, otherID) != 0 || assign(2, subID, otherID) != 0 || owner(otherID) != 2 || owner(subID) != 2 {
+		t.Fatalf("move: sub %d other %d", owner(subID), owner(otherID))
+	}
+	if assign(2, subID) != 0 || owner(otherID) != 0 || owner(subID) != 2 {
+		t.Fatalf("unassign: sub %d other %d", owner(subID), owner(otherID))
+	}
+	list := kernelContractPost(t, router, admin, "/api/v1/subscription/list", `{}`)
+	for _, it := range list.Data.(map[string]interface{})["items"].([]interface{}) {
+		v := it.(map[string]interface{})
+		if int64(v["id"].(float64)) == subID && v["userName"] != "xiaoming" {
+			t.Fatalf("admin list: %v", v)
+		}
+	}
+	// An update without subscriptionIds leaves them alone.
+	if res := kernelContractPost(t, router, admin, "/api/v1/user/update", `{"id":2,"user":"xiaoming","flow":99999,"num":99999,"expTime":2727251700000}`); res.Code != 0 || owner(subID) != 2 {
+		t.Fatalf("plain update: %+v owner %d", res, owner(subID))
+	}
+	// A new user can get subscriptions right away.
+	if res := kernelContractPost(t, router, admin, "/api/v1/user/create",
+		`{"user":"xinren","pwd":"secret123","flow":100,"num":10,"expTime":2727251700000,"subscriptionIds":`+ids(otherID)+`}`); res.Code != 0 {
+		t.Fatalf("create: %+v", res)
+	}
+	if got := mustQueryInt64(t, r, `SELECT u.id FROM user u WHERE u.user = 'xinren'`); owner(otherID) != got {
+		t.Fatalf("new user's subscription owner %d, want %d", owner(otherID), got)
+	}
+	// Editing the subscription keeps its assignment.
+	if res := kernelContractPost(t, router, admin, "/api/v1/subscription/save",
+		`{"id":`+jsonInt64(subID)+`,"name":"小明 · 手机","sourceAll":true,"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`); res.Code != 0 || owner(subID) != 2 {
+		t.Fatalf("edit: %+v owner %d", res, owner(subID))
 	}
 
 	mine := kernelContractPost(t, router, xiaoming, "/api/v1/user/subscription/list", `{}`)
@@ -83,7 +130,7 @@ func TestUserSubscriptionsContract(t *testing.T) {
 	if res := kernelContractPost(t, router, admin, "/api/v1/user/delete", `{"id":2}`); res.Code != 0 {
 		t.Fatalf("delete user: %+v", res)
 	}
-	if got := mustQueryInt64(t, r, `SELECT user_id FROM subscription WHERE id = ?`, subID); got != 0 {
+	if got := owner(subID); got != 0 {
 		t.Fatalf("subscription still assigned to %d", got)
 	}
 }
