@@ -57,6 +57,7 @@ import type {
   InboundShareEntry,
   InboundRelayApiItem,
   SubInfoApiData,
+  RelayLatency,
 } from "./types";
 
 import axios from "axios";
@@ -905,6 +906,13 @@ export const getSubInfo = (reset = false) =>
   Network.post<SubInfoApiData>("/inbound/sub/info", { reset });
 export const getInboundRelays = (inboundId: number) =>
   Network.post<InboundRelayApiItem[]>("/inbound/relay/list", { inboundId });
+/** Measures relay lines (all when ids is empty) and their entry nodes now. */
+export const probeInboundRelays = (ids: number[] = []) =>
+  Network.post<Record<string, RelayLatency>>(
+    "/inbound/relay/probe",
+    { ids },
+    { timeout: 90000 },
+  );
 export const createInboundRelay = (data: {
   inboundId: number;
   tunnelId: number;

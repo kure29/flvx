@@ -19,7 +19,7 @@ const CARD_POINTS = 3;
 
 type Tone = "success" | "warning" | "danger" | "default";
 
-const TONE: Record<Tone, [string, string]> = {
+export const TONE: Record<Tone, [string, string]> = {
   success: ["bg-emerald-500/15 text-emerald-600", "bg-emerald-500"],
   warning: ["bg-amber-500/15 text-amber-600", "bg-amber-500"],
   danger: ["bg-rose-500/15 text-rose-600", "bg-rose-500"],
@@ -205,6 +205,8 @@ export function LatencyCell({
   onShowTrend,
   onEditTargets,
   note,
+  title = "到各测试点的延迟",
+  footer,
 }: {
   probe?: InboundProbe;
   probing?: boolean;
@@ -218,6 +220,10 @@ export function LatencyCell({
   onEditTargets?: () => void;
   /** Shown before the time on cards, e.g. "自定义". */
   note?: string;
+  /** Heading of the details. */
+  title?: string;
+  /** Shown under the points in the details, e.g. a relay line's legs. */
+  footer?: React.ReactNode;
 }) {
   const points = probePoints(probe);
 
@@ -310,7 +316,7 @@ export function LatencyCell({
       >
         <div role="presentation" onClick={stop} onPointerDown={stop}>
           <div className="flex items-center justify-between px-2 pb-1.5 pt-1 text-xs text-default-500">
-            <span>到各测试点的延迟</span>
+            <span>{title}</span>
             {probe && <span>{ago(probe.checkedAt)}</span>}
           </div>
           <div className="space-y-1 px-2 pb-2">
@@ -341,6 +347,7 @@ export function LatencyCell({
               );
             })}
           </div>
+          {footer}
           <div className="grid auto-cols-fr grid-flow-col border-t border-divider">
             <DropdownItem
               className="justify-center whitespace-nowrap px-1 text-xs text-primary"

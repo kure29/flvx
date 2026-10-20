@@ -33,6 +33,8 @@ type relayView struct {
 	RemoteAddr    string              `json:"remoteAddr"`
 	Entries       []repo.ForwardEntry `json:"entries"`
 	CreatedTime   int64               `json:"createdTime"`
+	// Latency is the line's last measurement (relay_latency.go).
+	Latency *relayLatency `json:"latency,omitempty"`
 }
 
 type shareEntry struct {
@@ -89,6 +91,7 @@ func (h *Handler) relayViews(inboundID int64) ([]relayView, error) {
 			RemoteAddr:    rw.RemoteAddr,
 			Entries:       []repo.ForwardEntry{},
 			CreatedTime:   rw.CreatedTime,
+			Latency:       h.relayLatencyView(rw.ID),
 		}
 		if rw.ForwardExists {
 			if entries, err := h.repo.ForwardEntries(rw.ForwardID, rw.TunnelID); err == nil && entries != nil {

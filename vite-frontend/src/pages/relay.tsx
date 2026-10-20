@@ -3,7 +3,7 @@ import type { InboundApiItem, InboundRelayApiItem } from "@/api/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-import { getInboundList, getInboundRelays } from "@/api";
+import { getInboundList, getInboundRelays, probeInboundRelays } from "@/api";
 import { AnimatedPage } from "@/components/animated-page";
 import { PageLoadingState } from "@/components/page-state";
 import {
@@ -14,6 +14,7 @@ import {
   PageToolbar,
 } from "@/components/page-kit";
 import { CARD_GRID, InfoCard } from "@/components/info-card";
+import { RelayLatencyCell } from "@/components/relay-latency";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import ForwardPage from "@/pages/forward";
 import { RelayModal } from "@/pages/inbound/relay-modal";
@@ -53,6 +54,7 @@ function LinesView() {
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useViewMode("relay");
   const card = viewMode === "card";
+  const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +74,51 @@ function LinesView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /** Measures the given lines (all when empty) and merges the results. */
+  const probe = useCallback(
+    async (ids: number[]) => {
+      const busy = ids.length > 0 ? ids : relays.map((r) => r.id);
+
+      setProbingIds((prev) => new Set([...prev, ...busy]));
+      try {
+        const res = await probeInboundRelays(ids);
+
+        if (res.code !== 0) {
+          toast.error(res.msg || "检测失败");
+
+          return;
+        }
+        const data = res.data ?? {};
+
+        setRelays((prev) =>
+          prev.map((r) =>
+            data[String(r.id)] ? { ...r, latency: data[String(r.id)] } : r,
+          ),
+        );
+      } catch {
+        toast.error("检测失败");
+      } finally {
+        setProbingIds((prev) => {
+          const next = new Set(prev);
+
+          busy.forEach((id) => next.delete(id));
+
+          return next;
+        });
+      }
+    },
+    [relays],
+  );
+
+  const latencyOf = (l: InboundRelayApiItem) =>
+    l.forwardExists ? (
+      <RelayLatencyCell
+        latency={l.latency}
+        probing={probingIds.has(l.id)}
+        onProbe={() => probe([l.id])}
+      />
+    ) : null;
 
   const byInbound = useMemo(() => {
     const m = new Map<number, InboundRelayApiItem[]>();
@@ -108,6 +155,17 @@ function LinesView() {
         >
           只看有中转的
         </Button>
+        {relays.length > 0 && (
+          <Button
+            className="shrink-0"
+            isLoading={probingIds.size > 0}
+            size="sm"
+            variant="flat"
+            onPress={() => probe([])}
+          >
+            测延迟
+          </Button>
+        )}
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </PageToolbar>
 
@@ -160,21 +218,7 @@ function LinesView() {
                       </Chip>
                     )
                   }
-                  rows={[
-                    ["落地", i.external ? "导入的节点" : i.nodeName],
-                    ...lines.map((l): [string, React.ReactNode] => {
-                      const entry = l.entries[0];
-
-                      return [
-                        l.name || l.tunnelName,
-                        <span key={l.forwardId} className="font-mono">
-                          {entry
-                            ? `${l.shareHost || entry.Host}:${entry.Port}`
-                            : "-"}
-                        </span>,
-                      ];
-                    }),
-                  ]}
+                  rows={[["落地", i.external ? "导入的节点" : i.nodeName]]}
                   status={
                     lines.length === 0
                       ? "无中转"
@@ -191,7 +235,35 @@ function LinesView() {
                         : "success"
                   }
                   onPress={() => setEditing(i)}
-                />
+                >
+                  {lines.length > 0 && (
+                    <div className="-mt-1 space-y-2">
+                      {lines.map((l) => {
+                        const entry = l.entries[0];
+
+                        return (
+                          <div
+                            key={l.id}
+                            className="flex min-w-0 items-center justify-between gap-2 text-sm"
+                          >
+                            <span className="min-w-0 truncate text-default-600">
+                              {l.name || l.tunnelName}
+                            </span>
+                            <span className="shrink-0 text-xs">
+                              {latencyOf(l) ?? (
+                                <span className="font-mono">
+                                  {entry
+                                    ? `${l.shareHost || entry.Host}:${entry.Port}`
+                                    : "-"}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </InfoCard>
               );
             }
 
@@ -207,9 +279,24 @@ function LinesView() {
                 }
                 meta={lineTexts.length === 0 ? empty : lineTexts.join(" · ")}
                 right={
-                  <span className="text-xs text-default-500">
-                    {lines.length > 0 ? `${lines.length} 条` : ""}
-                  </span>
+                  lines.some((l) => l.forwardExists) ? (
+                    <span className="flex flex-col items-end gap-1">
+                      {lines.map((l) => (
+                        <span key={l.id} className="flex items-center gap-1.5">
+                          {lines.length > 1 && (
+                            <span className="max-w-24 truncate text-xs text-default-400">
+                              {l.name || l.tunnelName}
+                            </span>
+                          )}
+                          {latencyOf(l)}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-default-500">
+                      {lines.length > 0 ? `${lines.length} 条` : ""}
+                    </span>
+                  )
                 }
                 status={lines.length === 0 ? "off" : broken ? "warn" : "ok"}
                 statusTitle={

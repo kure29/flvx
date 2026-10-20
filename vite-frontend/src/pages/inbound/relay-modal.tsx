@@ -11,8 +11,10 @@ import {
   createInboundRelay,
   deleteInboundRelay,
   getInboundRelays,
+  probeInboundRelays,
   getTunnelList,
 } from "@/api";
+import { RelayLatencyCell } from "@/components/relay-latency";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import { Input } from "@/shadcn-bridge/heroui/input";
@@ -87,6 +89,26 @@ export function RelayModal({
   const [removing, setRemoving] = useState<InboundRelayApiItem | null>(null);
   const [removeFailed, setRemoveFailed] = useState(false);
   const [removeLoading, setRemoveLoading] = useState(false);
+  const [probingId, setProbingId] = useState(0);
+
+  const probeRelay = async (id: number) => {
+    setProbingId(id);
+    try {
+      const res = await probeInboundRelays([id]);
+      const latency = res.data?.[String(id)];
+
+      if (res.code !== 0) toast.error(res.msg || "检测失败");
+      else if (latency) {
+        setRelays((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, latency } : r)),
+        );
+      }
+    } catch {
+      toast.error("检测失败");
+    } finally {
+      setProbingId(0);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!item) return;
@@ -264,6 +286,13 @@ export function RelayModal({
                             → {rel.remoteAddr}
                           </p>
                         </div>
+                        {rel.forwardExists && (
+                          <RelayLatencyCell
+                            latency={rel.latency}
+                            probing={probingId === rel.id}
+                            onProbe={() => probeRelay(rel.id)}
+                          />
+                        )}
                         <Button
                           color="danger"
                           size="sm"

@@ -21,7 +21,7 @@ import (
 const latencyTargetsConfigKey = "latency_targets"
 
 const (
-	maxLatencyTargets       = 10
+	maxLatencyTargets       = 30
 	maxPinnedLatencyTargets = 3
 	maxLatencyTargetName    = 20
 	latencyPingCount        = 4
@@ -365,6 +365,9 @@ func (h *Handler) onLatencyConfigChanged(key string, prev []latencyTarget) {
 	go func() {
 		if _, err := h.probeNodeLatency(ctx, nil); err != nil && ctx.Err() == nil {
 			log.Printf("node latency probe failed: %v", err)
+		}
+		if _, err := h.probeRelayLatency(ctx, nil); err != nil && ctx.Err() == nil {
+			log.Printf("relay latency probe failed: %v", err)
 		}
 		if _, err := h.traceNodeRoutes(ctx, nil, false); err != nil && ctx.Err() == nil {
 			log.Printf("node route trace failed: %v", err)

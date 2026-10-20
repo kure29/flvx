@@ -913,6 +913,30 @@ export interface InboundRelayApiItem {
   remoteAddr: string;
   entries: { Host: string; Port: number }[];
   createdTime: number;
+  /** Last measurement of the line, when made. */
+  latency?: RelayLatency;
+}
+
+/** One leg of a relay line, measured from its first node. */
+export interface RelayHop {
+  from: string;
+  to: string;
+  ok: boolean;
+  latencyMs?: number;
+  lossPct?: number;
+  error?: string;
+}
+
+/**
+ * A relay line's estimated latency to each reference point: the entry
+ * node's latency plus every leg to the landing. Without reference points
+ * the only point is the path itself.
+ */
+export interface RelayLatency extends InboundProbe {
+  entry?: string;
+  entryNodeId?: number;
+  hops: RelayHop[];
+  pathMs?: number;
 }
 
 export interface SubInfoApiData {
