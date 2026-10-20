@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://kure29.github.io/flyx/
+    about: 安装、升级、各功能的用法
+  - name: 常见问题
+    url: https://kure29.github.io/flyx/guide/faq
+    about: 节点连不上、延迟、升级失败等常见问题
