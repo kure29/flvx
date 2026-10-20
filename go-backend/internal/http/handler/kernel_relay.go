@@ -535,7 +535,9 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 		rows = filtered
 	}
 	endpoints := h.subEndpoints(sub, rows)
-	body, contentType, err := kernel.Subscription(format, endpoints, parsePipeline(sub.Options).options())
+	opts := parsePipeline(sub.Options).options()
+	opts.SingboxSnell = kernel.SingboxClientHasSnell(r.UserAgent())
+	body, contentType, err := kernel.Subscription(format, endpoints, opts)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

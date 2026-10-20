@@ -22,6 +22,9 @@ type Settings struct {
 	// SnellVersion is the protocol version clients use (4 or 5; 6 on
 	// sing-box only).
 	SnellVersion int `json:"snellVersion,omitempty"`
+	// SnellMode is Snell v6's traffic shaping: "" (default) or "unshaped";
+	// clients must use the same.
+	SnellMode string `json:"snellMode,omitempty"`
 	// Masquerade is the site Hysteria2 serves to non-clients (optional URL).
 	Masquerade string `json:"masquerade,omitempty"`
 	// BackendPort is the loopback port a ShadowTLS-fronted Snell listens on.
@@ -146,6 +149,15 @@ type Inbound struct {
 
 func (in Inbound) Tag() string {
 	return fmt.Sprintf("in-%d", in.ID)
+}
+
+// NetworkOn is Network for the kernel serving the inbound: sing-box's Snell
+// has no QUIC proxy mode, so it only listens on TCP.
+func (in Inbound) NetworkOn(kernelType string) string {
+	if in.Protocol == ProtocolSnell && kernelType == TypeSingbox {
+		return "tcp"
+	}
+	return in.Network()
 }
 
 // Network reports which L4 protocols the inbound listens on, used for nft
@@ -486,6 +498,14 @@ func normalizeSettings(in *Inbound) error {
 		if s.SnellVersion == 6 && len(s.Password) < snellV6MinPSK {
 			return fmt.Errorf("Snell v6 的 PSK 至少 %d 位", snellV6MinPSK)
 		}
+		s.SnellMode = strings.TrimSpace(s.SnellMode)
+		if s.SnellMode == "default" || s.SnellVersion != 6 {
+			s.SnellMode = ""
+		}
+		// unsafe-raw turns encryption off; not offered.
+		if s.SnellMode != "" && s.SnellMode != SnellModeUnshaped {
+			return errors.New("Snell v6 流量整形只支持默认或 unshaped")
+		}
 		s.UUID, s.Method, s.Flow = "", "", ""
 	}
 	if in.Protocol == ProtocolHysteria2 {
@@ -599,6 +619,10 @@ var snellPSKPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 
 // snellV6MinPSK is the shortest PSK Snell v6 accepts.
 const snellV6MinPSK = 12
+
+// SnellModeUnshaped keeps Snell v6's encryption but turns traffic shaping
+// off (faster, easier to fingerprint).
+const SnellModeUnshaped = "unshaped"
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 

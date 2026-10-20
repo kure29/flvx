@@ -45,14 +45,14 @@
 | 订阅格式 | 不包含 |
 |----------|--------|
 | Clash / Mihomo | XHTTP、Snell、NaïveProxy |
-| sing-box | XHTTP、Snell、VLESS Encryption |
+| sing-box | XHTTP、VLESS Encryption；Snell 只给 1.14 及以上的客户端 |
 | Shadowrocket | XHTTP、Snell、NaïveProxy、WireGuard、VLESS Encryption |
 | Loon | TUIC、gRPC、XHTTP、Snell、NaïveProxy、WireGuard、VLESS Encryption |
 | Quantumult X | Hysteria2、TUIC、gRPC、XHTTP、ShadowTLS、Snell、NaïveProxy、WireGuard、VLESS Encryption |
 | 通用 base64 | Snell、HTTP 代理 |
 | Surge | VLESS、Reality、gRPC、XHTTP、NaïveProxy、WireGuard |
 
-Snell 只在 Surge 订阅里，原因见 [Snell 用哪个内核](./kernels.md#snell-用哪个内核)。
+Snell 只在 Surge 和 sing-box 1.14+ 的订阅里，原因见 [Snell 用哪个内核 - 客户端和出站](./kernels.md#客户端和出站)。
 
 ## 其他
 

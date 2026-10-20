@@ -58,17 +58,17 @@
 
 - Xray 作出站时只能连接 VLESS / VMess / Trojan / Shadowsocks（不含插件和 ShadowTLS）/ SOCKS5 / HTTP 节点；要连 Hysteria2、TUIC、AnyTLS 等请用 sing-box
 - 订阅用户单独凭据只对支持的协议有效：Shadowsocks、Snell、WireGuard 在哪个内核上都共用凭据，见 [凭据、到期与流量](./subscription-users.md)
-- 用到 1.14 功能（ACME、内置 Snell）的 sing-box 不能换回 1.14 以前的版本，面板会拒绝
+- 用到 1.14 功能（ACME、内置 Snell、经 Snell 节点出站）的 sing-box 不能换回 1.14 以前的版本，面板会拒绝
 
 ## Snell 用哪个内核
 
-Snell 有两种跑法：装独立的 **Snell 内核**（Surge 官方的 snell-server），或用 **sing-box 1.14 起内置的 Snell**。两者客户端写法一样，都只能给 Surge 用。
+Snell 有两种跑法：装独立的 **Snell 内核**（Surge 官方的 snell-server），或用 **sing-box 1.14 起内置的 Snell**。两者客户端写法一样，客户端可以用 Surge，或 sing-box 1.14 及以上（SFA / SFI / SFM）。
 
 | | sing-box 内置 Snell | Snell 内核（snell-server） |
 |--|---------------------|---------------------------|
 | 程序 | sing-box 1.14 及以上 | Surge 官方 snell-server 5.0.1 / 4.1.1，闭源 |
 | 客户端版本 | v4、v5、v6 | v4、v5（v5 需要装 5.x） |
-| Snell v6 | ✓（PSK 至少 12 位） | |
+| Snell v6 | ✓（PSK 至少 12 位，可选流量整形） | |
 | v5 的 QUIC 代理模式 | 不支持，UDP 改走 TCP 转发 | ✓ |
 | ShadowTLS | sing-box 自己处理，不用额外程序和端口 | 另装 shadow-tls，占用一个本机后端端口 |
 | 分流、链式出站 | ✓ | |
@@ -83,10 +83,15 @@ Snell 有两种跑法：装独立的 **Snell 内核**（Surge 官方的 snell-se
 新建入站时两个内核都能选 **Snell** / **Snell + ShadowTLS** 模板，在 **Snell 版本** 里选客户端版本：
 
 - sing-box 上选 v4 或 v5 时，跑的都是 sing-box 的 v5 服务端（没有 QUIC 模式的 v5 和 v4 协议相同）；选 v6 跑 v6 服务端
+- v6 可以选 **流量整形**：默认，或 unshaped（不做整形，更快但更容易被识别）；客户端必须选同样的模式，订阅和分享会自动带上
 - Snell 内核上，入站的版本不能高于节点安装的 Snell 主版本，有 v5 入站时也不能把内核换成 4.x
 
 ::: info 为什么不支持多用户
 sing-box 的 Snell 开启多用户后，只带 PSK、不带 userkey 的客户端会被直接断开，现有链接都会失效。所以面板和 Shadowsocks 一样只用一个 PSK：订阅用户共用凭据，停用后订阅失效，但已经导入的配置仍能连接。
 :::
 
-Snell 没有通用分享链接，**分享** 里显示 Surge 配置行（v6 为 `version=6`），Surge 用户请用 Surge 订阅。Clash / Mihomo 只支持 Snell v1–v3，sing-box 客户端订阅也不包含 Snell（1.14 以前的客户端遇到会整个配置加载失败）。
+### 客户端和出站
+
+- Snell 没有通用分享链接，**分享** 里显示 Surge 配置行（v6 为 `version=6`）
+- **订阅**：Surge 订阅都包含 Snell；sing-box 订阅只给 1.14 及以上的客户端（面板按客户端上报的版本判断），旧客户端遇到 Snell 会整个配置加载失败，所以拿不到；Clash / Mihomo 只支持 Snell v1–v3，不包含
+- **作为出站节点**：Snell 入站（两种内核搭的都行）可以被 sing-box 1.14 及以上内核的入站选作 [链式出站或分流去向](./routing.md)；Xray 不能连接 Snell

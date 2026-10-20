@@ -78,6 +78,7 @@ export interface InboundForm {
   password: string;
   method: string;
   snellVersion: string;
+  snellMode: string;
   masquerade: string;
   backendPort: number;
   portHopping: string;
@@ -316,6 +317,7 @@ export function emptyForm(
     password: "",
     method: caps?.defaults.ssMethod ?? "2022-blake3-aes-128-gcm",
     snellVersion: "",
+    snellMode: "",
     masquerade: "",
     backendPort: 0,
     portHopping: "",
@@ -419,6 +421,7 @@ export function formFromItem(item: InboundApiItem): InboundForm {
     snellVersion: item.settings.snellVersion
       ? String(item.settings.snellVersion)
       : "",
+    snellMode: item.settings.snellMode ?? "",
     masquerade: item.settings.masquerade ?? "",
     backendPort: item.settings.backendPort ?? 0,
     portHopping: item.settings.portHopping ?? "",
@@ -547,6 +550,10 @@ export function toPayload(form: InboundForm): InboundMutationPayload {
       snellVersion:
         form.protocol === "snell" && form.snellVersion
           ? Number(form.snellVersion)
+          : undefined,
+      snellMode:
+        form.protocol === "snell" && form.snellVersion === "6"
+          ? form.snellMode || undefined
           : undefined,
       masquerade:
         form.protocol === "hysteria2" ? form.masquerade.trim() : undefined,

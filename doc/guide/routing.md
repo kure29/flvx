@@ -34,7 +34,7 @@ Xray 和 sing-box 内核支持，Snell 内核不支持（Snell 想用分流请�
 
 
 - 分类数据自动更新：Xray 用 v2fly 的 geosite / geoip 数据，节点每天检查一次，有新版本就下载、校验后替换并重启 Xray（启动失败会恢复原文件），内核日志里可以看到更新记录；sing-box 首次使用某个分类时下载规则集并缓存，之后每天更新。两者都经 **设置** 里的 GitHub 加速地址下载，落地机需要能访问
-- Xray 能连接 VLESS / VMess / Trojan / Shadowsocks（不含插件和 ShadowTLS）/ SOCKS5 / HTTP 出站节点；Hysteria2、TUIC、AnyTLS 等请用 sing-box 内核；Snell 入站不能作为出站节点
+- Xray 能连接 VLESS / VMess / Trojan / Shadowsocks（不含插件和 ShadowTLS）/ SOCKS5 / HTTP 出站节点；Hysteria2、TUIC、AnyTLS 等请用 sing-box 内核；Snell 节点只有 sing-box 1.14 及以上能连接
 - 出站节点是本面板的自签证书入站时，Xray 用证书指纹校验；导入的节点如果跳过了证书验证，Xray 无法连接（新版 Xray 已移除 `allowInsecure`），请改用 sing-box
 - 开启了“获取真实客户端 IP”的入站只能经中转连接，不能作为出站节点；只监听本机的入站只能被同一节点上的入站选用
 - 出站节点开启了白名单时，会自动放行经它出站的节点；规则之间形成循环（A 经 B、B 又经 A）时无法保存

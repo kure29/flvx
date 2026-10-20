@@ -294,7 +294,7 @@ func (m splitMatch) singbox() []obj {
 
 // singboxSplitRoutes is xraySplitRoutes for sing-box; it also returns the
 // rule-set tags the rules use.
-func singboxSplitRoutes(in Inbound) ([]interface{}, []interface{}, []string, error) {
+func singboxSplitRoutes(in Inbound, snell bool) ([]interface{}, []interface{}, []string, error) {
 	var outbounds, rules []interface{}
 	var sets []string
 	tags := singboxInboundTags(in)
@@ -308,13 +308,13 @@ func singboxSplitRoutes(in Inbound) ([]interface{}, []interface{}, []string, err
 			ownerRoute = obj{"action": "reject"}
 			userRoute = func(int64) obj { return obj{"action": "reject"} }
 		case SplitProxy:
-			obs, err := singboxChainOutbounds(*r.Via, splitTag(in, i), 0)
+			obs, err := singboxChainOutbounds(*r.Via, splitTag(in, i), 0, snell)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("入站 %d 第 %d 条分流: %v", in.ID, i+1, err)
 			}
 			outbounds = append(outbounds, obs...)
 			for _, id := range users {
-				obs, _ := singboxChainOutbounds(*r.Via, splitUserTag(in, i, id), UserMark(id))
+				obs, _ := singboxChainOutbounds(*r.Via, splitUserTag(in, i, id), UserMark(id), snell)
 				outbounds = append(outbounds, obs...)
 			}
 			ownerRoute = route(splitTag(in, i))

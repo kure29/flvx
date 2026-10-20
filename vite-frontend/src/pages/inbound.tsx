@@ -155,6 +155,7 @@ function detailRows(item: InboundApiItem): Array<[string, string]> {
   if (s.password)
     rows.push([item.protocol === "snell" ? "PSK" : "密码", s.password]);
   if (s.snellVersion) rows.push(["Snell 版本", `v${s.snellVersion}`]);
+  if (s.snellMode) rows.push(["流量整形", s.snellMode]);
   if (s.masquerade) rows.push(["伪装网站", s.masquerade]);
   if (s.portHopping) rows.push(["端口跳跃", `${s.portHopping}（UDP）`]);
   if (t.path) rows.push(["路径", t.path]);

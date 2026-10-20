@@ -226,3 +226,47 @@ func TestInboundSplitSave(t *testing.T) {
 		t.Fatalf("rules not cleared: %q", got.SplitRules)
 	}
 }
+
+// sing-box dials Snell targets from 1.14 on: saving checks the installed
+// version, the config carries the snell outbound, and a downgrade is refused.
+func TestInboundChainThroughSnell(t *testing.T) {
+	r, err := repo.Open(t.TempDir() + "/chain-snell.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = r.Close() })
+	h := New(r, "unit-test-secret")
+
+	front := seedRelayTargetNode(t, r, "front", "198.51.100.1")
+	landing := seedRelayTargetNode(t, r, "landing", "203.0.113.10")
+	frontBox := seedChainKernel(t, r, front, kernel.TypeSingbox)
+	landingSnell := seedChainKernel(t, r, landing, kernel.TypeSnell)
+	target := seedChainInbound(t, r, landingSnell, "landing-snell", kernel.Inbound{Protocol: kernel.ProtocolSnell, Port: 6160}, 0)
+	entry := seedChainInbound(t, r, frontBox, "front-vless", kernel.Inbound{Protocol: kernel.ProtocolVLESS, Port: 8443,
+		Security: kernel.Security{Type: kernel.SecurityNone}}, target.ID)
+
+	if err := h.validateChainFor(*entry, kernel.TypeSingbox, "1.12.8"); err == nil || !strings.Contains(err.Error(), "1.14") {
+		t.Fatalf("sing-box 1.12 cannot dial snell: %v", err)
+	}
+	if err := h.validateChainFor(*entry, kernel.TypeSingbox, "1.14.3"); err != nil {
+		t.Fatalf("sing-box 1.14 dials snell: %v", err)
+	}
+	if err := h.validateChain(*entry, kernel.TypeXray); err == nil {
+		t.Fatal("xray cannot dial snell")
+	}
+
+	payload, _, err := h.buildKernelApplyPayload(frontBox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := payload["files"].([]kernel.File)[0].Content
+	if !strings.Contains(cfg, `"type": "snell"`) || !strings.Contains(cfg, `"server": "203.0.113.10"`) {
+		t.Fatalf("chain outbound missing:\n%s", cfg)
+	}
+	if err := h.checkKernelVersionFits(frontBox.ID, kernel.TypeSingbox, "1.13.5"); err == nil || !strings.Contains(err.Error(), "Snell") {
+		t.Fatalf("downgrade below 1.14 must be refused: %v", err)
+	}
+	if err := h.checkKernelVersionFits(frontBox.ID, kernel.TypeSingbox, "1.14.0"); err != nil {
+		t.Fatal(err)
+	}
+}

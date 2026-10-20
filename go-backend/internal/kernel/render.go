@@ -49,6 +49,9 @@ type RenderOptions struct {
 	// (sing-box 1.14+; older versions reject the field, newer ones drop
 	// the implicit default in 1.16).
 	SingboxHTTPClient bool
+	// SingboxSnell lets sing-box dial Snell targets (chained outbounds and
+	// 分流 targets); sing-box 1.14+.
+	SingboxSnell bool
 }
 
 // Render produces the kernel configuration for the given enabled inbounds.

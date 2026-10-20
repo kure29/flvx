@@ -89,3 +89,115 @@ func TestSurgeSnellV6(t *testing.T) {
 		t.Fatalf("surge line: %q", line)
 	}
 }
+
+func snellEndpoints(t *testing.T) []Endpoint {
+	t.Helper()
+	ins := singboxSnellInbounds(t)
+	ins[1].Settings.SnellMode = SnellModeUnshaped
+	if err := Normalize(TypeSingbox, &ins[1]); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"Snell v4", "Snell v6", "Snell STLS"}
+	eps := make([]Endpoint, len(ins))
+	for i, in := range ins {
+		eps[i] = Endpoint{Name: names[i], Host: "127.0.0.1", Port: in.Port, Direct: true, Inbound: in}
+	}
+	return eps
+}
+
+func TestSingboxClientHasSnell(t *testing.T) {
+	for ua, want := range map[string]bool{
+		"SFA (sing-box 1.14.3; language zh_CN)": true,
+		"SFI/1.15.0 (sing-box 1.15.0)":          true,
+		"sing-box/2.0.1":                        true,
+		"SFA (sing-box 1.12.8; language en_US)": false,
+		"SFM (sing-box 1.13.9)":                 false,
+		"clash-verge/v2.0":                      false,
+		"":                                      false,
+	} {
+		if got := SingboxClientHasSnell(ua); got != want {
+			t.Errorf("%q: got %v, want %v", ua, got, want)
+		}
+	}
+}
+
+func TestSingboxProfileSnellOnlyForNewClients(t *testing.T) {
+	eps := snellEndpoints(t)
+	old, _, err := Subscription(FormatSingbox, eps, SubOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(old, `"snell"`) {
+		t.Fatal("clients before sing-box 1.14 must not get Snell")
+	}
+	sb, _, err := Subscription(FormatSingbox, eps, SubOptions{SingboxSnell: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertGolden(t, "singbox-snell-client.golden.json", sb)
+	obs := renderJSONString(t, sb)["outbounds"].([]interface{})
+	byTag := map[string]map[string]interface{}{}
+	for _, o := range obs {
+		m := o.(map[string]interface{})
+		byTag[m["tag"].(string)] = m
+	}
+	if v4 := byTag["Snell v4"]; v4["type"] != "snell" || v4["version"] != 4.0 || v4["psk"] != "psk-aaaaaaaa" {
+		t.Fatalf("v4 client: %v", v4)
+	}
+	if v6 := byTag["Snell v6"]; v6["version"] != 6.0 || v6["mode"] != "unshaped" {
+		t.Fatalf("v6 client: %v", v6)
+	}
+	stls, front := byTag["Snell STLS"], byTag["Snell STLS (shadowtls)"]
+	if stls["detour"] != "Snell STLS (shadowtls)" || stls["server"] != nil || front["type"] != "shadowtls" || front["password"] != "stls-pass-1" {
+		t.Fatalf("shadowtls pair: %v %v", stls, front)
+	}
+}
+
+func TestSingboxChainThroughSnell(t *testing.T) {
+	via := snellEndpoints(t)[2]
+	in := Inbound{ID: 5, Protocol: ProtocolVLESS, Port: 8443, Settings: Settings{UUID: testUUID}, Security: Security{Type: SecurityNone}}
+	if err := Normalize(TypeSingbox, &in); err != nil {
+		t.Fatal(err)
+	}
+	in.Via = &via
+	if err := CheckChainWith(TypeSingbox, via, RenderOptions{}); err == nil || !strings.Contains(err.Error(), "1.14") {
+		t.Fatalf("sing-box before 1.14 cannot dial snell: %v", err)
+	}
+	if err := CheckChainWith(TypeSingbox, via, RenderOptions{SingboxSnell: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Render(TypeSingbox, []Inbound{in}); err == nil {
+		t.Fatal("rendering a snell chain for an old sing-box must fail")
+	}
+	out, err := RenderWith(TypeSingbox, []Inbound{in}, RenderOptions{SingboxSnell: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertGolden(t, "singbox-snell-chain.golden.json", out.Files[0].Content)
+	if ob := outboundByTag(renderJSONString(t, out.Files[0].Content), "via-5"); ob == nil || ob["type"] != "snell" || ob["detour"] == nil {
+		t.Fatalf("chain outbound: %v", ob)
+	}
+}
+
+func TestSnellModeRules(t *testing.T) {
+	in := Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 5, SnellMode: SnellModeUnshaped}}
+	if err := Normalize(TypeSingbox, &in); err != nil || in.Settings.SnellMode != "" {
+		t.Fatalf("mode is v6 only: %+v %v", in.Settings, err)
+	}
+	bad := Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 6, SnellMode: "unsafe-raw"}}
+	if err := Normalize(TypeSingbox, &bad); err == nil {
+		t.Fatal("unsafe-raw must be refused")
+	}
+	v5 := singboxSnellInbounds(t)[0]
+	if v5.NetworkOn(TypeSingbox) != "tcp" || v5.NetworkOn(TypeSnell) != "tcp" {
+		t.Fatal("v4 is tcp everywhere")
+	}
+	v5.Settings.SnellVersion = 5
+	if v5.NetworkOn(TypeSingbox) != "tcp" || v5.NetworkOn(TypeSnell) != "tcp,udp" {
+		t.Fatal("v5 adds udp only on snell-server")
+	}
+	ep := snellEndpoints(t)[1]
+	if line, _ := SurgeLine(ep); !strings.Contains(line, "version=6") || !strings.Contains(line, "mode=unshaped") {
+		t.Fatalf("surge v6 line: %s", line)
+	}
+}

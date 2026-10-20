@@ -49,6 +49,9 @@ type SubOptions struct {
 	// RegionGroups there.
 	Rules      bool
 	RuleGroups []string
+	// SingboxSnell puts Snell nodes in sing-box profiles: the client is
+	// sing-box 1.14+ (see SingboxClientHasSnell).
+	SingboxSnell bool
 }
 
 // RegionOther is the filter value for names without a recognized region.

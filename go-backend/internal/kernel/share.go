@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -346,8 +347,15 @@ func ClashProxy(e Endpoint) (yamlNode, bool) {
 
 // SingboxOutbounds renders the sing-box client outbounds (1.11+ schema) for
 // an endpoint. The first one carries the endpoint's tag; ShadowTLS adds a
-// second outbound the first detours through.
+// second outbound the first detours through. Snell is left out: only
+// sing-box 1.14+ has it (see singboxOutbounds).
 func SingboxOutbounds(e Endpoint) ([]map[string]interface{}, bool) {
+	return singboxOutbounds(e, false)
+}
+
+// singboxOutbounds is SingboxOutbounds; snell includes built Snell inbounds
+// for sing-box 1.14+.
+func singboxOutbounds(e Endpoint, snell bool) ([]map[string]interface{}, bool) {
 	if e.Proxy != nil {
 		return proxySingbox(e)
 	}
@@ -356,14 +364,14 @@ func SingboxOutbounds(e Endpoint) ([]map[string]interface{}, bool) {
 		return proxySingbox(e)
 	}
 	in := e.Inbound
-	if in.Protocol == ProtocolSnell {
+	if in.Protocol == ProtocolSnell && !snell {
 		return nil, false
 	}
 	o, ok := singboxOutbound(e)
 	if !ok {
 		return nil, false
 	}
-	if in.Protocol == ProtocolShadowsocks && in.Security.Type == SecurityShadowTLS {
+	if (in.Protocol == ProtocolShadowsocks || in.Protocol == ProtocolSnell) && in.Security.Type == SecurityShadowTLS {
 		stlsTag := e.Name + " (shadowtls)"
 		o["detour"] = stlsTag
 		return []map[string]interface{}{o, {
@@ -410,6 +418,23 @@ func singboxOutbound(e Endpoint) (map[string]interface{}, bool) {
 	case ProtocolTrojan:
 		o["type"] = "trojan"
 		o["password"] = in.Settings.Password
+	case ProtocolSnell:
+		// The v4 client speaks to v4 and v5 servers (sing-box has no v5
+		// client: without QUIC proxy mode v5 is v4).
+		o["type"] = "snell"
+		o["version"] = 4
+		if in.Settings.SnellVersion == 6 {
+			o["version"] = 6
+			if in.Settings.SnellMode != "" {
+				o["mode"] = in.Settings.SnellMode
+			}
+		}
+		o["psk"] = in.Settings.Password
+		if in.Security.Type == SecurityShadowTLS {
+			delete(o, "server")
+			delete(o, "server_port")
+		}
+		return o, true
 	case ProtocolShadowsocks:
 		o["type"] = "shadowsocks"
 		o["method"] = in.Settings.Method
@@ -531,6 +556,9 @@ func SurgeLine(e Endpoint) (string, bool) {
 	case ProtocolSnell:
 		parts = append(parts, "snell", host, strconv.Itoa(e.Port), "psk="+in.Settings.Password,
 			fmt.Sprintf("version=%d", in.Settings.SnellVersion), "reuse=true", "tfo=true")
+		if in.Settings.SnellMode != "" {
+			parts = append(parts, "mode="+in.Settings.SnellMode)
+		}
 		parts = append(parts, shadowTLS()...)
 		return name + " = " + strings.Join(parts, ", "), true
 	case ProtocolHysteria2:
@@ -569,6 +597,20 @@ func SurgeLine(e Endpoint) (string, bool) {
 		}
 	}
 	return name + " = " + strings.Join(parts, ", "), true
+}
+
+var singboxUAVersion = regexp.MustCompile(`sing-box[ /]v?(\d+)\.(\d+)`)
+
+// SingboxClientHasSnell reports whether a client UA names sing-box 1.14 or
+// later, e.g. "SFA (sing-box 1.14.3; language zh_CN)".
+func SingboxClientHasSnell(ua string) bool {
+	m := singboxUAVersion.FindStringSubmatch(strings.ToLower(ua))
+	if m == nil {
+		return false
+	}
+	major, _ := strconv.Atoi(m[1])
+	minor, _ := strconv.Atoi(m[2])
+	return major > 1 || (major == 1 && minor >= 14)
 }
 
 // FormatForUserAgent picks a subscription format from the client's UA.
@@ -779,7 +821,7 @@ func singboxProfile(endpoints []Endpoint, withRegions bool, opts SubOptions) (st
 	var rendered []Endpoint
 	var obsList [][]map[string]interface{}
 	for _, e := range endpoints {
-		if obs, ok := SingboxOutbounds(e); ok {
+		if obs, ok := singboxOutbounds(e, opts.SingboxSnell); ok {
 			rendered = append(rendered, e)
 			obsList = append(obsList, obs)
 		}

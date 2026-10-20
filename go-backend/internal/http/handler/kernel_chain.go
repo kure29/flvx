@@ -136,6 +136,19 @@ func (h *Handler) inboundSplit(row model.NodeInbound) ([]kernel.SplitRule, error
 // validateChain checks the outbound targets (chained outbound and 分流
 // targets) of an inbound about to be saved.
 func (h *Handler) validateChain(row model.NodeInbound, kernelType string) error {
+	return h.validateChainFor(row, kernelType, "")
+}
+
+// kernelCaps is what a kernel version can do, for config and chain checks.
+func kernelCaps(version string) kernel.RenderOptions {
+	modern := !versionBelow(version, 1, 14)
+	return kernel.RenderOptions{SingboxHTTPClient: modern, SingboxSnell: modern}
+}
+
+// validateChainFor is validateChain for an installed kernel version ("" is
+// treated as the latest).
+func (h *Handler) validateChainFor(row model.NodeInbound, kernelType, version string) error {
+	caps := kernelCaps(version)
 	check := func(targetID int64, what string) error {
 		if targetID == row.ID {
 			return fmt.Errorf("%s不能选择自己", what)
@@ -154,7 +167,7 @@ func (h *Handler) validateChain(row model.NodeInbound, kernelType string) error 
 		if err != nil {
 			return fmt.Errorf("%s：%v", what, err)
 		}
-		if err := kernel.CheckChain(kernelType, e); err != nil {
+		if err := kernel.CheckChainWith(kernelType, e, caps); err != nil {
 			return fmt.Errorf("%s：%v", what, err)
 		}
 		return nil
@@ -325,7 +338,7 @@ func changedTargets(before, after []int64) []int64 {
 
 // setInboundRouting sets an inbound's default exit and 分流 rules and checks
 // that its kernel can reach every target.
-func (h *Handler) setInboundRouting(row *model.NodeInbound, kernelType string, outboundID int64, rules []kernel.SplitRule) error {
+func (h *Handler) setInboundRouting(row *model.NodeInbound, kernelType, version string, outboundID int64, rules []kernel.SplitRule) error {
 	if outboundID < 0 {
 		outboundID = 0
 	}
@@ -339,7 +352,7 @@ func (h *Handler) setInboundRouting(row *model.NodeInbound, kernelType string, o
 		raw, _ := json.Marshal(split)
 		row.SplitRules = string(raw)
 	}
-	return h.validateChain(*row, kernelType)
+	return h.validateChainFor(*row, kernelType, version)
 }
 
 // applyChangedTargets re-applies the whitelists of targets the inbound
@@ -378,7 +391,7 @@ func (h *Handler) inboundSplitSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prevTargets := outboundTargets(*row)
-	if err := h.setInboundRouting(row, k.KernelType, req.OutboundID, req.SplitRules); err != nil {
+	if err := h.setInboundRouting(row, k.KernelType, k.Version, req.OutboundID, req.SplitRules); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}

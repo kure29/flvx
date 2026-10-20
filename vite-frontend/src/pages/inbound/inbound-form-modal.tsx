@@ -600,6 +600,25 @@ export function InboundFormModal({
                     ))}
                   </Select>
                 )}
+                {form.protocol === "snell" && form.snellVersion === "6" && (
+                  <Select
+                    description="客户端要选同样的模式；unshaped 不做流量整形，更快但更容易被识别"
+                    label="流量整形"
+                    selectedKeys={[form.snellMode || "default"]}
+                    onSelectionChange={(keys) => {
+                      const v = String(Array.from(keys)[0] ?? "default");
+
+                      set("snellMode", v === "default" ? "" : v);
+                    }}
+                  >
+                    <SelectItem key="default" textValue="默认">
+                      默认
+                    </SelectItem>
+                    <SelectItem key="unshaped" textValue="unshaped">
+                      unshaped
+                    </SelectItem>
+                  </Select>
+                )}
                 {(form.protocol === "socks" || form.protocol === "http") && (
                   <p className="text-xs text-warning">
                     {PROTOCOL_LABELS[form.protocol]}

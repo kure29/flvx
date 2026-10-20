@@ -42,7 +42,7 @@ func renderSingbox(inbounds []Inbound, opts RenderOptions) (string, error) {
 	}
 	// Chained inbounds leave through their target; their rules come first
 	// so their users do not match the direct per-user rules below.
-	chained, rules, sets, err := singboxChainRoutes(inbounds)
+	chained, rules, sets, err := singboxChainRoutes(inbounds, opts.SingboxSnell)
 	if err != nil {
 		return "", err
 	}
@@ -149,6 +149,9 @@ func singboxInbounds(in Inbound, acme *acmeProviders) ([]interface{}, error) {
 		snell := obj{"type": "snell", "version": 5, "psk": s.Password}
 		if s.SnellVersion == 6 {
 			snell["version"] = 6
+			if s.SnellMode != "" {
+				snell["mode"] = s.SnellMode
+			}
 		}
 		if in.Security.Type == SecurityShadowTLS {
 			return singboxShadowTLSFront(in, snell)

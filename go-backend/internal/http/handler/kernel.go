@@ -551,7 +551,7 @@ func (h *Handler) inboundList(w http.ResponseWriter, r *http.Request) {
 			Protocol:       row.Protocol,
 			Listen:         row.Listen,
 			Port:           row.Port,
-			Network:        in.Network(),
+			Network:        in.NetworkOn(k.KernelType),
 			Settings:       in.Settings,
 			Transport:      in.Transport,
 			Security:       kernelSecurityView{Security: in.Security, ACMEDNSSet: in.Security.ACMEDNSKey != ""},
@@ -705,7 +705,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		return
 	}
 	prevTargets := outboundTargets(row)
-	if err := h.setInboundRouting(&row, k.KernelType, req.OutboundID, req.SplitRules); err != nil {
+	if err := h.setInboundRouting(&row, k.KernelType, k.Version, req.OutboundID, req.SplitRules); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
@@ -1199,7 +1199,7 @@ func (h *Handler) buildKernelApplyPayload(k *model.NodeKernel) (map[string]inter
 			return nil, "", err
 		}
 		inbounds = append(inbounds, in)
-		port := map[string]interface{}{"inboundId": in.ID, "port": in.Port, "network": in.Network()}
+		port := map[string]interface{}{"inboundId": in.ID, "port": in.Port, "network": in.NetworkOn(k.KernelType)}
 		if lo, hi := in.HopRange(); lo > 0 {
 			port["hopFrom"], port["hopTo"] = lo, hi
 		}
@@ -1214,7 +1214,8 @@ func (h *Handler) buildKernelApplyPayload(k *model.NodeKernel) (map[string]inter
 	}
 	rendered, err := kernel.RenderWith(k.KernelType, inbounds, kernel.RenderOptions{
 		RuleSetMirror:     proxy,
-		SingboxHTTPClient: !versionBelow(k.Version, 1, 14),
+		SingboxHTTPClient: kernelCaps(k.Version).SingboxHTTPClient,
+		SingboxSnell:      kernelCaps(k.Version).SingboxSnell,
 	})
 	if err != nil {
 		return nil, "", err
@@ -1396,6 +1397,11 @@ func (h *Handler) checkKernelVersionFits(kernelID int64, kernelType, version str
 			}
 			if in.Security.CertMode == kernel.CertModeACME {
 				return fmt.Errorf("入站 %s 自动申请证书，需要 sing-box 1.14 及以上", row.Name)
+			}
+			for _, id := range outboundTargets(row) {
+				if t, err := h.repo.GetNodeInbound(id); err == nil && t != nil && t.Protocol == kernel.ProtocolSnell {
+					return fmt.Errorf("入站 %s 经 Snell 节点 %s 出站，需要 sing-box 1.14 及以上", row.Name, t.Name)
+				}
 			}
 		}
 	}
