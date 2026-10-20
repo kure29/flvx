@@ -112,16 +112,24 @@ await evaluate(`[...document.querySelectorAll("button")].find((b) => b.textConte
 await sleep(SETTLE_MS);
 for (const r of USER_PAGES) await visit("user", r);
 
-ws.close();
-chrome.kill();
-server.close();
-fs.rmSync(profile, { recursive: true, force: true });
-
 for (const n of notes) console.log(`note  ${n}`);
-if (problems.length) {
-  for (const p of problems) console.log(`FAIL  ${p}`);
-  console.log(`\n${problems.length} problem(s). Recording missing for new pages? See scripts/demo/README.md.`);
-  process.exit(1);
+for (const p of problems) console.log(`FAIL  ${p}`);
+console.log(problems.length
+  ? `\n${problems.length} problem(s). Recording missing for new pages? See scripts/demo/README.md.`
+  : `demo ok: ${ADMIN_PAGES.length} admin + ${USER_PAGES.length} user pages`);
+
+// Chrome keeps writing its profile until it has exited; clean up after
+// that, and never let cleanup decide the result.
+ws.close();
+server.close();
+await new Promise((r) => {
+  chrome.once("exit", r);
+  chrome.kill();
+  setTimeout(r, 5000);
+});
+try {
+  fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+} catch {
+  // a leftover temp directory is harmless
 }
-console.log(`demo ok: ${ADMIN_PAGES.length} admin + ${USER_PAGES.length} user pages`);
-process.exit(0);
+process.exit(problems.length ? 1 : 0);
