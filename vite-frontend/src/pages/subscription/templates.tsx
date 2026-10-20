@@ -491,7 +491,7 @@ function Editor({
         {(!building || draft.kind === "singbox") && (
           <p className="text-xs text-default-500">
             {building
-              ? "生成的 sing-box 模板适用于 1.14 及以上版本"
+              ? "生成的 sing-box 模板适用于 1.12 及以上版本"
               : `节点进策略组的写法：${AUTO_HINT[draft.kind]}`}
           </p>
         )}

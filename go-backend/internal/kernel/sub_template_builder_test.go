@@ -49,6 +49,10 @@ func TestTemplateBuilderAllFormats(t *testing.T) {
 				if err := yaml.Unmarshal([]byte(content), &cfg); err != nil {
 					t.Fatal(err)
 				}
+				// Stash and Shadowrocket take Mihomo templates: no .mrs.
+				if strings.Contains(content, ".mrs") || len(summary.Warnings) != 0 {
+					t.Fatalf("Mihomo template must suit every Mihomo-format client: %v", summary.Warnings)
+				}
 				if cfg.Rules[0] != "DOMAIN-SUFFIX,example.com,DIRECT" || cfg.Rules[1] != "IP-CIDR6,2001:db8::/32,REJECT,no-resolve" || cfg.Rules[len(cfg.Rules)-1] != "MATCH,节点选择" {
 					t.Fatal(cfg.Rules)
 				}
@@ -61,6 +65,10 @@ func TestTemplateBuilderAllFormats(t *testing.T) {
 				}
 				if err := json.Unmarshal([]byte(body), &cfg); err != nil {
 					t.Fatal(err)
+				}
+				// download_detour works from sing-box 1.12 (http_clients is 1.14+).
+				if strings.Contains(content, "http_client") || !strings.Contains(content, `"download_detour"`) {
+					t.Fatalf("rule sets must download on 1.12+: %s", content)
 				}
 				if cfg.Route.Rules[1]["outbound"] != "direct" || cfg.Route.Rules[2]["action"] != "reject" || cfg.Route.Final != builderMain || strings.Contains(string(body), "{all}") || strings.Contains(string(body), `"filter"`) {
 					t.Fatalf("routing: %s", body)

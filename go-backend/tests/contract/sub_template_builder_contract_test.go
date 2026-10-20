@@ -50,14 +50,14 @@ func TestSubscriptionTemplateBuilderContract(t *testing.T) {
 				t.Fatal(body)
 			}
 			if kind == "clash" {
-				// New visual recipes also use upstream's Mihomo-compatible slots.
+				// Visual Mihomo templates also serve the Stash / Shadowrocket slots.
 				for _, slot := range []string{"stash", "shadowrocket"} {
 					res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"builder-test","sourceAll":true,"options":{"templates":{"`+slot+`":`+id+`}}}`)
 					if res.Code != 0 {
 						t.Fatal(res.Msg)
 					}
 					body := getSub(t, router, path+"?format="+slot, "").Body.String()
-					if !strings.Contains(body, "example.com") || !strings.Contains(body, "漏网之鱼") || strings.Contains(body, "include-all") {
+					if !strings.Contains(body, "example.com") || !strings.Contains(body, "漏网之鱼") || strings.Contains(body, "include-all") || strings.Contains(body, ".mrs") {
 						t.Fatalf("visual template not expanded for %s: %s", slot, body)
 					}
 				}

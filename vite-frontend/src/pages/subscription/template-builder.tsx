@@ -12,6 +12,43 @@ import { Button } from "@/shadcn-bridge/heroui/button";
 import { Input } from "@/shadcn-bridge/heroui/input";
 
 const MAIN = "节点选择";
+
+/**
+ * A group name is committed on blur: rules follow the renamed group, and a
+ * half-typed name must not take over another target's rules. Taken names
+ * are refused.
+ */
+function GroupNameInput({
+  label,
+  name,
+  taken,
+  onCommit,
+}: {
+  label: string;
+  name: string;
+  taken: string[];
+  onCommit: (name: string) => void;
+}) {
+  const [draft, setDraft] = useState(name);
+
+  useEffect(() => setDraft(name), [name]);
+
+  return (
+    <Input
+      aria-label={label}
+      size="sm"
+      value={draft}
+      variant="bordered"
+      onBlur={() => {
+        const next = draft.trim();
+
+        if (next && next !== name && !taken.includes(next)) onCommit(next);
+        else setDraft(name);
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+    />
+  );
+}
 const selectClass =
   "h-9 min-w-0 rounded-lg border border-divider bg-background px-2 text-sm";
 const PRESETS = [
@@ -454,12 +491,16 @@ export function TemplateBuilder({
           {value.groups.map((g, i) => (
             <div key={i} className="space-y-2 rounded-lg bg-default-50 p-2">
               <div className="flex items-center gap-2">
-                <Input
-                  aria-label={`策略组 ${i + 1} 名称`}
-                  size="sm"
-                  value={g.name}
-                  variant="bordered"
-                  onChange={(e) => editGroup(i, { name: e.target.value })}
+                <GroupNameInput
+                  label={`策略组 ${i + 1} 名称`}
+                  name={g.name}
+                  taken={[
+                    MAIN,
+                    ...value.groups
+                      .filter((_, j) => j !== i)
+                      .map((o) => o.name),
+                  ]}
+                  onCommit={(name) => editGroup(i, { name })}
                 />
                 <select
                   aria-label={`策略组 ${i + 1} 类型`}

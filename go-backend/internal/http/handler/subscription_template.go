@@ -36,23 +36,25 @@ type subTemplateView struct {
 	Rules      int `json:"rules"`
 }
 
-// effectiveTemplate rebuilds visual recipes on read without rewriting user data.
+// effectiveTemplate returns a template's saved content and, for visual
+// templates, the recipe the editor reopens. The content generated at save
+// time is what clients get, so a later change to the generator only reaches
+// a template when it is saved again.
 func effectiveTemplate(t *model.SubscriptionTemplate) (string, *kernel.TemplateBuilder) {
-	if t.BuilderConfig != "" && t.SourceURL == "" {
-		var b kernel.TemplateBuilder
-		if json.Unmarshal([]byte(t.BuilderConfig), &b) == nil {
-			if b.Groups == nil {
-				b.Groups = []kernel.TemplateBuilderGroup{}
-			}
-			if b.Rules == nil {
-				b.Rules = []kernel.TemplateBuilderRule{}
-			}
-			if content, err := kernel.BuildSubscriptionTemplate(t.Kind, b); err == nil {
-				return content, &b
-			}
-		}
+	if t.BuilderConfig == "" || t.SourceURL != "" {
+		return t.Content, nil
 	}
-	return t.Content, nil
+	var b kernel.TemplateBuilder
+	if json.Unmarshal([]byte(t.BuilderConfig), &b) != nil {
+		return t.Content, nil
+	}
+	if b.Groups == nil {
+		b.Groups = []kernel.TemplateBuilderGroup{}
+	}
+	if b.Rules == nil {
+		b.Rules = []kernel.TemplateBuilderRule{}
+	}
+	return t.Content, &b
 }
 
 func templateView(t *model.SubscriptionTemplate, usedBy int) subTemplateView {

@@ -14,8 +14,8 @@ const builderMain = "节点选择"
 // TemplateBuilder is the editable recipe, kept alongside its generated profile.
 // Rules are evaluated in order; Final applies after every selected/custom rule.
 type TemplateBuilder struct {
-	// Nil keeps existing visual templates on the current default: independent
-	// service selectors. Explicit false opts into shared routing targets.
+	// ServiceGroups gives each category its own selector (nil = on); false
+	// routes rules straight to their targets.
 	ServiceGroups *bool                  `json:"serviceGroups,omitempty"`
 	Version       int                    `json:"version"`
 	Preset        string                 `json:"preset"`
@@ -234,8 +234,10 @@ func buildClashTemplate(b TemplateBuilder) string {
 			if kind == "ip" {
 				behavior, dir = "ipcidr", "geoip"
 			}
-			providers = append(providers, yamlField{tag, yamlNode{{"type", "http"}, {"behavior", behavior}, {"format", "mrs"},
-				{"url", metaRuleURL("meta", dir, name, ".mrs")}, {"path", "./ruleset/" + tag + ".mrs"}, {"interval", 86400}, {"proxy", builderMain}}})
+			// YAML, not .mrs: Stash and Shadowrocket take Mihomo templates
+			// too and only Mihomo reads .mrs.
+			providers = append(providers, yamlField{tag, yamlNode{{"type", "http"}, {"behavior", behavior}, {"format", "yaml"},
+				{"url", metaRuleURL("meta", dir, name, ".yaml")}, {"path", "./ruleset/" + tag + ".yaml"}, {"interval", 86400}, {"proxy", builderMain}}})
 		}
 		return tag
 	}
@@ -299,7 +301,7 @@ func buildSingboxTemplate(b TemplateBuilder) string {
 		if !seen[tag] {
 			seen[tag] = true
 			sets = append(sets, map[string]interface{}{"type": "remote", "tag": tag, "format": "binary",
-				"url": metaRuleURL("sing", dir, name, ".srs"), "http_client": "rules-http", "update_interval": "1d"})
+				"url": metaRuleURL("sing", dir, name, ".srs"), "download_detour": builderMain, "update_interval": "1d"})
 		}
 		return tag
 	}
@@ -331,7 +333,6 @@ func buildSingboxTemplate(b TemplateBuilder) string {
 		"dns":          map[string]interface{}{"servers": []interface{}{map[string]interface{}{"type": "local", "tag": "dns-local"}}, "final": "dns-local"},
 		"inbounds":     []interface{}{map[string]interface{}{"type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080}},
 		"outbounds":    outbounds,
-		"http_clients": []interface{}{map[string]interface{}{"tag": "rules-http", "detour": builderMain}},
 		"route":        map[string]interface{}{"rules": rules, "rule_set": sets, "final": ruleTarget(builderFinal(b, targets), "direct"), "auto_detect_interface": true, "default_domain_resolver": "dns-local"},
 		"experimental": map[string]interface{}{"cache_file": map[string]interface{}{"enabled": true}},
 	}
