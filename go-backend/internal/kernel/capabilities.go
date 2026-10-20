@@ -126,6 +126,11 @@ var snellDownload = &Download{
 	BinName: "snell-server",
 	ArchMap: map[string]string{"amd64": "amd64", "arm64": "aarch64", "arm": "armv7l"},
 	Pinned: map[string]map[string]string{
+		// 6.0.0 is a beta; Surge publishes no armv7 build of it.
+		"6.0.0": {
+			"amd64":   "8a9c4463ca87cfa5eaa37c6af0d37ab93ea275aa12391985bb2a375ca3abd7f2",
+			"aarch64": "a0b2915cbc77dc3baf8fa069e741c20808d8a10c3a8a93e709a0a580645c3bd7",
+		},
 		"5.0.1": {
 			"amd64":   "9bea1c2b9e35b73b31634856c04d18c393072b9e5dcde6a32781d8b8f908c539",
 			"aarch64": "2f178bf5ac468ce1a130454efa40a0603fbbe4e47ecc4880a989f4abc7f824cf",
@@ -233,7 +238,8 @@ var catalog = []Info{
 		Implemented: true,
 		CertModes:   []string{},
 		Download:    snellDownload,
-		Versions:    []string{"5.0.1", "4.1.1"},
+		// 5.0.1 stays the default: the 6.0.0 beta only serves v6 clients.
+		Versions: []string{"5.0.1", "6.0.0", "4.1.1"},
 		Protocols: []ProtocolCap{
 			{Protocol: ProtocolSnell, Transports: []TransportCap{{Type: TransportTCP, Securities: []string{SecurityNone, SecurityShadowTLS}}}},
 		},
@@ -360,6 +366,13 @@ func downloadSpec(d *Download, version, proxy string) (map[string]interface{}, e
 		pinned := make(map[string]string, len(sums))
 		for k, v := range sums {
 			pinned[k] = v
+		}
+		// Arches without a build of this version are left out, so the
+		// agent reports an unsupported arch instead of a missing checksum.
+		for goarch, arch := range archMap {
+			if _, ok := sums[arch]; !ok {
+				delete(archMap, goarch)
+			}
 		}
 		spec["url"] = mirror(strings.ReplaceAll(d.URL, "{VERSION}", version))
 		spec["sha256"] = pinned

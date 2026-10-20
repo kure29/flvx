@@ -428,7 +428,7 @@ func TestNormalizePhase3Rules(t *testing.T) {
 		kernel string
 		in     Inbound
 	}{
-		{TypeSnell, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 6}}},
+		{TypeSnell, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 7}}},
 		{TypeSnell, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{Password: "has space"}}},
 		{TypeSingbox, Inbound{Protocol: ProtocolHysteria2, Port: 1, Transport: Transport{Type: TransportQUIC}, Settings: Settings{Masquerade: "ftp://x"}}},
 		{TypeSingbox, Inbound{Protocol: ProtocolVLESS, Port: 1, AcceptProxyProtocol: true}},

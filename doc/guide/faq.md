@@ -53,9 +53,9 @@ GITHUB_TOKEN=github_pat_xxx
 
 ### Snell 用哪个版本、哪个内核
 
-有两种：Snell 内核（官方 snell-server，支持 v4 / v5，含 v5 的 QUIC 代理模式）和 sing-box 1.14 起内置的 Snell（支持 v4 / v5 / v6、分流和链式出站，不支持 QUIC 模式）。对比和选择见 [Snell 用哪个内核](./kernels.md#snell-用哪个内核)。
+有两种：Snell 内核（官方 snell-server：5.x 支持 v4 / v5，含 v5 的 QUIC 代理模式；6.0.0 测试版只支持 v6）和 sing-box 1.14 起内置的 Snell（支持 v4 / v5 / v6、分流和链式出站，不支持 QUIC 模式）。对比和选择见 [Snell 用哪个内核](./kernels.md#snell-用哪个内核)。
 
-用 Snell 内核时，入站的 Snell 版本不能高于节点安装的 Snell 主版本，v5 入站需要节点安装 Snell 5.x。
+用 Snell 内核时，入站的 Snell 版本要和节点安装的版本对得上：v5 入站需要 Snell 5.x，v6 入站需要 Snell 6.0.0（测试版，只接受 v6 客户端）。
 
 ### sing-box 提示需要 1.14 及以上
 

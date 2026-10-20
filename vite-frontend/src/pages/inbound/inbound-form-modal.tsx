@@ -98,6 +98,11 @@ export function InboundFormModal({
   const installedKernel = kernels.find(
     (k) => String(k.nodeId) === form.nodeId && k.kernelType === form.kernelType,
   );
+  // snell-server 6.x only serves v6 clients, so new inbounds default to it.
+  const defaultSnellVersion =
+    form.kernelType === "snell" && installedKernel?.version?.startsWith("6.")
+      ? "6"
+      : "5";
   // NaïveProxy needs a certificate clients trust, so no self-signed option.
   const certModes = (kernelInfo?.certModes ?? ["self", "file"]).filter(
     (m) => !(form.protocol === "naive" && m === "self"),
@@ -129,11 +134,6 @@ export function InboundFormModal({
 
     setForm((prev) => {
       const next = { ...prev, kernelType };
-
-      // Snell v6 is sing-box only.
-      if (kernelType !== "singbox" && next.snellVersion === "6") {
-        next.snellVersion = "5";
-      }
 
       if (info?.protocols?.some((p) => p.protocol === prev.protocol)) {
         return next;
@@ -277,7 +277,11 @@ export function InboundFormModal({
     }
     setSaving(true);
     try {
-      const payload = toPayload({ ...form, certMode });
+      const payload = toPayload({
+        ...form,
+        certMode,
+        snellVersion: form.snellVersion || defaultSnellVersion,
+      });
       const res = isEdit
         ? await updateInbound(payload)
         : await createInbound(payload);
@@ -581,19 +585,15 @@ export function InboundFormModal({
                     description={
                       form.kernelType === "singbox"
                         ? "客户端使用的协议版本；sing-box 内置 Snell 需要 1.14 及以上，v6 的 PSK 至少 12 位"
-                        : "客户端使用的协议版本；v5 需要节点安装 Snell 5.x"
+                        : "客户端使用的协议版本，要和节点上的 Snell 一致：v4 / v5 用 5.x（也可 4.x 跑 v4），v6 用 6.0.0（只接受 v6 客户端）"
                     }
                     label="Snell 版本"
-                    selectedKeys={[form.snellVersion || "5"]}
+                    selectedKeys={[form.snellVersion || defaultSnellVersion]}
                     onSelectionChange={(keys) =>
                       set("snellVersion", String(Array.from(keys)[0] ?? "5"))
                     }
                   >
-                    {[
-                      ...(form.kernelType === "singbox" ? ["6"] : []),
-                      "5",
-                      "4",
-                    ].map((v) => (
+                    {["6", "5", "4"].map((v) => (
                       <SelectItem key={v} textValue={`v${v}`}>
                         {`v${v}`}
                       </SelectItem>

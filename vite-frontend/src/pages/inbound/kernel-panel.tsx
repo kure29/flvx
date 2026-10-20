@@ -500,6 +500,12 @@ export function KernelPanel({
                       {pinnedVersions.map((v) => (
                         <SelectItem key={v} textValue={v}>
                           {v}
+                          {installForm.kernelType === "snell" &&
+                            v.startsWith("6.") && (
+                              <span className="ml-2 text-xs text-warning">
+                                测试版 · 只接受 v6 客户端 · 无 armv7
+                              </span>
+                            )}
                         </SelectItem>
                       ))}
                     </Select>

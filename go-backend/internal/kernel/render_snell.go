@@ -12,7 +12,8 @@ import (
 const ShadowTLSExtra = "shadow-tls"
 
 // renderSnell gives every inbound its own snell-server process (Snell serves
-// a single port and PSK). ShadowTLS-fronted inbounds bind Snell to loopback
+// a single port and PSK). The binary's major version matches the inbounds'
+// client version (v6 servers only serve v6 clients; see the handler). ShadowTLS-fronted inbounds bind Snell to loopback
 // and add a shadow-tls v3 process on the public port.
 func renderSnell(inbounds []Inbound) (Rendered, error) {
 	var out Rendered
@@ -41,7 +42,14 @@ func renderSnell(inbounds []Inbound) (Rendered, error) {
 		fmt.Fprintf(&conf, "listen = %s\n", listen)
 		fmt.Fprintf(&conf, "psk = %s\n", in.Settings.Password)
 		fmt.Fprintf(&conf, "ipv6 = %t\n", ipv6)
-		conf.WriteString("obfs = off\n")
+		if in.Settings.SnellVersion == 6 {
+			// v6 has no obfs setting; mode replaces it.
+			if in.Settings.SnellMode != "" {
+				fmt.Fprintf(&conf, "mode = %s\n", in.Settings.SnellMode)
+			}
+		} else {
+			conf.WriteString("obfs = off\n")
+		}
 
 		file := name + ".conf"
 		out.Files = append(out.Files, File{Name: file, Content: conf.String()})

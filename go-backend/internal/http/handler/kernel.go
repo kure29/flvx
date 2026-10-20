@@ -714,8 +714,8 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		return
 	}
 	if in.Protocol == kernel.ProtocolSnell && k.KernelType == kernel.TypeSnell {
-		if major := snellMajor(k.Version); in.Settings.SnellVersion > major {
-			response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("节点安装的是 Snell %s，不支持 v%d 客户端", k.Version, in.Settings.SnellVersion)))
+		if err := snellServes(k.Version, in.Settings.SnellVersion); err != nil {
+			response.WriteJSON(w, response.ErrDefault(err.Error()))
 			return
 		}
 	}
@@ -1362,10 +1362,26 @@ func versionBelow(version string, major, minor int) bool {
 
 // snellMajor returns the protocol major version a Snell binary serves.
 func snellMajor(version string) int {
-	if strings.HasPrefix(version, "4.") {
+	switch {
+	case strings.HasPrefix(version, "4."):
 		return 4
+	case strings.HasPrefix(version, "6."):
+		return 6
 	}
 	return 5
+}
+
+// snellServes reports whether a snell-server version accepts clients of a
+// protocol version: 5.x also serves v4, while 6.x serves v6 only.
+func snellServes(version string, client int) error {
+	major := snellMajor(version)
+	switch {
+	case major == 6 && client != 6:
+		return fmt.Errorf("Snell %s 只接受 v6 客户端：请把入站改成 v6，或安装 Snell 5.0.1", version)
+	case client > major:
+		return fmt.Errorf("节点安装的是 Snell %s，不支持 v%d 客户端", version, client)
+	}
+	return nil
 }
 
 // checkKernelVersionFits refuses to install a kernel version that cannot
@@ -1377,7 +1393,6 @@ func (h *Handler) checkKernelVersionFits(kernelID int64, kernelType, version str
 	if err != nil {
 		return err
 	}
-	major := snellMajor(version)
 	for _, row := range rows {
 		in, err := inboundFromModel(row)
 		if err != nil {
@@ -1385,7 +1400,7 @@ func (h *Handler) checkKernelVersionFits(kernelID int64, kernelType, version str
 		}
 		switch kernelType {
 		case kernel.TypeSnell:
-			if in.Settings.SnellVersion > major {
+			if err := snellServes(version, in.Settings.SnellVersion); err != nil {
 				return fmt.Errorf("入站 %s 使用 Snell v%d，不能安装 %s", row.Name, in.Settings.SnellVersion, version)
 			}
 		case kernel.TypeSingbox:

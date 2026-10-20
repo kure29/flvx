@@ -19,8 +19,7 @@ type Settings struct {
 	Password string `json:"password,omitempty"`
 	Method   string `json:"method,omitempty"`
 
-	// SnellVersion is the protocol version clients use (4 or 5; 6 on
-	// sing-box only).
+	// SnellVersion is the protocol version clients use (4, 5 or 6).
 	SnellVersion int `json:"snellVersion,omitempty"`
 	// SnellMode is Snell v6's traffic shaping: "" (default) or "unshaped";
 	// clients must use the same.
@@ -292,9 +291,6 @@ func Normalize(kernelType string, in *Inbound) error {
 	}
 	if err := normalizeSecurity(in); err != nil {
 		return err
-	}
-	if in.Protocol == ProtocolSnell && in.Settings.SnellVersion == 6 && kernelType != TypeSingbox {
-		return errors.New("Snell v6 目前只支持 sing-box 内核")
 	}
 	if in.Protocol == ProtocolSnell && kernelType == TypeSingbox {
 		// sing-box chains ShadowTLS to Snell internally; no loopback port.

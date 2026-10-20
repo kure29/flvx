@@ -57,7 +57,7 @@ func TestSingboxSnellRules(t *testing.T) {
 	}{
 		{TypeSingbox, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 7}}},
 		{TypeSingbox, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 6, Password: "short-psk"}}},
-		{TypeSnell, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 6, Password: "long-enough-psk"}}},
+		{TypeSnell, Inbound{Protocol: ProtocolSnell, Port: 1, Settings: Settings{SnellVersion: 6, Password: "short-psk"}}},
 	}
 	for i, tc := range bad {
 		in := tc.in
@@ -199,5 +199,46 @@ func TestSnellModeRules(t *testing.T) {
 	ep := snellEndpoints(t)[1]
 	if line, _ := SurgeLine(ep); !strings.Contains(line, "version=6") || !strings.Contains(line, "mode=unshaped") {
 		t.Fatalf("surge v6 line: %s", line)
+	}
+}
+
+// The official snell-server 6.0.0 (beta) takes mode instead of obfs and
+// only ships amd64 / aarch64 builds.
+func TestSnellKernelV6(t *testing.T) {
+	ins := []Inbound{
+		{ID: 1, Protocol: ProtocolSnell, Port: 7160, Settings: Settings{Password: "psk-default-123", SnellVersion: 6}},
+		{ID: 2, Protocol: ProtocolSnell, Port: 7161, Settings: Settings{Password: "psk-unshaped-12", SnellVersion: 6, SnellMode: SnellModeUnshaped}},
+	}
+	for i := range ins {
+		if err := Normalize(TypeSnell, &ins[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := Render(TypeSnell, ins)
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, uns := out.Files[0].Content, out.Files[1].Content
+	if strings.Contains(def, "obfs") || strings.Contains(def, "mode") || !strings.Contains(uns, "mode = unshaped\n") {
+		t.Fatalf("v6 configs:\n%s\n%s", def, uns)
+	}
+	if ins[0].NetworkOn(TypeSnell) != "tcp" {
+		t.Fatal("v6 has no QUIC proxy mode")
+	}
+
+	info, _ := Lookup(TypeSnell)
+	if v, err := ResolveVersion(info, "latest"); err != nil || v != "5.0.1" {
+		t.Fatalf("the 6.0.0 beta must not be the default: %s %v", v, err)
+	}
+	spec, err := ResolveDownload(info, "6.0.0", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arch := spec["archMap"].(map[string]string)
+	if arch["amd64"] != "amd64" || arch["arm64"] != "aarch64" || arch["arm"] != "" || len(spec["sha256"].(map[string]string)) != 2 {
+		t.Fatalf("6.0.0 download: %v", spec)
+	}
+	if spec, _ := ResolveDownload(info, "4.1.1", ""); spec["archMap"].(map[string]string)["arm"] != "armv7l" {
+		t.Fatalf("4.1.1 keeps armv7: %v", spec)
 	}
 }
