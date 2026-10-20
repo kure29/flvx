@@ -52,6 +52,9 @@ type RenderOptions struct {
 	// SingboxSnell lets sing-box dial Snell targets (chained outbounds and
 	// 分流 targets); sing-box 1.14+.
 	SingboxSnell bool
+	// SingboxPreferGoDNS bypasses systemd-resolved DBus in local DNS
+	// resolvers; supported by sing-box 1.13+.
+	SingboxPreferGoDNS bool
 }
 
 // Render produces the kernel configuration for the given enabled inbounds.

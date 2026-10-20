@@ -1222,9 +1222,10 @@ func (h *Handler) buildKernelApplyPayloadWith(k *model.NodeKernel, realmOverride
 		proxy = proxyURL
 	}
 	rendered, err := kernel.RenderWith(k.KernelType, inbounds, kernel.RenderOptions{
-		RuleSetMirror:     proxy,
-		SingboxHTTPClient: kernelCaps(k.Version).SingboxHTTPClient,
-		SingboxSnell:      kernelCaps(k.Version).SingboxSnell,
+		RuleSetMirror:      proxy,
+		SingboxHTTPClient:  kernelCaps(k.Version).SingboxHTTPClient,
+		SingboxSnell:       kernelCaps(k.Version).SingboxSnell,
+		SingboxPreferGoDNS: kernelCaps(k.Version).SingboxPreferGoDNS,
 	})
 	if err != nil {
 		return nil, "", err

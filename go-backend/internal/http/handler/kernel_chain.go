@@ -142,7 +142,7 @@ func (h *Handler) validateChain(row model.NodeInbound, kernelType string) error 
 // kernelCaps is what a kernel version can do, for config and chain checks.
 func kernelCaps(version string) kernel.RenderOptions {
 	modern := !versionBelow(version, 1, 14)
-	return kernel.RenderOptions{SingboxHTTPClient: modern, SingboxSnell: modern}
+	return kernel.RenderOptions{SingboxHTTPClient: modern, SingboxSnell: modern, SingboxPreferGoDNS: !versionBelow(version, 1, 13)}
 }
 
 // validateChainFor is validateChain for an installed kernel version ("" is

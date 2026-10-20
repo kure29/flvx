@@ -79,7 +79,7 @@ func (p *subPipeline) normalize() error {
 	if p.Sort != "name" {
 		p.Sort = ""
 	}
-	if p.Lines != "relay" && p.Lines != "direct" {
+	if p.Lines != "relay" && p.Lines != "direct" && p.Lines != "prefer_relay" {
 		p.Lines = ""
 	}
 	if p.Regions == nil {

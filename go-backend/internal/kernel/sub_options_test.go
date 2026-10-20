@@ -175,3 +175,49 @@ func TestSubPipelineFilterFlagDedupe(t *testing.T) {
 		t.Fatal("bad include regex must be rejected")
 	}
 }
+
+func TestPreferRelayByInboundIdentity(t *testing.T) {
+	direct := namedEndpoints("同名落地", "同名落地", "导入落地")
+	for i := range direct {
+		direct[i].Direct = true
+	}
+	direct[2].Proxy = Proxy{"type": "trojan", "name": "导入落地", "server": "203.0.113.3", "port": 443, "password": "test"}
+	relayA, relayB, importedRelay := direct[0], direct[0], direct[2]
+	relayA.Name, relayA.Direct, relayA.Port = "入口 A → 同名落地", false, 30001
+	relayB.Name, relayB.Direct, relayB.Port = "入口 B → 同名落地", false, 30002
+	importedRelay.Name, importedRelay.Direct = "入口 → 导入落地", false
+	unknown, unknownRelay := direct[1], relayA
+	unknown.Name, unknown.Inbound.ID = "无标识直连", 0
+	unknownRelay.Name, unknownRelay.Inbound.ID = "无标识中转", 0
+	// Relays can come before or after their direct endpoint. Identical names on
+	// another inbound, and unknown identities, must never hide unrelated nodes.
+	eps := []Endpoint{relayA, direct[0], direct[1], direct[2], relayB, importedRelay, unknown, unknownRelay}
+	got := ApplySubOptions(eps, SubOptions{Lines: "prefer_relay"})
+	want := "入口 A → 同名落地,同名落地,入口 B → 同名落地,入口 → 导入落地,无标识直连,无标识中转"
+	if names := strings.Join(endpointNames(got), ","); names != want {
+		t.Fatalf("got %s want %s", names, want)
+	}
+	for _, e := range got {
+		if e.Direct && (e.Inbound.ID == 1 || e.Inbound.ID == 3) {
+			t.Fatalf("direct with relay leaked: %+v", e)
+		}
+	}
+	if len(ApplySubOptions(eps, SubOptions{})) != len(eps) {
+		t.Fatal("default changed")
+	}
+	if len(ApplySubOptions(eps, SubOptions{Lines: "direct"})) != 4 {
+		t.Fatal("direct-only changed")
+	}
+	if len(ApplySubOptions(eps, SubOptions{Lines: "relay"})) != 4 {
+		t.Fatal("relay-only changed")
+	}
+	// A later name filter dropping relays must not expose the landing address.
+	filtered := ApplySubOptions(eps, SubOptions{Lines: "prefer_relay", Exclude: "入口|无标识"})
+	if len(filtered) != 1 || filtered[0].Inbound.ID != 2 {
+		t.Fatalf("name filter unexpectedly revealed a landing: %+v", filtered)
+	}
+	// With no configured relay left, the original direct endpoints return.
+	if got := ApplySubOptions(direct, SubOptions{Lines: "prefer_relay"}); len(got) != 3 {
+		t.Fatal("direct fallback missing")
+	}
+}

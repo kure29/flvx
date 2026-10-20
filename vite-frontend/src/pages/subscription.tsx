@@ -294,7 +294,14 @@ type ChainRole = "" | "landing" | "relay";
 function filterSummary(o: SubPipeline): string {
   const steps: string[] = [];
 
-  if (o.lines) steps.push(o.lines === "relay" ? "只要中转" : "只要直连");
+  if (o.lines)
+    steps.push(
+      o.lines === "prefer_relay"
+        ? "有中转优先显示中转"
+        : o.lines === "relay"
+          ? "只要中转"
+          : "只要直连",
+    );
   if (o.regions.length) steps.push(`地区 ${o.regions.length} 个`);
   if (o.protocols.length) steps.push(`协议 ${o.protocols.length} 个`);
   if (o.include || o.exclude) steps.push("名称");
@@ -721,14 +728,21 @@ function Editor({
               <div className="space-y-1.5">
                 <p className="text-xs font-medium">线路</p>
                 <Segmented
+                  columns={2}
                   options={[
                     ["", "全部"],
                     ["relay", "只要中转"],
                     ["direct", "只要直连"],
+                    ["prefer_relay", "有中转优先显示中转"],
                   ]}
                   value={o.lines}
                   onChange={(lines) => setOpts({ lines })}
                 />
+                {o.lines === "prefer_relay" && (
+                  <p className="text-xs text-default-500">
+                    同一落地有启用的中转时隐藏原直连，保留全部中转线路；没有中转则保留直连。按中转配置判断，不随测速结果变化，其他筛选继续生效。
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <p className="text-xs font-medium">地区</p>

@@ -12,6 +12,8 @@ import (
 // region groups are added when the profile is rendered.
 type SubOptions struct {
 	// Lines keeps "relay" or "direct" endpoints only; "" keeps both.
+	// "prefer_relay" hides each inbound's direct endpoint when that same
+	// inbound has a relay, before applying the other filters.
 	Lines string
 	// Regions keeps endpoints whose region (see RegionOf) is listed;
 	// RegionOther stands for names without a recognized region.
@@ -156,10 +158,20 @@ func FilterEndpoints(endpoints []Endpoint, opts SubOptions) []Endpoint {
 	exclude, _ := ParseMatcher(opts.Exclude)
 	regionSet := toSet(opts.Regions)
 	protoSet := toSet(opts.Protocols)
+	relayInbounds := map[int64]bool{}
+	if opts.Lines == "prefer_relay" {
+		for _, e := range endpoints {
+			if !e.Direct && e.Inbound.ID > 0 {
+				relayInbounds[e.Inbound.ID] = true
+			}
+		}
+	}
 	out := make([]Endpoint, 0, len(endpoints))
 	for _, e := range endpoints {
 		switch {
 		case opts.Lines == "relay" && e.Direct, opts.Lines == "direct" && !e.Direct:
+			continue
+		case opts.Lines == "prefer_relay" && e.Direct && relayInbounds[e.Inbound.ID]:
 			continue
 		case len(regionSet) > 0 && !regionSet[EndpointRegion(e)]:
 			continue
