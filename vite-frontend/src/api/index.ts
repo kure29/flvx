@@ -696,7 +696,7 @@ export const batchToggleInbounds = (ids: number[], enabled: boolean) =>
     enabled,
   });
 export interface SubPipeline {
-  lines: "" | "relay" | "direct";
+  lines: "" | "relay" | "direct" | "prefer_relay";
   regions: string[];
   protocols: string[];
   include: string;

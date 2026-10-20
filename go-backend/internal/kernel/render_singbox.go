@@ -34,6 +34,14 @@ func renderSingbox(inbounds []Inbound, opts RenderOptions) (string, error) {
 		"inbounds":  inboundList,
 		"outbounds": []interface{}{obj{"type": "direct", "tag": "direct"}},
 	}
+	if opts.SingboxPreferGoDNS {
+		// The implicit resolver uses systemd-resolved over DBus. Servers
+		// without that service cannot resolve REALITY/ShadowTLS handshakes
+		// or outbound destinations; use the system DNS through Go instead.
+		const tag = "flvx-local-resolver"
+		cfg["dns"] = obj{"servers": []interface{}{obj{"type": "local", "tag": tag, "prefer_go": true}}}
+		cfg["route"] = obj{"default_domain_resolver": tag}
+	}
 	if len(endpoints) > 0 {
 		cfg["endpoints"] = endpoints
 	}
@@ -56,7 +64,11 @@ func renderSingbox(inbounds []Inbound, opts RenderOptions) (string, error) {
 	}
 	cfg["outbounds"] = outbounds
 	if len(rules) > 0 {
-		route := obj{"rules": rules, "final": "direct"}
+		route, _ := cfg["route"].(obj)
+		if route == nil {
+			route = obj{}
+		}
+		route["rules"], route["final"] = rules, "direct"
 		if defs := singboxRuleSets(sets, opts); len(defs) > 0 {
 			// sing-box downloads the 分流 rule sets itself and keeps them in
 			// the cache file across restarts.

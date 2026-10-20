@@ -12,17 +12,19 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  columns,
 }: {
   value: T;
   options: Array<[T, string]>;
   onChange: (v: T) => void;
+  columns?: number;
 }) {
   return (
     <div
       className="grid gap-2"
       role="radiogroup"
       style={{
-        gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${columns ?? options.length}, minmax(0, 1fr))`,
       }}
     >
       {options.map(([k, label]) => (
