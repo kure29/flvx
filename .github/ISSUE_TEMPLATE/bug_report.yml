@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        提交前请先看看 [常见问题](https://kure29.github.io/flyx/guide/faq) 和已有的 issue，可能已经有答案。
+        提交前请先看看 [常见问题](https://kure29.github.io/flyx/guide/faq) 和已有的 issue，可能已经有答案；使用上的问题也可以先到 [Telegram 交流群](https://t.me/flyx_chat) 问。
         **不要贴出** 面板地址、密码、节点密钥、订阅链接等敏感信息，截图里也请打码。
   - type: input
     id: panel-version

@@ -71,7 +71,10 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [{ icon: "github", link: "https://github.com/kure29/flyx" }],
+    socialLinks: [
+      { icon: "github", link: "https://github.com/kure29/flyx" },
+      { icon: "telegram", link: "https://t.me/flyx_chat" },
+    ],
     search: { provider: "local" },
     outline: { level: [2, 3], label: "本页目录" },
     docFooter: { prev: "上一页", next: "下一页" },
