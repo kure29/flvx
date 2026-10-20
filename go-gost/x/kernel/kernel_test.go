@@ -608,3 +608,22 @@ func TestResolveGitHubThroughPanelMirror(t *testing.T) {
 		t.Fatalf("download url %s", url)
 	}
 }
+
+func TestRealmFixFileWithoutIPv6(t *testing.T) {
+	orig := ipv6Sockets
+	defer func() { ipv6Sockets = orig }()
+	cfg := "[[endpoints]]\nlisten = \"[::]:31001\"\nremote = \"[2001:db8::1]:80\"\n"
+
+	ipv6Sockets = func() bool { return true }
+	if got := realmFixFile("config.toml", cfg); got != cfg {
+		t.Fatalf("changed with IPv6: %q", got)
+	}
+	ipv6Sockets = func() bool { return false }
+	want := "[[endpoints]]\nlisten = \"0.0.0.0:31001\"\nremote = \"[2001:db8::1]:80\"\n"
+	if got := realmFixFile("config.toml", cfg); got != want {
+		t.Fatalf("got %q", got)
+	}
+	if got := realmFixFile("other.txt", cfg); got != cfg {
+		t.Fatalf("other files must stay: %q", got)
+	}
+}

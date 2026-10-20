@@ -54,6 +54,7 @@ export interface TunnelApiItem {
   ipPreference?: string;
   probeTargetHost?: string;
   probeTargetPort?: number;
+  engine?: string;
   inNodeId?: TunnelChainNodePayload[];
   outNodeId?: TunnelChainNodePayload[];
   chainNodes?: TunnelChainNodePayload[][];
@@ -374,6 +375,7 @@ export interface TunnelMutationPayload {
   ipPreference?: string;
   probeTargetHost?: string;
   probeTargetPort?: number;
+  engine?: string;
   inNodeId?: TunnelChainNodePayload[];
   outNodeId?: TunnelChainNodePayload[];
   chainNodes?: TunnelChainNodePayload[][];
@@ -642,6 +644,8 @@ export interface KernelInfo {
   type: string;
   name: string;
   implemented: boolean;
+  /** Runs realm-engine tunnel forwards; installed by the panel itself. */
+  relay?: boolean;
   protocols: KernelProtocolCap[] | null;
   versions?: string[];
   certModes?: string[];

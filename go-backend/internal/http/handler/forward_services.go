@@ -37,6 +37,9 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 		}
 		return nil, h.syncNftablesNode(entryNodeIDs[0])
 	}
+	if tunnelIsRealm(tunnel) {
+		return h.syncRealmForward(forward, nil)
+	}
 	ports, err := h.listForwardPorts(forward.ID)
 	if err != nil {
 		return nil, err
@@ -319,6 +322,9 @@ func buildForwardServiceDeleteNames(bases []string) []string {
 func (h *Handler) controlForwardServices(forward *forwardRecord, commandType string, tolerateNotFound bool) error {
 	if h == nil || forward == nil {
 		return errors.New("invalid forward control context")
+	}
+	if tunnel, err := h.getTunnelRecord(forward.TunnelID); err == nil && tunnelIsRealm(tunnel) {
+		return h.controlRealmForward(forward, commandType)
 	}
 	ports, err := h.listForwardPorts(forward.ID)
 	if err != nil {

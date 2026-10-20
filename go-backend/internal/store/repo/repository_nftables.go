@@ -205,6 +205,30 @@ func (r *Repository) ListActiveForwardsByNode(nodeID int64) ([]model.ForwardReco
 	if err != nil {
 		return nil, err
 	}
+	return forwardRecordsFromModels(forwards), nil
+}
+
+// ListRealmForwardsByNode lists the forwards, paused ones included, with a
+// port on the node in tunnels run by realm.
+func (r *Repository) ListRealmForwardsByNode(nodeID int64) ([]model.ForwardRecord, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var forwards []model.Forward
+	err := r.db.Model(&model.Forward{}).
+		Joins("JOIN forward_port ON forward_port.forward_id = forward.id").
+		Joins("JOIN tunnel ON tunnel.id = forward.tunnel_id").
+		Where("forward_port.node_id = ? AND tunnel.engine = ?", nodeID, "realm").
+		Order("forward.id ASC").
+		Distinct("forward.*").
+		Find(&forwards).Error
+	if err != nil {
+		return nil, err
+	}
+	return forwardRecordsFromModels(forwards), nil
+}
+
+func forwardRecordsFromModels(forwards []model.Forward) []model.ForwardRecord {
 	rows := make([]model.ForwardRecord, 0, len(forwards))
 	for _, f := range forwards {
 		proxyProtocolReceive, proxyProtocolSend := normalizeForwardProxyProtocol(f.ProxyProtocol, f.ProxyProtocolReceive, f.ProxyProtocolSend)
@@ -231,7 +255,7 @@ func (r *Repository) ListActiveForwardsByNode(nodeID int64) ([]model.ForwardReco
 			rows[i].Strategy = "fifo"
 		}
 	}
-	return rows, nil
+	return rows
 }
 
 func defaultString(value, fallback string) string {

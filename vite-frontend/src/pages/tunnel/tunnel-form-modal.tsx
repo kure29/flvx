@@ -125,6 +125,32 @@ export function TunnelFormModal({
                   <SelectItem key="2">隧道转发</SelectItem>
                 </Select>
 
+                {form.type === 1 && (
+                  <Select
+                    description={
+                      form.engine === "realm"
+                        ? "入口节点自动安装 realm 运行这条隧道的转发；不支持限速和连接数限制，节点 agent 需为最新版"
+                        : "节点 agent 直接转发，支持限速和连接数限制"
+                    }
+                    label="转发引擎"
+                    selectedKeys={[form.engine === "realm" ? "realm" : "agent"]}
+                    variant="bordered"
+                    onSelectionChange={(keys) => {
+                      const selectedKey = Array.from(keys)[0] as string;
+
+                      if (selectedKey) {
+                        setForm((prev) => ({
+                          ...prev,
+                          engine: selectedKey === "realm" ? "realm" : "",
+                        }));
+                      }
+                    }}
+                  >
+                    <SelectItem key="agent">面板转发（默认）</SelectItem>
+                    <SelectItem key="realm">realm</SelectItem>
+                  </Select>
+                )}
+
                 <Divider />
                 <h3 className="text-lg font-semibold">入口配置</h3>
 

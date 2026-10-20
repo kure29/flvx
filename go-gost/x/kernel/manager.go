@@ -194,8 +194,13 @@ func (m *Manager) Apply(req ApplyRequest) (State, error) {
 		return m.state(req.Type, false), err
 	}
 	prevFiles := readFiles(runDir, req.Files)
+	fix := adapters[req.Type].fixFile
 	for _, f := range req.Files {
-		if err := writeFileAtomic(filepath.Join(runDir, f.Name), []byte(f.Content), 0o600); err != nil {
+		content := f.Content
+		if fix != nil {
+			content = fix(f.Name, content)
+		}
+		if err := writeFileAtomic(filepath.Join(runDir, f.Name), []byte(content), 0o600); err != nil {
 			m.setErr(inst, err)
 			return m.state(req.Type, false), err
 		}

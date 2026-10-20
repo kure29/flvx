@@ -58,11 +58,6 @@ func (h *Handler) collectNftablesNodeTraffic(nodeID int64, cfgModel *model.NodeS
 		log.Printf("nftables traffic collection failed op=collect node_id=%d err=%v", nodeID, err)
 		return
 	}
-	oldStates, err := h.repo.GetNftCounterStatesByNode(nodeID)
-	if err != nil {
-		log.Printf("nftables traffic collection failed op=list_states node_id=%d err=%v", nodeID, err)
-		return
-	}
 	bindings, err := h.repo.ListNftRuleBindingsByNode(nodeID)
 	if err != nil {
 		log.Printf("nftables traffic collection failed op=list_bindings node_id=%d err=%v", nodeID, err)
@@ -80,12 +75,23 @@ func (h *Handler) collectNftablesNodeTraffic(nodeID int64, cfgModel *model.NodeS
 		hashes[binding.ForwardID] = ruleHash
 	}
 
+	h.accountForwardCounterSamples(nodeID, filterNftCounterSamplesWithBinding(samples, hashes), hashes, now)
+}
+
+// accountForwardCounterSamples turns per-forward byte counters (nftables
+// rules, realm ports) into forward traffic, quota usage and flow policies.
+// hashes identify each forward's counter generation: a change restarts it.
+func (h *Handler) accountForwardCounterSamples(nodeID int64, samples []runtimenft.CounterSample, hashes map[int64]string, now time.Time) {
+	oldStates, err := h.repo.GetNftCounterStatesByNode(nodeID)
+	if err != nil {
+		log.Printf("forward counter accounting failed op=list_states node_id=%d err=%v", nodeID, err)
+		return
+	}
 	nowMs := now.UnixMilli()
-	boundSamples := filterNftCounterSamplesWithBinding(samples, hashes)
-	deltas, newStates := buildNftCounterDeltas(nodeID, boundSamples, oldStates, hashes, nowMs)
+	deltas, newStates := buildNftCounterDeltas(nodeID, samples, oldStates, hashes, nowMs)
 	if len(newStates) == 0 {
 		if len(deltas) != 0 {
-			log.Printf("nftables traffic collection skipped suspicious deltas without states node_id=%d deltas=%d", nodeID, len(deltas))
+			log.Printf("forward counter accounting skipped suspicious deltas without states node_id=%d deltas=%d", nodeID, len(deltas))
 		}
 		return
 	}
@@ -100,17 +106,17 @@ func (h *Handler) collectNftablesNodeTraffic(nodeID int64, cfgModel *model.NodeS
 	if len(deltas) != 0 {
 		metas, err = h.repo.GetFlowUploadForwardMetas(forwardIDs)
 		if err != nil {
-			log.Printf("nftables traffic collection failed op=load_flow_metas node_id=%d err=%v", nodeID, err)
+			log.Printf("forward counter accounting failed op=load_flow_metas node_id=%d err=%v", nodeID, err)
 			return
 		}
 		if missingForwardID, ok := firstNftDeltaMissingMeta(deltas, metas); ok {
-			log.Printf("nftables traffic collection skipped state advance op=missing_flow_meta node_id=%d forward_id=%d", nodeID, missingForwardID)
+			log.Printf("forward counter accounting skipped state advance op=missing_flow_meta node_id=%d forward_id=%d", nodeID, missingForwardID)
 			return
 		}
 	}
 	if len(deltas) == 0 {
 		if err := h.repo.UpsertNftCounterStates(newStates, nowMs); err != nil {
-			log.Printf("nftables traffic collection failed op=upsert_states node_id=%d err=%v", nodeID, err)
+			log.Printf("forward counter accounting failed op=upsert_states node_id=%d err=%v", nodeID, err)
 			return
 		}
 		return
@@ -118,12 +124,12 @@ func (h *Handler) collectNftablesNodeTraffic(nodeID int64, cfgModel *model.NodeS
 
 	batch := buildNftFlowUploadBatch(deltas, metas)
 	if missingForwardID, ok := firstNftBatchMissingDelta(deltas, batch); ok {
-		log.Printf("nftables traffic collection skipped state advance op=unaccounted_delta node_id=%d forward_id=%d", nodeID, missingForwardID)
+		log.Printf("forward counter accounting skipped state advance op=unaccounted_delta node_id=%d forward_id=%d", nodeID, missingForwardID)
 		return
 	}
 	quotaViews, err := h.repo.ApplyNftTrafficAccounting(batch.flowDeltas, batch.quotaUsage, newStates, now)
 	if err != nil {
-		log.Printf("nftables traffic collection failed op=accounting node_id=%d err=%v", nodeID, err)
+		log.Printf("forward counter accounting failed op=accounting node_id=%d err=%v", nodeID, err)
 		return
 	}
 	h.recordTunnelMetricsFromForwardBatch(nodeID, batch.forwardTraffic, metas, nowMs)

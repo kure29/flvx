@@ -380,6 +380,7 @@ export default function TunnelPage({
       ipPreference: tunnel.ipPreference || "",
       probeTargetHost: tunnel.probeTargetHost || "",
       probeTargetPort: tunnel.probeTargetPort || 0,
+      engine: tunnel.engine || "",
       status: tunnel.status,
     });
     setErrors({});
@@ -669,6 +670,7 @@ export default function TunnelPage({
         chainNodes: cleanedChainNodes,
         probeTargetHost,
         probeTargetPort,
+        engine: form.type === 1 ? form.engine || "" : "",
       };
 
       const response = isEdit
@@ -1539,6 +1541,16 @@ export default function TunnelPage({
                             >
                               {getTunnelTypeDisplay(tunnel.type).text}
                             </Chip>
+                            {tunnel.engine === "realm" && (
+                              <Chip
+                                className="shrink-0"
+                                color="primary"
+                                size="sm"
+                                variant="flat"
+                              >
+                                realm
+                              </Chip>
+                            )}
                             {bestExit && (
                               <Chip
                                 className="shrink-0"
@@ -1614,9 +1626,9 @@ export default function TunnelPage({
         isOpen={Boolean(sheetTunnel)}
         subtitle={
           sheetTunnel &&
-          `${getTunnelTypeDisplay(sheetTunnel.type).text} · ${
-            sheetTunnel.status === 1 ? "正常" : "不可用"
-          }`
+          `${getTunnelTypeDisplay(sheetTunnel.type).text}${
+            sheetTunnel.engine === "realm" ? " · realm" : ""
+          } · ${sheetTunnel.status === 1 ? "正常" : "不可用"}`
         }
         title={sheetTunnel?.name ?? ""}
         onClose={() => setSheetTunnelId(null)}

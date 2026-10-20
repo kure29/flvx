@@ -482,6 +482,14 @@ func (r *Repository) UpdateTunnelTx(tx *gorm.DB, tunnelID int64, name string, ty
 		}).Error
 }
 
+// SetTunnelEngineTx sets which engine runs a tunnel's forwards.
+func (r *Repository) SetTunnelEngineTx(tx *gorm.DB, tunnelID int64, engine string) error {
+	if tx == nil {
+		return errors.New("database unavailable")
+	}
+	return tx.Model(&model.Tunnel{}).Where("id = ?", tunnelID).Update("engine", engine).Error
+}
+
 func (r *Repository) DeleteChainTunnelsByTunnelTx(tx *gorm.DB, tunnelID int64) error {
 	if tx == nil {
 		return errors.New("database unavailable")

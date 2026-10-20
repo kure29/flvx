@@ -128,12 +128,34 @@ type Status struct {
 
 type adapter struct {
 	versionArgs []string
+	// fixFile adjusts a rendered file to this host before it is written.
+	fixFile func(name, content string) string
 }
 
 var adapters = map[string]adapter{
 	"xray":    {versionArgs: []string{"version"}},
 	"singbox": {versionArgs: []string{"version"}},
 	"snell":   {versionArgs: []string{"-v"}},
+	// realm runs the forwards of realm-engine tunnels.
+	"realm": {versionArgs: []string{"-v"}, fixFile: realmFixFile},
+}
+
+// realmFixFile listens on IPv4 only on hosts without IPv6 sockets: realm,
+// unlike Go, cannot bind [::] there.
+func realmFixFile(name, content string) string {
+	if name != "config.toml" || ipv6Sockets() {
+		return content
+	}
+	return strings.ReplaceAll(content, `listen = "[::]:`, `listen = "0.0.0.0:`)
+}
+
+var ipv6Sockets = func() bool {
+	c, err := net.ListenPacket("udp6", "[::]:0")
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
 }
 
 var (

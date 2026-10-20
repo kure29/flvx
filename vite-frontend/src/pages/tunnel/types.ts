@@ -46,6 +46,8 @@ export interface Tunnel {
   ipPreference?: string;
   probeTargetHost?: string;
   probeTargetPort?: number;
+  /** "" = agent forwarder, "realm" = realm on the entry nodes. */
+  engine?: string;
   bestExitState?: BestExitState;
   status: number;
   createdTime: string;
@@ -76,6 +78,7 @@ export interface TunnelForm {
   ipPreference: string;
   probeTargetHost?: string;
   probeTargetPort?: number;
+  engine?: string;
   status: number;
 }
 

@@ -96,6 +96,14 @@ func (h *Handler) tunnelCreate(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
+	engine, err := normalizeTunnelEngine(asString(req["engine"]))
+	if err == nil && engine == tunnelEngineRealm {
+		err = h.validateRealmTunnelTx(tx, typeVal, entryNodeIDs)
+	}
+	if err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
 	if err := validateTunnelRuntimeBeforeApply(runtimeState); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
@@ -171,6 +179,7 @@ func (h *Handler) tunnelCreate(w http.ResponseWriter, r *http.Request) {
 		IPPreference:    ipPreference,
 		ProbeTargetHost: probeTargetHost,
 		ProbeTargetPort: probeTargetPort,
+		Engine:          engine,
 	}
 	if err := tx.Create(&tunnel).Error; err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
@@ -420,6 +429,19 @@ func (h *Handler) tunnelUpdate(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
+	engine := oldTunnel.Engine
+	if raw, ok := req["engine"]; ok {
+		if engine, err = normalizeTunnelEngine(asString(raw)); err != nil {
+			response.WriteJSON(w, response.ErrDefault(err.Error()))
+			return
+		}
+	}
+	if engine == tunnelEngineRealm {
+		if err := h.validateRealmTunnelTx(validationTx, typeVal, entryNodeIDs); err != nil {
+			response.WriteJSON(w, response.ErrDefault(err.Error()))
+			return
+		}
+	}
 
 	if err := h.validateTunnelEntryPortConflictsForNewEntriesTx(validationTx, id, oldEntryNodeIDs, entryNodeIDs); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
@@ -500,6 +522,12 @@ func (h *Handler) tunnelUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.repo.SetTunnelEngineTx(tx, id, engine); err != nil {
+		tx.Rollback()
+		err = errors.Join(err, h.releaseFederationRuntimeRefs(federationReleaseRefs))
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
 	if err := h.repo.DeleteChainTunnelsByTunnelTx(tx, id); err != nil {
 		tx.Rollback()
 		err = errors.Join(err, h.releaseFederationRuntimeRefs(federationReleaseRefs))
@@ -569,6 +597,22 @@ func (h *Handler) tunnelUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		newChainRows, _ := h.listChainNodesForTunnel(id)
 		h.cleanupObsoleteTunnelRuntime(id, oldChainRows, newChainRows)
+	}
+
+	if engine != oldTunnel.Engine {
+		h.switchTunnelEngine(id, tunnelIsRealm(oldTunnel), oldEntryNodeIDs, newEntryNodeIDs)
+		response.WriteJSON(w, response.OKEmpty())
+		return
+	}
+	if engine == tunnelEngineRealm {
+		// realm renders whole nodes: re-render the old and new entries
+		// (forward ports, tunnel status).
+		if _, err := h.syncRealmNodes(append(append([]int64{}, oldEntryNodeIDs...), newEntryNodeIDs...), nil); err != nil {
+			response.WriteJSON(w, response.ErrDefault(err.Error()))
+			return
+		}
+		response.WriteJSON(w, response.OKEmpty())
+		return
 	}
 
 	oldType := 0
@@ -648,6 +692,11 @@ func forwardPortNodeIDs(ports []forwardPortRecord) []int64 {
 func (h *Handler) deleteForwardServicesOnNodeBatch(forward *forwardRecord, nodeID int64) error {
 	if h == nil || forward == nil || nodeID <= 0 {
 		return errors.New("invalid forward service cleanup context")
+	}
+	if tunnel, err := h.getTunnelRecord(forward.TunnelID); err == nil && tunnelIsRealm(tunnel) {
+		// The forward left a realm tunnel: re-rendering drops it there.
+		_, err := h.syncRealmNodes([]int64{nodeID}, nil)
+		return err
 	}
 	bases, err := h.forwardServiceBaseCandidates(forward)
 	if err != nil {
@@ -1137,8 +1186,13 @@ func (h *Handler) deleteTunnelByID(id int64) error {
 	}
 
 	tunnelName, _ := h.repo.GetTunnelName(id)
+	tunnel, _ := h.repo.GetTunnelRecord(id)
+	entryNodeIDs, _ := h.tunnelEntryNodeIDs(id)
 	if err := h.repo.DeleteTunnelCascade(id); err != nil {
 		return err
+	}
+	if tunnelIsRealm(tunnel) {
+		_, _ = h.syncRealmNodes(entryNodeIDs, nil)
 	}
 
 	shareID, port, ok := parsePeerShareInfoFromFederationTunnelName(tunnelName)

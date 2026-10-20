@@ -96,8 +96,11 @@ export function KernelPanel({
     onInstallRequestHandled();
   }, [installRequest, onInstallRequestHandled]);
 
-  const kernelName = (type: string) =>
-    caps?.kernels.find((k) => k.type === type)?.name ?? type;
+  const kernelName = (type: string) => {
+    const info = caps?.kernels.find((k) => k.type === type);
+
+    return info?.relay ? `${info.name}（转发引擎）` : (info?.name ?? type);
+  };
 
   const openInstall = (nodeId?: number, kernelType = "xray") => {
     setInstallForm({
@@ -373,12 +376,21 @@ export function KernelPanel({
                   label: "日志",
                   onPress: () => openLogs(sheetKernel),
                 },
-                {
-                  key: "upgrade",
-                  label: "换版本",
-                  onPress: () =>
-                    openInstall(sheetKernel.nodeId, sheetKernel.kernelType),
-                },
+                // realm's version follows the panel.
+                ...(caps?.kernels.find((k) => k.type === sheetKernel.kernelType)
+                  ?.relay
+                  ? []
+                  : [
+                      {
+                        key: "upgrade",
+                        label: "换版本",
+                        onPress: () =>
+                          openInstall(
+                            sheetKernel.nodeId,
+                            sheetKernel.kernelType,
+                          ),
+                      },
+                    ]),
                 {
                   key: "remove",
                   label: "卸载",
@@ -470,16 +482,18 @@ export function KernelPanel({
                       }))
                     }
                   >
-                    {(caps?.kernels ?? []).map((k) => (
-                      <SelectItem
-                        key={k.type}
-                        textValue={
-                          k.implemented ? k.name : `${k.name}（即将支持）`
-                        }
-                      >
-                        {k.implemented ? k.name : `${k.name}（即将支持）`}
-                      </SelectItem>
-                    ))}
+                    {(caps?.kernels ?? [])
+                      .filter((k) => !k.relay)
+                      .map((k) => (
+                        <SelectItem
+                          key={k.type}
+                          textValue={
+                            k.implemented ? k.name : `${k.name}（即将支持）`
+                          }
+                        >
+                          {k.implemented ? k.name : `${k.name}（即将支持）`}
+                        </SelectItem>
+                      ))}
                   </Select>
                   {pinnedVersions.length > 0 ? (
                     <Select

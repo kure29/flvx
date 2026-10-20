@@ -452,9 +452,15 @@ func (h *Handler) forwardForceDelete(w http.ResponseWriter, r *http.Request) {
 
 	// Force delete: remove DB record without touching node services.
 	// This is used when nodes are offline or service deletion fails.
+	oldPorts, _ := h.listForwardPorts(id)
 	if err := h.deleteForwardByID(id); err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
+	}
+	if tunnel, err := h.getTunnelRecord(forward.TunnelID); err == nil && tunnelIsRealm(tunnel) {
+		// realm renders from the database: the forward drops out on the
+		// next apply, now or when the node reconnects.
+		_, _ = h.syncRealmNodes(forwardPortNodeIDs(oldPorts), nil)
 	}
 	_ = h.repo.DeleteNftRuleBindingsByForward(id)
 	if nftMode, entryNodeIDs, modeErr := h.tunnelUsesNftables(forward.TunnelID); modeErr == nil && nftMode && len(entryNodeIDs) > 0 {

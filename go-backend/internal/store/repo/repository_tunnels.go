@@ -223,6 +223,7 @@ func (r *Repository) ListTunnels() ([]map[string]interface{}, error) {
 			"ipPreference":    t.IPPreference,
 			"probeTargetHost": t.ProbeTargetHost,
 			"probeTargetPort": t.ProbeTargetPort,
+			"engine":          t.Engine,
 			"inNodeId":        make([]map[string]interface{}, 0),
 			"outNodeId":       make([]map[string]interface{}, 0),
 			"chainNodes":      make([][]map[string]interface{}, 0),

@@ -92,6 +92,9 @@ type Info struct {
 	// CertModes lists the TLS certificate sources the kernel supports.
 	CertModes []string  `json:"certModes"`
 	Download  *Download `json:"-"`
+	// Relay kernels run forwards, not inbounds: the panel installs them
+	// itself for realm-engine tunnels.
+	Relay bool `json:"relay,omitempty"`
 }
 
 var xrayDownload = &Download{
@@ -243,6 +246,16 @@ var catalog = []Info{
 		Protocols: []ProtocolCap{
 			{Protocol: ProtocolSnell, Transports: []TransportCap{{Type: TransportTCP, Securities: []string{SecurityNone, SecurityShadowTLS}}}},
 		},
+	},
+	{
+		Type:        TypeRealm,
+		Name:        "realm",
+		Implemented: true,
+		CertModes:   []string{},
+		Download:    realmDownload,
+		Versions:    []string{RealmVersion},
+		Protocols:   []ProtocolCap{},
+		Relay:       true,
 	},
 }
 

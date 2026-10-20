@@ -281,6 +281,7 @@ func (r *Repository) GetTunnelRecord(tunnelID int64) (*model.TunnelRecord, error
 		Protocol:        t.Protocol,
 		ProbeTargetHost: t.ProbeTargetHost,
 		ProbeTargetPort: t.ProbeTargetPort,
+		Engine:          t.Engine,
 	}
 	if tr.Flow <= 0 {
 		tr.Flow = 1

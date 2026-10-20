@@ -272,6 +272,7 @@ func (r *Repository) exportTunnels() ([]model.TunnelBackup, error) {
 			CreatedTime: t.CreatedTime, UpdatedTime: t.UpdatedTime,
 			Status: t.Status, Inx: t.Inx, IPPreference: t.IPPreference,
 			ProbeTargetHost: t.ProbeTargetHost, ProbeTargetPort: t.ProbeTargetPort,
+			Engine: t.Engine,
 		}
 		if t.InIP.Valid {
 			b.InIP = t.InIP.String
@@ -724,11 +725,12 @@ func importTunnels(tx *gorm.DB, tunnels []model.TunnelBackup, now int64) (int, e
 			IPPreference:    t.IPPreference,
 			ProbeTargetHost: t.ProbeTargetHost,
 			ProbeTargetPort: t.ProbeTargetPort,
+			Engine:          t.Engine,
 		}
 		err := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
-				"name", "traffic_ratio", "type", "protocol", "flow", "updated_time", "status", "in_ip", "inx", "ip_preference", "probe_target_host", "probe_target_port",
+				"name", "traffic_ratio", "type", "protocol", "flow", "updated_time", "status", "in_ip", "inx", "ip_preference", "probe_target_host", "probe_target_port", "engine",
 			}),
 		}).Create(&item).Error
 		if err != nil {

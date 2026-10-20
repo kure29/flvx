@@ -91,7 +91,7 @@ export function InboundFormModal({
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const implementedKernels = useMemo(
-    () => (caps?.kernels ?? []).filter((k) => k.implemented),
+    () => (caps?.kernels ?? []).filter((k) => k.implemented && !k.relay),
     [caps],
   );
   const kernelInfo = caps?.kernels.find((k) => k.type === form.kernelType);
