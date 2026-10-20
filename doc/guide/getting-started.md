@@ -1,6 +1,6 @@
 # 快速上手
 
-用一台落地机搭一个 VLESS Reality 节点，再经中转机对接，最后用订阅导入客户端。
+用一台落地机搭一个 VLESS Reality 节点，经中转机对接，最后用订阅导入客户端。先了解名词可以看 [基本概念](./concepts.md)。
 
 ## 1. 安装面板
 
@@ -10,20 +10,22 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 
 选 `1. 安装面板`，完成后访问 `http://服务器IP:6366`，默认账号 `admin_user` / `admin_user`，**登录后立即修改密码**。
 
-详见 [安装部署](./install.md)。
+详见 [安装面板](./install.md)。
 
 ## 2. 添加节点
 
-1. **网站配置** 里填好“面板后端地址”（节点用它连接面板）
-2. **节点** 页新建落地机和中转机，复制生成的安装命令，到对应服务器上执行
+1. **设置 → 基本** 里填好“面板后端地址”（节点用它连接面板）
+2. **节点** 页新建落地机和中转机，点 **安装** 复制生成的命令，到对应服务器上以 root 执行
 3. 等节点状态变为 **在线**
 
-## 3. 搭建节点
+详见 [安装节点](./agent.md)。
+
+## 3. 搭建落地
 
 1. **落地** 页 → **内核** 标签 → **安装内核**，在落地机上安装 Xray
-2. **入站** 标签 → **新建入站** → 选落地机和 Xray → 点模板 **VLESS + Reality + Vision** → 保存
+2. **入站** 标签 → **新建入站** → 选落地机和 Xray → 点模板 **VLESS + Reality + Vision** → **创建并下发**
 
-详见 [搭建节点](./nodes.md)。
+想知道该选哪个内核、哪个协议，见 [内核与协议](./kernels.md)；入站的更多选项见 [新建入站](./nodes.md)。
 
 ## 4. 对接中转（可选）
 
@@ -32,10 +34,16 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 
 详见 [对接中转](./relay.md)。已有别处搭好的节点，可以用 [导入节点](./import.md)。
 
-## 5. 订阅
+## 5. 导入客户端
 
-**订阅** 页里默认有一个“我的订阅”，点开它选客户端一键导入（Clash、sing-box、Shadowrocket、Loon、Quantumult X、Surge、Stash），或点复制按钮复制链接，直连和中转线路都在里面。想按地区拆分、改名或分享给朋友，见 [订阅](./subscription.md)。
+**订阅** 页里默认有一个“我的订阅”，点开它选客户端一键导入（Clash、sing-box、Shadowrocket、Loon、Quantumult X、Surge、Stash），或复制链接。直连和中转线路都在里面。
+
+想按地区拆分、改名或分给朋友，见 [订阅与客户端](./subscription.md)。
+
+## 6. 看延迟（可选）
+
+**设置 → 延迟测试点** 点 **添加三网推荐**，节点就会定时测到北京 / 上海 / 广东三网的延迟，并检测回程线路（CN2 GIA、9929、CMIN2 等），结果显示在落地和节点卡片上。详见 [延迟与回程](./latency.md)。
 
 ::: tip 复制失败？
-浏览器只在 HTTPS 页面里完全开放复制功能。建议给面板配置域名和 HTTPS，见 [安装部署 - 反向代理](./install.md#反向代理-可选)。
+浏览器只在 HTTPS 页面里完全开放复制功能。建议给面板配置域名和 HTTPS，见 [安装面板 - 反向代理](./install.md#反向代理-可选)。
 :::

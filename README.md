@@ -34,7 +34,7 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 
 节点：在面板 **节点** 页新建节点，复制生成的安装命令到服务器上执行。
 
-更多说明见 [使用文档](https://kure29.github.io/flyx/)：[安装部署](https://kure29.github.io/flyx/guide/install) · [搭建节点](https://kure29.github.io/flyx/guide/nodes) · [对接中转](https://kure29.github.io/flyx/guide/relay) · [导入节点](https://kure29.github.io/flyx/guide/import) · [升级](https://kure29.github.io/flyx/guide/upgrade) · [常见问题](https://kure29.github.io/flyx/guide/faq)
+更多说明见 [使用文档](https://kure29.github.io/flyx/)：[安装面板](https://kure29.github.io/flyx/guide/install) · [安装节点](https://kure29.github.io/flyx/guide/agent) · [内核与协议](https://kure29.github.io/flyx/guide/kernels) · [新建入站](https://kure29.github.io/flyx/guide/nodes) · [对接中转](https://kure29.github.io/flyx/guide/relay) · [延迟与回程](https://kure29.github.io/flyx/guide/latency) · [订阅](https://kure29.github.io/flyx/guide/subscription) · [升级](https://kure29.github.io/flyx/guide/upgrade) · [常见问题](https://kure29.github.io/flyx/guide/faq)
 
 ## 许可
 

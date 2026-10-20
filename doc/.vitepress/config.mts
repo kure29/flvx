@@ -18,29 +18,53 @@ export default defineConfig({
       {
         text: "开始",
         items: [
+          { text: "基本概念", link: "/guide/concepts" },
           { text: "快速上手", link: "/guide/getting-started" },
-          { text: "安装部署", link: "/guide/install" },
+          { text: "安装面板", link: "/guide/install" },
+          { text: "安装节点", link: "/guide/agent" },
           { text: "升级", link: "/guide/upgrade" },
         ],
       },
       {
-        text: "节点",
+        text: "落地",
         items: [
-          { text: "搭建节点", link: "/guide/nodes" },
-          { text: "对接中转", link: "/guide/relay" },
+          { text: "内核与协议", link: "/guide/kernels" },
+          { text: "新建入站", link: "/guide/nodes" },
+          { text: "分流与链式出站", link: "/guide/routing" },
           { text: "导入节点", link: "/guide/import" },
-          { text: "订阅", link: "/guide/subscription" },
+          { text: "延迟与回程", link: "/guide/latency" },
         ],
       },
       {
-        text: "更多",
+        text: "中转与转发",
         items: [
-          { text: "流量转发与管理", link: "/guide/forward" },
+          { text: "对接中转", link: "/guide/relay" },
+          { text: "转发规则与用户", link: "/guide/forward" },
+        ],
+      },
+      {
+        text: "订阅",
+        items: [
+          { text: "订阅与客户端", link: "/guide/subscription" },
+          { text: "来源与订阅源", link: "/guide/subscription-sources" },
+          { text: "筛选、命名与脚本", link: "/guide/subscription-nodes" },
+          { text: "分流规则与链式代理", link: "/guide/subscription-rules" },
+          { text: "凭据、到期与流量", link: "/guide/subscription-users" },
+        ],
+      },
+      {
+        text: "运维",
+        items: [
           { text: "通知", link: "/guide/notify" },
+          { text: "备份与恢复", link: "/guide/backup" },
           { text: "PostgreSQL", link: "/guide/postgresql" },
           { text: "通行证密钥登录", link: "/guide/passkey" },
-          { text: "常见问题", link: "/guide/faq" },
+          { text: "AI Skill", link: "/ai-skill" },
         ],
+      },
+      {
+        text: "帮助",
+        items: [{ text: "常见问题", link: "/guide/faq" }],
       },
     ],
     socialLinks: [{ icon: "github", link: "https://github.com/kure29/flyx" }],

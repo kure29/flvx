@@ -1,16 +1,13 @@
-# 安装部署
+# 安装面板
 
-面板端管理所有节点、隧道和入站；节点端（agent）装在中转机和落地机上，负责转发和运行内核。
+面板管理所有节点、入站、隧道和订阅，用 Docker 部署在一台服务器上。节点端（agent）的安装见 [安装节点](./agent.md)。
 
-## 面板端
+## 环境要求
 
-面板端负责管理用户、节点和转发规则。
+- Linux（推荐 Debian 10+ / Ubuntu 20.04+）
+- 已安装 Docker 和 Docker Compose（没装可以用 `curl -fsSL https://get.docker.com | bash`）
 
-### 环境要求
-- 操作系统：Linux (推荐 Debian 10+ / Ubuntu 20.04+)
-- 必须安装 Docker 和 Docker Compose
-
-### 一键安装
+## 一键安装
 
 使用以下命令即可快速安装面板：
 
@@ -24,7 +21,7 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 
 脚本会自动检测系统是否支持 IPv6，并自动配置 Docker 的 IPv6 支持。
 
-### 访问面板
+## 访问面板
 
 安装完成后，访问：
 `http://<服务器IP>:<前端端口>` (默认: `http://<服务器IP>:6366`)
@@ -37,91 +34,19 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 首次登录后请立即在“我的 / 个人资料”里修改默认密码。
 :::
 
-### 维护菜单
+## 维护菜单
 
 再次运行 `./panel_install.sh` 脚本可以看到管理菜单：
 1. 安装面板
 2. 更新面板
 3. 卸载面板
-4. 迁移到 PostgreSQL
+4. 迁移到 PostgreSQL（见 [PostgreSQL](./postgresql.md)）
 5. 退出
 
+## 下一步
 
-## 节点端
-
-节点端运行在实际进行流量转发的服务器上，需要连接到面板端进行管理。
-
-### 用面板生成的命令安装（推荐）
-
-1. **网站配置** 里填好“面板后端地址”，节点通过它连接面板（通常是 `http://面板IP:6365`，或反向代理后的地址）
-2. **节点** 页新建节点，点击 **安装**，安装命令会复制到剪贴板（复制失败时会弹出命令框）
-3. 到节点服务器上以 root 执行
-
-### 节点调优
-
-**节点** 页的节点卡片上点 **调优**（列表视图在操作菜单里），会先显示节点当前的网络参数，可调的项目默认全部勾选：
-
-| 项目 | 作用 |
-|------|------|
-| BBR 拥塞控制 | 高延迟、有丢包的线路上明显提速，需要内核 4.9 以上 |
-| 加大缓冲区 | 跨境长距离线路单连接更快 |
-| TCP 连接优化 | Fast Open、空闲后不降速、自动探测 MTU |
-| 高并发队列 | 连接多时不丢新连接 |
-| IPv4 转发 | 内核转发（nftables 端口转发）需要 |
-| 文件句柄上限 | 允许打开更多连接和文件 |
-
-- 点 **应用** 后立即生效，并写入 `/etc/sysctl.d/99-flyx-tuning.conf`，重启后保持
-- 只会调大的上限类参数（缓冲区、队列、句柄数）如果节点本来就更高，保持原值不动
-- 之后取消勾选某一项再应用，这一项会恢复成调优前的值；**恢复默认** 撤销全部调优
-- 系统不支持的项（比如内核没有 BBR）会跳过并提示
-- 需要节点 agent 为 3.3.10 及以上，旧版本请先升级
-
-### 国内节点安装慢
-
-安装脚本、agent 程序、Xray / sing-box 等内核和分流数据都来自 GitHub，国内节点直接下载很慢，默认经公共加速站下载，速度看加速站当时的情况。
-
-面板在海外时，可以让节点改从面板下载：**网站配置** → **节点与监控** → 打开 **GitHub 加速** → 加速地址点 **面板中转**，保存。地址是“面板后端地址”加上 `/api/v1/open_api/gh`，例如 `http://1.2.3.4:6365/api/v1/open_api/gh`（按钮会自动填，带 `https://` 的地址请核对一下）。之后：
-
-- 新生成的安装命令、节点升级、内核安装和分流数据更新都经面板下载，节点只需要能连上面板
-- 面板第一次下载某个文件时从 GitHub 拉取并缓存在数据目录的 `github-cache` 里（最多约 2 GB，超出自动清理最早的），之后直接给节点，多个节点只下载一次
-- 只提供面板用到的仓库（本项目、Xray、sing-box、shadow-tls 和分流数据），不能当通用 GitHub 代理用
-- 面板自己升级时仍直接访问 GitHub
-
-面板也在国内、同样访问不了 GitHub 时，继续用公共加速站，或者换成你自己的加速地址。
-
-### 手动安装
-
-在节点服务器上运行：
-
-```bash
-curl -L https://github.com/kure29/flyx/releases/latest/download/install.sh -o install.sh && chmod +x install.sh && ./install.sh
-```
-
-Alpine Linux 最小化安装若未包含 `curl`，可使用系统自带的 `wget` 下载：
-
-```bash
-wget -O install.sh https://github.com/kure29/flyx/releases/latest/download/install.sh && chmod +x install.sh && ./install.sh
-```
-
-脚本会在 Alpine 上自动安装 Bash、`curl` 和 CA 证书，并使用 OpenRC 注册、启动和管理 `flux_agent` 服务；其他受支持的 Linux 发行版继续使用 systemd。
-
-**安装过程中会提示输入：**
-- **服务器地址**: 面板端的通信地址（通常是 `http://<面板IP>:<后端端口>`，例如 `http://1.2.3.4:6365`）。
-- **密钥**: 节点页里该节点的密钥。
-
-或者直接使用带参数的命令（适用于自动化部署）：
-
-```bash
-# 替换 <面板地址> 和 <密钥>
-./install.sh -a "http://1.2.3.4:6365" -s "your_node_secret"
-```
-
-### 验证安装
-安装完成后，服务会自动启动。
-- systemd 查看状态: `systemctl status flux_agent`
-- Alpine/OpenRC 查看状态: `rc-service flux_agent status`
-- 回到面板 **节点管理** 页面，该节点状态应显示为 **在线**。
-
+1. **设置 → 基本** 里填写“面板后端地址”（`ip:port` 或 `域名:port`），节点用它连接面板，可以套 CDN / HTTPS
+2. [安装节点](./agent.md)
 
 ## 反向代理（可选）
 
@@ -176,3 +101,4 @@ sudo systemctl restart caddy
   ```
 
 升级见 [升级](./upgrade.md)。
+
