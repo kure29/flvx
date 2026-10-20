@@ -426,6 +426,7 @@ type InboundsBackup struct {
 	Counters      []InboundCounterBackup `json:"counters,omitempty"`
 	Subscriptions []SubscriptionBackup   `json:"subscriptions,omitempty"`
 	Sources       []RemoteSourceBackup   `json:"sources,omitempty"`
+	Templates     []TemplateBackup       `json:"templates,omitempty"`
 	// Users are shared users from 3.0.10 backups; imported as share
 	// subscriptions.
 	Users []SubUserBackup `json:"users,omitempty"`
@@ -505,6 +506,15 @@ type InboundBackup struct {
 	SourceID            int64  `json:"sourceId,omitempty"`
 	OutboundID          int64  `json:"outboundId,omitempty"`
 	SplitRules          string `json:"splitRules,omitempty"`
+}
+
+type TemplateBackup struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Content     string `json:"content"`
+	SourceURL   string `json:"sourceUrl,omitempty"`
+	CreatedTime int64  `json:"createdTime"`
 }
 
 type RemoteSourceBackup struct {

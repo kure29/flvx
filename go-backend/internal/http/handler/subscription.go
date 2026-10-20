@@ -48,6 +48,9 @@ type subPipeline struct {
 	ChainLandingNames []string `json:"chainLandingNames"`
 	ChainRelayNames   []string `json:"chainRelayNames"`
 	Script            string   `json:"script"`
+	// Templates picks a subscription template per kind (kernel.TemplateClash,
+	// ...): template ids; a kind without one renders the built-in profile.
+	Templates map[string]int64 `json:"templates,omitempty"`
 }
 
 func (p subPipeline) options() kernel.SubOptions {
@@ -94,6 +97,13 @@ func (p *subPipeline) normalize() error {
 		return err
 	}
 	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
+	templates := map[string]int64{}
+	for _, kind := range kernel.TemplateFormats {
+		if id := p.Templates[kind]; id > 0 {
+			templates[kind] = id
+		}
+	}
+	p.Templates = templates
 	return p.options().Validate()
 }
 
@@ -591,6 +601,9 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ids, err := req.validate(rows)
+	if err == nil {
+		err = h.checkPipelineTemplates(req.Options)
+	}
 	if err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
@@ -791,11 +804,31 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 	if err := kernel.SubScriptError(source, req.Options.options()); err != nil {
 		scriptError = err.Error()
 	}
+	// The picked templates' groups with these nodes.
+	names := make([]string, len(result))
+	for i, e := range result {
+		names[i] = e.Name
+	}
+	templates := map[string]interface{}{}
+	for kind, id := range req.Options.Templates {
+		t, err := h.repo.GetSubscriptionTemplate(id)
+		if err != nil || t == nil {
+			continue
+		}
+		view := map[string]interface{}{"id": t.ID, "name": t.Name}
+		if summary, err := kernel.CheckTemplate(t.Kind, t.Content, names); err != nil {
+			view["error"] = err.Error()
+		} else {
+			view["groups"], view["warnings"] = summary.Groups, summary.Warnings
+		}
+		templates[kind] = view
+	}
 	response.WriteJSON(w, response.OK(map[string]interface{}{
 		"items":       items,
 		"total":       len(source),
 		"dropped":     len(source) - len(items),
 		"scriptError": scriptError,
+		"templates":   templates,
 	}))
 }
 

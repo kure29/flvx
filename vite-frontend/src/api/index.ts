@@ -718,7 +718,67 @@ export interface SubPipeline {
   chainRelayNames: string[];
   /** JavaScript `function operator(nodes)` run after the other steps. */
   script: string;
+  /** Subscription template id per client kind; a kind without one gets the built-in profile. */
+  templates?: Partial<Record<SubTemplateKind, number>>;
 }
+export type SubTemplateKind = "clash" | "singbox" | "surge";
+/** A user's own Mihomo / sing-box / Surge profile that subscriptions render into. */
+export interface SubTemplate {
+  id: number;
+  name: string;
+  kind: SubTemplateKind;
+  content: string;
+  /** Downloaded from here once a day; empty for pasted templates. */
+  sourceUrl: string;
+  lastFetch: number;
+  lastError: string;
+  updatedTime: number;
+  usedBy: number;
+  groups: number;
+  autoGroups: number;
+  rules: number;
+}
+export interface SubTemplateGroup {
+  name: string;
+  type: string;
+  proxies: string[];
+  /** Takes nodes (include-all / {all}); nodes are the ones it gets. */
+  auto: boolean;
+  nodes: string[] | null;
+  /** The filter can't be previewed here (the client still applies it). */
+  filterError?: string;
+}
+export interface SubTemplateSummary {
+  groups: SubTemplateGroup[];
+  rules: number;
+  providers: number;
+  warnings: string[];
+}
+export interface SubTemplateDraft {
+  id?: number;
+  name: string;
+  kind: SubTemplateKind;
+  content: string;
+  sourceUrl: string;
+}
+export const getSubTemplates = () =>
+  Network.post<SubTemplate[]>("/subscription/template/list");
+export const checkSubTemplate = (
+  data: Omit<SubTemplateDraft, "id" | "name"> & { subscriptionId?: number },
+) =>
+  Network.post<{
+    summary: SubTemplateSummary;
+    autoGroups: number;
+    sample: string;
+    nodes: number;
+    content: string;
+  }>("/subscription/template/check", data);
+export const saveSubTemplate = (data: SubTemplateDraft) =>
+  Network.post<SubTemplate>("/subscription/template/save", data);
+export const refreshSubTemplate = (id: number) =>
+  Network.post<SubTemplate>("/subscription/template/refresh", { id });
+export const deleteSubTemplate = (id: number) =>
+  Network.post("/subscription/template/delete", { id });
 export interface SubRuleGroup {
   key: string;
   name: string;
@@ -853,13 +913,27 @@ export const deleteRemoteSource = (id: number, keepNodes: boolean) =>
   Network.post("/subscription/source/delete", { id, keepNodes });
 export const resetSubscriptionTraffic = (id: number) =>
   Network.post<SubscriptionItem>("/subscription/reset-traffic", { id });
+export interface SubPreview {
+  items: SubPreviewItem[];
+  total: number;
+  dropped: number;
+  scriptError: string;
+  /** The picked templates' groups with these nodes. */
+  templates?: Partial<
+    Record<
+      SubTemplateKind,
+      {
+        id: number;
+        name: string;
+        groups?: SubTemplateGroup[];
+        warnings?: string[];
+        error?: string;
+      }
+    >
+  >;
+}
 export const previewSubscription = (data: SubscriptionDraft) =>
-  Network.post<{
-    items: SubPreviewItem[];
-    total: number;
-    dropped: number;
-    scriptError: string;
-  }>("/subscription/preview", data);
+  Network.post<SubPreview>("/subscription/preview", data);
 
 export const testNotify = (data: {
   telegramToken: string;

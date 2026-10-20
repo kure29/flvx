@@ -638,6 +638,17 @@ func FormatForUserAgent(ua string) string {
 // Subscription renders every supported endpoint in the requested format and
 // returns the body with its content type.
 func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string, string, error) {
+	if kind := templateFor(format); kind != "" && strings.TrimSpace(opts.Templates[kind]) != "" {
+		tpl := opts.Templates[kind]
+		endpoints = uniqueNamesExcept(ApplySubOptions(endpoints, opts), templateGroupNames(kind, tpl))
+		body, err := templateProfile(kind, tpl, endpoints, opts)
+		if err != nil {
+			return "", "", fmt.Errorf("订阅模板出错：%v", err)
+		}
+		contentType := map[string]string{TemplateClash: "text/yaml; charset=utf-8",
+			TemplateSingbox: "application/json; charset=utf-8", TemplateSurge: "text/plain; charset=utf-8"}[kind]
+		return body, contentType, nil
+	}
 	endpoints = uniqueNames(ApplySubOptions(endpoints, opts), opts.Rules)
 	groups := opts.RegionGroups || opts.Rules
 	switch format {
@@ -936,16 +947,24 @@ func singboxProfile(endpoints []Endpoint, withRegions bool, opts SubOptions) (st
 // sing-box tags must be unique or the whole profile is rejected. With
 // rules, the rule groups' names are taken too.
 func uniqueNames(endpoints []Endpoint, rules bool) []Endpoint {
-	out := make([]Endpoint, len(endpoints))
-	seen := map[string]bool{"节点选择": true, "自动选择": true, "direct": true, "DIRECT": true, "REJECT": true,
-		ChainLandingGroup: true, ChainRelayGroup: true}
+	taken := []string{"节点选择", "自动选择"}
 	if rules {
-		for _, n := range ruleGroupNames() {
-			seen[n] = true
-		}
+		taken = append(taken, ruleGroupNames()...)
 	}
 	for _, r := range regions {
-		seen[r.name] = true
+		taken = append(taken, r.name)
+	}
+	return uniqueNamesExcept(endpoints, taken)
+}
+
+// uniqueNamesExcept suffixes duplicate names and names in taken (group
+// names of the profile).
+func uniqueNamesExcept(endpoints []Endpoint, taken []string) []Endpoint {
+	out := make([]Endpoint, len(endpoints))
+	seen := map[string]bool{"direct": true, "DIRECT": true, "REJECT": true,
+		ChainLandingGroup: true, ChainRelayGroup: true}
+	for _, n := range taken {
+		seen[n] = true
 	}
 	for i, e := range endpoints {
 		base := strings.TrimSpace(e.Name)

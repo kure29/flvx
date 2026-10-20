@@ -246,6 +246,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.Subscription{},
 		&model.SubscriptionCounter{},
 		&model.RemoteSource{},
+		&model.SubscriptionTemplate{},
 		&model.NodeLatencySample{},
 	}
 

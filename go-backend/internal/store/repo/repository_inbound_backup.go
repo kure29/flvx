@@ -72,6 +72,15 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 			RelayOnly: src.RelayOnly, Enabled: src.Enabled, CreatedTime: src.CreatedTime,
 		})
 	}
+	var templates []model.SubscriptionTemplate
+	if err := r.db.Order("id ASC").Find(&templates).Error; err != nil {
+		return nil, err
+	}
+	for _, t := range templates {
+		out.Templates = append(out.Templates, model.TemplateBackup{
+			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL, CreatedTime: t.CreatedTime,
+		})
+	}
 	var subs []model.Subscription
 	if err := r.db.Order("id ASC").Find(&subs).Error; err != nil {
 		return nil, err
@@ -127,6 +136,20 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{"name", "url", "interval_hours", "relay_only", "enabled", "updated_time"}),
+		}).Create(&item).Error; err != nil {
+			return 0, err
+		}
+	}
+
+	// Templates keep their ids: subscription options refer to them.
+	for _, t := range b.Templates {
+		item := model.SubscriptionTemplate{
+			ID: t.ID, Name: t.Name, Kind: t.Kind, Content: t.Content, SourceURL: t.SourceURL,
+			CreatedTime: t.CreatedTime, UpdatedTime: now,
+		}
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name", "kind", "content", "source_url", "updated_time"}),
 		}).Create(&item).Error; err != nil {
 			return 0, err
 		}

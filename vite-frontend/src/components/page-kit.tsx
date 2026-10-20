@@ -32,10 +32,13 @@ export function PageHeader({
   title,
   description,
   primary,
+  secondary,
 }: {
   title: string;
   description?: React.ReactNode;
   primary?: PageAction;
+  /** A second, quieter action left of the primary one. */
+  secondary?: PageAction;
 }) {
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
@@ -45,16 +48,29 @@ export function PageHeader({
           <p className="mt-0.5 text-xs text-default-500">{description}</p>
         )}
       </div>
-      {primary && (
-        <Button
-          className="shrink-0"
-          color="primary"
-          isDisabled={primary.disabled}
-          size="sm"
-          onPress={primary.onPress}
-        >
-          {primary.label}
-        </Button>
+      {(primary || secondary) && (
+        <div className="flex shrink-0 gap-2">
+          {secondary && (
+            <Button
+              isDisabled={secondary.disabled}
+              size="sm"
+              variant="flat"
+              onPress={secondary.onPress}
+            >
+              {secondary.label}
+            </Button>
+          )}
+          {primary && (
+            <Button
+              color="primary"
+              isDisabled={primary.disabled}
+              size="sm"
+              onPress={primary.onPress}
+            >
+              {primary.label}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

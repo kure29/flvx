@@ -1,6 +1,9 @@
 import type {
   RemoteSourceItem,
   SubPipeline,
+  SubPreview,
+  SubTemplate,
+  SubTemplateKind,
   SubPreviewItem,
   SubRuleGroup,
   SubscriptionDraft,
@@ -17,6 +20,7 @@ import {
   getInboundList,
   getRemoteSources,
   getSubscriptions,
+  getSubTemplates,
   previewSubscription,
   resetSubscription,
   resetSubscriptionTraffic,
@@ -43,6 +47,12 @@ import {
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
 import { SubClientGrid } from "@/pages/subscription/client-grid";
+import {
+  TEMPLATE_KINDS,
+  TemplateGroups,
+  TemplatesModal,
+  kindLabel,
+} from "@/pages/subscription/templates";
 import { RenameRules } from "@/pages/subscription/rename-rules";
 import {
   EditorTabs,
@@ -84,6 +94,7 @@ const EMPTY_PIPELINE: SubPipeline = {
   chainLandingNames: [],
   chainRelayNames: [],
   script: "",
+  templates: {},
 };
 
 const SCRIPT_EXAMPLE = `// 对处理后的节点再做一遍筛选、改名、排序，返回新的节点数组
@@ -382,6 +393,7 @@ function Editor({
   sources,
   regions,
   ruleGroups,
+  templates,
   saving,
   onSave,
   onClose,
@@ -392,16 +404,13 @@ function Editor({
   sources: RemoteSourceItem[];
   regions: string[];
   ruleGroups: SubRuleGroup[];
+  templates: SubTemplate[];
   saving: boolean;
   onSave: () => void;
   onClose: () => void;
 }) {
-  const [preview, setPreview] = useState<{
-    items: SubPreviewItem[];
-    total: number;
-    dropped: number;
-    scriptError: string;
-  } | null>(null);
+  const [preview, setPreview] = useState<SubPreview | null>(null);
+  const [previewKind, setPreviewKind] = useState<SubTemplateKind | null>(null);
   // Nodes to pick the chain from; loaded when the chain page opens and kept
   // while roles are picked (picking changes options, which drops preview).
   const [chainNodes, setChainNodes] = useState<SubPreviewItem[] | null>(null);
@@ -483,6 +492,10 @@ function Editor({
       chainRelay: "",
     });
   };
+  const picked = o.templates ?? {};
+  const templateOn = Object.values(picked).some(Boolean);
+  const setTemplate = (kind: SubTemplateKind, id: number) =>
+    setOpts({ templates: { ...picked, [kind]: id || undefined } });
   const chainOn =
     (o.chainLandingNames.length > 0 && o.chainRelayNames.length > 0) ||
     Boolean(o.chainLanding && o.chainRelay);
@@ -533,7 +546,7 @@ function Editor({
               {
                 key: "rules",
                 label: "规则",
-                badge: o.rules || chainOn ? "开" : "",
+                badge: o.rules || chainOn || templateOn ? "开" : "",
               },
               {
                 key: "preview",
@@ -853,8 +866,65 @@ function Editor({
         {page === "rules" && (
           <div className="space-y-4">
             <Section
-              hint="给 mihomo（Clash Meta 内核）、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点"
-              title="分组与规则"
+              hint="用自己的 Mihomo / sing-box / Surge 配置当骨架：规则、策略组、DNS 按模板来，面板只放节点进去；没选模板的客户端用下面的内置规则"
+              title="订阅模板"
+            >
+              {templates.length === 0 ? (
+                <p className="text-xs text-default-500">
+                  还没有模板，在订阅页右上角「模板」里添加
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {TEMPLATE_KINDS.map(([kind, label]) => {
+                    const options = templates.filter((t) => t.kind === kind);
+
+                    return (
+                      <div
+                        key={kind}
+                        className="grid grid-cols-[7.5rem_1fr] items-center gap-2"
+                      >
+                        <label className="text-sm" htmlFor={`sub-tpl-${kind}`}>
+                          {label}
+                        </label>
+                        <select
+                          className="block h-9 w-full rounded-lg border border-divider bg-background px-2 text-sm disabled:opacity-50"
+                          disabled={options.length === 0}
+                          id={`sub-tpl-${kind}`}
+                          value={picked[kind] ?? 0}
+                          onChange={(e) =>
+                            setTemplate(kind, Number(e.target.value))
+                          }
+                        >
+                          <option value={0}>
+                            {options.length === 0
+                              ? "没有这种格式的模板"
+                              : "不使用模板（内置规则）"}
+                          </option>
+                          {options.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-default-500">
+                    Stash、Shadowrocket、Loon、Quantumult X
+                    暂不支持模板，照旧用内置规则
+                  </p>
+                </div>
+              )}
+            </Section>
+            <Section
+              hint={`给 mihomo（Clash Meta 内核）、sing-box（1.12 及以上）、Surge、Shadowrocket、Loon、Quantumult X 加上分流规则；后三个会改为下发完整配置。Stash 和通用链接只有节点${
+                templateOn
+                  ? `。${TEMPLATE_KINDS.filter(([k]) => picked[k])
+                      .map(([, l]) => l)
+                      .join("、")} 已用模板，这里的设置对它们不生效`
+                  : ""
+              }`}
+              title={templateOn ? "内置分组与规则" : "分组与规则"}
             >
               <ToggleRow
                 hint="国内直连、境外走代理，另加下面勾选的分组"
@@ -1083,6 +1153,46 @@ function Editor({
                 </>
               )}
             </Section>
+            {preview?.templates &&
+              Object.keys(preview.templates).length > 0 &&
+              (() => {
+                const kinds = TEMPLATE_KINDS.filter(
+                  ([k]) => preview.templates?.[k],
+                );
+                const kind =
+                  previewKind && preview.templates[previewKind]
+                    ? previewKind
+                    : kinds[0][0];
+                const view = preview.templates[kind]!;
+
+                return (
+                  <Section
+                    hint="按模板里的写法，每个策略组会收到哪些节点；空组在客户端里没有节点可选"
+                    title="模板策略组"
+                  >
+                    {kinds.length > 1 && (
+                      <Segmented
+                        options={kinds}
+                        value={kind}
+                        onChange={setPreviewKind}
+                      />
+                    )}
+                    <p className="text-xs text-default-500">
+                      {kindLabel(kind)} · 「{view.name}」
+                    </p>
+                    {view.error ? (
+                      <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger dark:bg-danger-500/10">
+                        模板出错：{view.error}
+                      </p>
+                    ) : (
+                      <TemplateGroups
+                        groups={view.groups ?? []}
+                        warnings={view.warnings}
+                      />
+                    )}
+                  </Section>
+                );
+              })()}
           </div>
         )}
       </ModalBody>
@@ -1112,6 +1222,15 @@ export default function SubscriptionPage() {
   const [confirm, setConfirm] = useState<"reset" | "delete" | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
   const [resettingTraffic, setResettingTraffic] = useState(false);
+  const [templates, setTemplates] = useState<SubTemplate[]>([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await getSubTemplates();
+
+      if (res.code === 0) setTemplates(res.data ?? []);
+    } catch {}
+  }, []);
   const load = useCallback(async () => {
     try {
       const [subRes, inRes, srcRes] = await Promise.all([
@@ -1137,7 +1256,8 @@ export default function SubscriptionPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+    void loadTemplates();
+  }, [load, loadTemplates]);
 
   const url = (s: SubscriptionItem, format = "") =>
     `${panelOrigin()}${s.path}${format ? `?format=${format}` : ""}`;
@@ -1384,7 +1504,20 @@ export default function SubscriptionPage() {
           label: "新建订阅",
           onPress: () => setDraft(draftFrom()),
         }}
+        secondary={{
+          key: "templates",
+          label: templates.length > 0 ? `模板 ${templates.length}` : "模板",
+          onPress: () => setTemplatesOpen(true),
+        }}
         title="订阅"
+      />
+
+      <TemplatesModal
+        isOpen={templatesOpen}
+        subscriptions={subs}
+        templates={templates}
+        onChanged={loadTemplates}
+        onClose={() => setTemplatesOpen(false)}
       />
 
       {subs.length === 0 ? (
@@ -1551,6 +1684,7 @@ export default function SubscriptionPage() {
                 saving={saving}
                 setDraft={setDraft}
                 sources={sources}
+                templates={templates}
                 onClose={onClose}
                 onSave={save}
               />

@@ -52,6 +52,10 @@ type SubOptions struct {
 	// SingboxSnell puts Snell nodes in sing-box profiles: the client is
 	// sing-box 1.14+ (see SingboxClientHasSnell).
 	SingboxSnell bool
+	// Templates are the user's own profiles by template kind
+	// (TemplateClash, ...; see sub_template.go). A format with a template
+	// renders into it instead of the built-in profile and rules.
+	Templates map[string]string
 }
 
 // RegionOther is the filter value for names without a recognized region.
