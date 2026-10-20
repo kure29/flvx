@@ -2,6 +2,7 @@ import type { TunnelDiagnosisApiItem } from "@/api/types";
 
 import axios from "axios";
 
+import { IS_DEMO } from "@/demo";
 import { clearSession, getToken } from "@/utils/session";
 
 const DIAGNOSIS_STREAM_TIMEOUT_MS = 2 * 60 * 1000;
@@ -86,7 +87,9 @@ const resolveApiPath = (path: string): string => {
 };
 
 const isStreamSupported = (): boolean => {
+  // The online demo answers through axios only (no streaming).
   return (
+    !IS_DEMO &&
     typeof window !== "undefined" &&
     typeof fetch === "function" &&
     typeof TextDecoder !== "undefined"

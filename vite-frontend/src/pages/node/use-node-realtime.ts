@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 
+import { IS_DEMO, startDemoRealtime } from "@/demo";
 import { getToken } from "@/utils/session";
 
 interface NodeRealtimeMessage {
@@ -37,7 +38,8 @@ export const useNodeRealtime = ({
   onMessage,
   enabled = true,
 }: UseNodeRealtimeOptions) => {
-  const [wsConnected, setWsConnected] = useState(false);
+  // The demo shows the nodes as connected (it has no live stream).
+  const [wsConnected, setWsConnected] = useState(IS_DEMO);
   const [wsConnecting, setWsConnecting] = useState(false);
   const [usingPollingFallback, setUsingPollingFallback] = useState(false);
 
@@ -84,7 +86,8 @@ export const useNodeRealtime = ({
   }, [clearReconnectTimer]);
 
   const connect = useCallback(() => {
-    if (!enabled) {
+    // The online demo has no server to stream from.
+    if (!enabled || IS_DEMO) {
       return;
     }
 
@@ -159,6 +162,9 @@ export const useNodeRealtime = ({
   useEffect(() => {
     if (!enabled) {
       return;
+    }
+    if (IS_DEMO) {
+      return startDemoRealtime((m) => onMessageRef.current(m));
     }
 
     connect();

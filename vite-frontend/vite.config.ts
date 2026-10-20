@@ -8,6 +8,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // No service worker for the online demo.
+      disable: process.env.VITE_DEMO === "true",
       registerType: "prompt",
       injectRegister: "auto",
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
@@ -46,7 +48,8 @@ export default defineConfig({
       },
     }),
   ],
-  base: "/",
+  // The online demo is served from the docs site (VITE_BASE=/flyx/demo/).
+  base: process.env.VITE_BASE || "/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

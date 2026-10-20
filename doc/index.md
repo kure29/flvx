@@ -10,6 +10,9 @@ hero:
       text: 快速上手
       link: /guide/getting-started
     - theme: alt
+      text: 在线演示
+      link: https://kure29.github.io/flyx/demo/
+    - theme: alt
       text: 基本概念
       link: /guide/concepts
     - theme: alt

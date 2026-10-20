@@ -1,9 +1,11 @@
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, HashRouter } from "react-router-dom";
 import { registerSW } from "virtual:pwa-register";
 import toast from "react-hot-toast";
 
 import App from "./App.tsx";
+import { IS_DEMO, installDemo } from "./demo";
+import { DemoBanner } from "./demo/banner";
 import { Provider } from "./provider.tsx";
 import "@/styles/globals.css";
 
@@ -24,6 +26,8 @@ window.addEventListener("vite:preloadError", (event) => {
   event.preventDefault();
   window.location.reload();
 });
+
+if (IS_DEMO) installDemo();
 
 const updateSW = registerSW({
   immediate: true,
@@ -58,10 +62,14 @@ const updateSW = registerSW({
   },
 });
 
+// The demo is static files on GitHub Pages: hash routes need no server.
+const Router = IS_DEMO ? HashRouter : BrowserRouter;
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <BrowserRouter>
+  <Router>
     <Provider>
       <App />
+      {IS_DEMO && <DemoBanner />}
     </Provider>
-  </BrowserRouter>,
+  </Router>,
 );
