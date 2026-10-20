@@ -201,7 +201,12 @@ async function answer(config: InternalAxiosRequestConfig) {
     return { code: 0, msg: "操作成功", data: echo, ts: Date.now() };
   }
 
-  // Not recorded: an empty answer most pages render as "nothing yet".
+  // Not recorded: an empty answer most pages render as "nothing yet". The
+  // CI check (scripts/demo/check.mjs) fails on this warning, so new pages
+  // get recorded (scripts/demo/README.md).
+  // eslint-disable-next-line no-console
+  console.warn(`[demo] not recorded: ${bare}`);
+
   return { code: 0, msg: "操作成功", data: [], ts: Date.now() };
 }
 

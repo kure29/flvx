@@ -45,6 +45,13 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      # The online demo answers the API from a recording: fail when a page
+      # breaks or asks for something that was never recorded.
+      - name: Check online demo
+        run: |
+          VITE_DEMO=true VITE_BASE=/flyx/demo/ pnpm exec vite build --outDir dist-demo
+          node scripts/demo/check.mjs dist-demo
+
   backend:
     name: Build and Test Go Backend
     runs-on: ubuntu-latest
