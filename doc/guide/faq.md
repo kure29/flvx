@@ -67,6 +67,8 @@ GITHUB_TOKEN=github_pat_xxx
 
 入站的 Snell 版本不能高于节点安装的 Snell 主版本，v5 入站需要节点安装 Snell 5.x。
 
+也可以用 sing-box 内核（1.14 及以上）内置的 Snell：v4 / v5 / v6 客户端都能连，ShadowTLS 由 sing-box 自己处理，不用额外装 shadow-tls，还支持分流和链式出站。区别是 sing-box 不支持 Snell v5 的 QUIC 代理模式（UDP 走 TCP 转发），也不支持多用户 userkey，订阅用户仍共用 PSK。
+
 ### Reality 用 Clash / Mihomo 连不上
 
 Xray 26.7.11 起，Reality 未设置“最低客户端版本”时默认只接受 26.3.27 及以上的客户端，而 Mihomo（Clash Verge、Stash、FlClash 等）上报的版本是 1.8.2，会被拒绝。面板默认把最低客户端版本设为 `1.0.0`，所有客户端都能连接；如需调整，在 Reality 设置里修改“最低客户端版本”。也可以在安装内核时选择旧版本的 Xray。

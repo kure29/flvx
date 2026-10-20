@@ -330,8 +330,8 @@ func (h *Handler) kernelInstall(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	if k != nil && info.Type == kernel.TypeSnell {
-		if err := h.checkSnellVersions(k.ID, version); err != nil {
+	if k != nil && (info.Type == kernel.TypeSnell || info.Type == kernel.TypeSingbox) {
+		if err := h.checkKernelVersionFits(k.ID, info.Type, version); err != nil {
 			response.WriteJSON(w, response.ErrDefault(err.Error()))
 			return
 		}
@@ -709,7 +709,11 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	if in.Protocol == kernel.ProtocolSnell {
+	if in.Protocol == kernel.ProtocolSnell && k.KernelType == kernel.TypeSingbox && versionBelow(k.Version, 1, 14) {
+		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("sing-box 内置 Snell 需要 1.14 及以上，节点安装的是 %s", k.Version)))
+		return
+	}
+	if in.Protocol == kernel.ProtocolSnell && k.KernelType == kernel.TypeSnell {
 		if major := snellMajor(k.Version); in.Settings.SnellVersion > major {
 			response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("节点安装的是 Snell %s，不支持 v%d 客户端", k.Version, in.Settings.SnellVersion)))
 			return
@@ -1363,9 +1367,11 @@ func snellMajor(version string) int {
 	return 5
 }
 
-// checkSnellVersions refuses to install a Snell binary older than the
-// protocol version an existing inbound advertises to clients.
-func (h *Handler) checkSnellVersions(kernelID int64, version string) error {
+// checkKernelVersionFits refuses to install a kernel version that cannot
+// serve an existing inbound: a Snell binary older than the protocol version
+// the inbound advertises, or a sing-box before 1.14 under inbounds that need
+// it (built-in Snell, ACME certificates).
+func (h *Handler) checkKernelVersionFits(kernelID int64, kernelType, version string) error {
 	rows, err := h.repo.ListNodeInboundsByKernel(kernelID)
 	if err != nil {
 		return err
@@ -1373,8 +1379,24 @@ func (h *Handler) checkSnellVersions(kernelID int64, version string) error {
 	major := snellMajor(version)
 	for _, row := range rows {
 		in, err := inboundFromModel(row)
-		if err == nil && in.Settings.SnellVersion > major {
-			return fmt.Errorf("入站 %s 使用 Snell v%d，不能安装 %s", row.Name, in.Settings.SnellVersion, version)
+		if err != nil {
+			continue
+		}
+		switch kernelType {
+		case kernel.TypeSnell:
+			if in.Settings.SnellVersion > major {
+				return fmt.Errorf("入站 %s 使用 Snell v%d，不能安装 %s", row.Name, in.Settings.SnellVersion, version)
+			}
+		case kernel.TypeSingbox:
+			if !versionBelow(version, 1, 14) {
+				continue
+			}
+			if in.Protocol == kernel.ProtocolSnell {
+				return fmt.Errorf("入站 %s 使用 sing-box 内置 Snell，需要 1.14 及以上", row.Name)
+			}
+			if in.Security.CertMode == kernel.CertModeACME {
+				return fmt.Errorf("入站 %s 自动申请证书，需要 sing-box 1.14 及以上", row.Name)
+			}
 		}
 	}
 	return nil

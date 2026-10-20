@@ -130,6 +130,11 @@ export function InboundFormModal({
     setForm((prev) => {
       const next = { ...prev, kernelType };
 
+      // Snell v6 is sing-box only.
+      if (kernelType !== "singbox" && next.snellVersion === "6") {
+        next.snellVersion = "5";
+      }
+
       if (info?.protocols?.some((p) => p.protocol === prev.protocol)) {
         return next;
       }
@@ -573,19 +578,26 @@ export function InboundFormModal({
 
                 {form.protocol === "snell" && (
                   <Select
-                    description="客户端使用的协议版本；v5 需要节点安装 Snell 5.x"
+                    description={
+                      form.kernelType === "singbox"
+                        ? "客户端使用的协议版本；sing-box 内置 Snell 需要 1.14 及以上，v6 的 PSK 至少 12 位"
+                        : "客户端使用的协议版本；v5 需要节点安装 Snell 5.x"
+                    }
                     label="Snell 版本"
                     selectedKeys={[form.snellVersion || "5"]}
                     onSelectionChange={(keys) =>
                       set("snellVersion", String(Array.from(keys)[0] ?? "5"))
                     }
                   >
-                    <SelectItem key="5" textValue="v5">
-                      v5
-                    </SelectItem>
-                    <SelectItem key="4" textValue="v4">
-                      v4
-                    </SelectItem>
+                    {[
+                      ...(form.kernelType === "singbox" ? ["6"] : []),
+                      "5",
+                      "4",
+                    ].map((v) => (
+                      <SelectItem key={v} textValue={`v${v}`}>
+                        {`v${v}`}
+                      </SelectItem>
+                    ))}
                   </Select>
                 )}
                 {(form.protocol === "socks" || form.protocol === "http") && (

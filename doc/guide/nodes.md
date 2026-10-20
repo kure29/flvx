@@ -41,7 +41,7 @@
 | NaïveProxy | sing-box | 需要域名和真实证书 |
 | WireGuard | Xray / sing-box | 所有人共用一份客户端配置；分享里有配置文件和二维码，WireGuard 官方 App 可直接导入 |
 | SOCKS5 / HTTP 代理 | Xray / sing-box | 不加密，适合内网或经加密线路中转后使用；订阅用户各有自己的用户名和密码 |
-| Snell / Snell + ShadowTLS | Snell | Surge 专用 |
+| Snell / Snell + ShadowTLS | Snell / sing-box | Surge 专用；sing-box 内置 Snell 需要 1.14 及以上，支持 v4 / v5 / v6 客户端（v6 的 PSK 至少 12 位），可以分流和链式出站 |
 
 ### 证书
 

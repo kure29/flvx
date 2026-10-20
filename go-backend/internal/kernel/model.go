@@ -19,7 +19,8 @@ type Settings struct {
 	Password string `json:"password,omitempty"`
 	Method   string `json:"method,omitempty"`
 
-	// SnellVersion is the protocol version clients use (4 or 5).
+	// SnellVersion is the protocol version clients use (4 or 5; 6 on
+	// sing-box only).
 	SnellVersion int `json:"snellVersion,omitempty"`
 	// Masquerade is the site Hysteria2 serves to non-clients (optional URL).
 	Masquerade string `json:"masquerade,omitempty"`
@@ -165,7 +166,8 @@ func (in Inbound) Network() string {
 		return "tcp,udp"
 	case ProtocolSnell:
 		// v5 adds UDP (QUIC proxy mode); behind ShadowTLS only TCP is exposed.
-		if in.Security.Type == SecurityShadowTLS || in.Settings.SnellVersion == 4 {
+		// v6 (sing-box) carries UDP over TCP.
+		if in.Security.Type == SecurityShadowTLS || in.Settings.SnellVersion == 4 || in.Settings.SnellVersion == 6 {
 			return "tcp"
 		}
 		return "tcp,udp"
@@ -278,6 +280,13 @@ func Normalize(kernelType string, in *Inbound) error {
 	}
 	if err := normalizeSecurity(in); err != nil {
 		return err
+	}
+	if in.Protocol == ProtocolSnell && in.Settings.SnellVersion == 6 && kernelType != TypeSingbox {
+		return errors.New("Snell v6 目前只支持 sing-box 内核")
+	}
+	if in.Protocol == ProtocolSnell && kernelType == TypeSingbox {
+		// sing-box chains ShadowTLS to Snell internally; no loopback port.
+		in.Settings.BackendPort = 0
 	}
 	if in.Settings.Decryption != "" && kernelType != TypeXray {
 		return errors.New("VLESS Encryption 目前只支持 Xray 内核")
@@ -471,8 +480,11 @@ func normalizeSettings(in *Inbound) error {
 		if s.SnellVersion == 0 {
 			s.SnellVersion = DefaultSnellVersion
 		}
-		if s.SnellVersion != 4 && s.SnellVersion != 5 {
-			return errors.New("Snell 版本只支持 4 或 5")
+		if s.SnellVersion != 4 && s.SnellVersion != 5 && s.SnellVersion != 6 {
+			return errors.New("Snell 版本只支持 4、5 或 6")
+		}
+		if s.SnellVersion == 6 && len(s.Password) < snellV6MinPSK {
+			return fmt.Errorf("Snell v6 的 PSK 至少 %d 位", snellV6MinPSK)
 		}
 		s.UUID, s.Method, s.Flow = "", "", ""
 	}
@@ -584,6 +596,9 @@ var naiveUserPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
 var semverPattern = regexp.MustCompile(`^\d{1,4}\.\d{1,4}\.\d{1,4}$`)
 
 var snellPSKPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
+
+// snellV6MinPSK is the shortest PSK Snell v6 accepts.
+const snellV6MinPSK = 12
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 

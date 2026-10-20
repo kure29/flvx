@@ -220,6 +220,8 @@ var catalog = []Info{
 			{Protocol: ProtocolShadowsocks, Transports: []TransportCap{
 				{Type: TransportTCP, Securities: []string{SecurityNone, SecurityShadowTLS}},
 			}},
+			// Built-in Snell server, sing-box 1.14+.
+			{Protocol: ProtocolSnell, Transports: []TransportCap{{Type: TransportTCP, Securities: []string{SecurityNone, SecurityShadowTLS}}}},
 			{Protocol: ProtocolSOCKS, Transports: []TransportCap{{Type: TransportTCP, Securities: []string{SecurityNone}}}},
 			{Protocol: ProtocolHTTP, Transports: []TransportCap{{Type: TransportTCP, Securities: []string{SecurityNone}}}},
 			{Protocol: ProtocolWireGuard, Transports: []TransportCap{{Type: TransportUDP, Securities: []string{SecurityNone}}}},
