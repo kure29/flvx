@@ -293,8 +293,16 @@ func TestRealtimeSessionGetsLatestNodeMetricOnConnect(t *testing.T) {
 	waitLastMetric(0)
 	admin = dialAdmin()
 	defer admin.Close()
+	// The node-offline status broadcast can reach the new session; only a
+	// replayed metric is wrong.
 	_ = admin.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
-	if _, raw, err := admin.ReadMessage(); err == nil {
-		t.Fatalf("expected no replay after the node went offline, got %s", raw)
+	for {
+		_, raw, err := admin.ReadMessage()
+		if err != nil {
+			break
+		}
+		if strings.Contains(string(raw), `"type":"metric"`) {
+			t.Fatalf("expected no metric replay after the node went offline, got %s", raw)
+		}
 	}
 }
