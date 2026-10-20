@@ -12,6 +12,7 @@ export default defineConfig({
     logo: "/logo.png",
     nav: [
       { text: "指南", link: "/guide/getting-started" },
+      { text: "更新日志", link: "/changelog" },
       { text: "下载", link: "https://github.com/kure29/flyx/releases" },
     ],
     sidebar: [
@@ -64,7 +65,10 @@ export default defineConfig({
       },
       {
         text: "帮助",
-        items: [{ text: "常见问题", link: "/guide/faq" }],
+        items: [
+          { text: "常见问题", link: "/guide/faq" },
+          { text: "更新日志", link: "/changelog" },
+        ],
       },
     ],
     socialLinks: [{ icon: "github", link: "https://github.com/kure29/flyx" }],

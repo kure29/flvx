@@ -255,6 +255,10 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Tags and history for the release notes (commits since the
+          # previous release when the changelog has no entry).
+          fetch-depth: 0
 
       - name: Download GOST AMD64 binary
         uses: actions/download-artifact@v7
@@ -327,52 +331,16 @@ jobs:
           VERSION="${{ needs.check-version.outputs.version }}"
           OWNER="${{ needs.check-version.outputs.image_owner }}"
 
-          # 获取 commit 信息
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
-          COMMIT_DATE=$(git log -1 --pretty=format:"%ai")
+          # 更新内容取自 doc/changelog.md 里这个版本的一节，没有时列出上个版本以来的提交
+          .github/scripts/release-notes.sh "${VERSION}" "${{ github.repository }}" \
+            "${{ env.REGISTRY }}/${OWNER}" "${{ github.sha }}" > release-notes.md
+          cat release-notes.md
 
           # 创建 release
           gh release create "${VERSION}" \
             --target "${{ github.sha }}" \
             --title "Release ${VERSION}" \
-            --notes "## 📝 Release Information
-
-          - **Version**: ${VERSION}
-          - **Commit**: [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-          - **Author**: ${COMMIT_AUTHOR}
-          - **Date**: ${COMMIT_DATE}
-          - **Message**: ${COMMIT_MSG}
-
-          ## 📦 Docker Images
-
-          \`\`\`bash
-          # Backend
-          docker pull ${{ env.REGISTRY }}/${OWNER}/flux-panel-backend:${VERSION}
-
-          # Frontend
-          docker pull ${{ env.REGISTRY }}/${OWNER}/vite-frontend:${VERSION}
-          \`\`\`
-
-          ## 🚀 Quick Install
-
-          **Panel (安装此版本 ${VERSION}):**
-          \`\`\`bash
-          curl -L https://github.com/${{ github.repository }}/releases/download/${VERSION}/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
-          \`\`\`
-
-          **Node (安装此版本 ${VERSION}):**
-          \`\`\`bash
-          curl -L https://github.com/${{ github.repository }}/releases/download/${VERSION}/install.sh -o install.sh && chmod +x install.sh && ./install.sh
-          \`\`\`
-
-          **安装最新版:**
-          \`\`\`bash
-          # 面板端
-          curl -L https://github.com/${{ github.repository }}/releases/latest/download/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
-          # 节点端
-          curl -L https://github.com/${{ github.repository }}/releases/latest/download/install.sh -o install.sh && chmod +x install.sh && ./install.sh
-          \`\`\`" \
+            --notes-file release-notes.md \
             --repo ${{ github.repository }}
 
           # 上传所有文件到 release

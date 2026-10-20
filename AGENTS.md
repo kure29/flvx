@@ -47,6 +47,10 @@ FLYX — traffic forwarding panel: Go admin API + Vite/React UI + Go agent.
 - **Commits**: no `Co-Authored-By: Claude …` trailer — the owner doesn't want Claude listed as a contributor. Commit as the owner (set the repo's `user.name` / `user.email` to the owner's GitHub identity first; a Claude author makes GitHub add the co-author line back on squash merge).
 - **Go versions**: `go.mod` says 1.25.0 for all three modules; CI and the Docker images build with Go 1.25.
 
+## Releases
+
+- Before triggering a release (`docker-build.yml`, input `version`), add a `## <version>` section to `doc/changelog.md` (Chinese, user-facing, date line under the heading, a **升级** line when node agents must be upgraded) and merge it: the release notes take that section, falling back to the commit list since the previous tag (`.github/scripts/release-notes.sh`).
+
 ## Anti-patterns
 
 - `install.sh` / `panel_install.sh`: `REPO` must stay `kure29/flyx` (this repo is independent of upstream; don't sync it back). The release job rewrites `REPO`, the version and `PINNED_VERSION` in the release copies, so don't hand-edit those for a release.
