@@ -4,6 +4,14 @@
 
 完整的提交记录见 [GitHub Releases](https://github.com/kure29/flyx/releases)。
 
+## 3.3.22
+
+2026-10-20
+
+- Snell 内核可以安装 Surge 官方的 snell-server **6.0.0（测试版）**，支持 v6 入站和流量整形（默认 / unshaped）；默认版本仍是 5.0.1
+- 注意：官方 6.0.0 **只接受 v6 客户端**，v4 / v5 客户端连不上；面板会拦住版本对不上的入站和内核版本切换，详见 [Snell 用哪个内核](./guide/kernels.md#snell-用哪个内核)
+- 官方 6.0.0 没有 armv7 版本，armv7 节点安装时会提示架构不支持
+
 ## 3.3.21
 
 2026-10-20
