@@ -42,7 +42,7 @@ import {
   getNodeMonthTraffic,
   type ReleaseChannel,
 } from "@/api";
-import { LatencyCell } from "@/components/latency-cell";
+import { LatencyCell, probePoints } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
 import { LatencyTrendModal } from "@/components/latency-trend-modal";
 import { LatencyTargetsModal } from "@/pages/node/latency-targets-modal";
@@ -1212,7 +1212,9 @@ export default function NodePage({
         >
           不测延迟
         </button>
-      ) : (
+      ) : probePoints(node.latency).length === 0 ? null : (
+        // Nothing until the first round (every 3 minutes) has a result;
+        // re-probing is in the result's menu.
         <LatencyCell
           note={node.latencyTargets ? "自定义" : undefined}
           probe={node.latency}
