@@ -27,7 +27,8 @@ const ForwardPage = lazy(() => import("@/pages/forward"));
 const TunnelPage = lazy(() => import("@/pages/tunnel"));
 // 用户 hosts the 分组 and 限速 tabs; each tab keeps its address.
 const UserHubPage = lazy(() => import("@/pages/user-hub"));
-const NodePage = lazy(() => import("@/pages/node"));
+// 节点 hosts the 内核 tab.
+const NodePage = lazy(() => import("@/pages/node-hub"));
 const ProfilePage = lazy(() => import("@/pages/profile"));
 const InboundPage = lazy(() => import("@/pages/inbound"));
 const RelayPage = lazy(() => import("@/pages/relay"));
