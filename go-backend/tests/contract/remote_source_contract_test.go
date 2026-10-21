@@ -169,4 +169,20 @@ func TestFileSourceChainContract(t *testing.T) {
 	save(`{"id":` + airportID + `,"name":"机场","kind":"file","role":"relay","content":"` +
 		quote(ssLink("203.0.113.1", "8388", "香港 01 2x")+"\n"+ssLink("203.0.113.2", "8388", "日本 01")) + `"}`)
 	check("香港 01 2x")
+
+	// Only the airport's 香港 nodes relay; the rest of it is left out.
+	sub = kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"香港前置","sourceAll":false,"inboundIds":[],"sourceIds":[],"options":{`+
+		`"chainRelaySources":[`+airportID+`],"chainLandingSources":[`+jsonInt64(int64(landing["id"].(float64)))+`],`+
+		`"chainSourceFilters":{"`+airportID+`":"香港","999":"ignored"},"chainDropUnused":true}}`)
+	if sub.Code != 0 {
+		t.Fatalf("filtered chain: %+v", sub)
+	}
+	view := sub.Data.(map[string]interface{})
+	if f := view["options"].(map[string]interface{})["chainSourceFilters"].(map[string]interface{}); len(f) != 1 || f[airportID] != "香港" {
+		t.Fatalf("filters are kept for chain sources only: %v", f)
+	}
+	body := getSub(t, router, view["path"].(string)+"?format=clash", "").Body.String()
+	if !strings.Contains(body, "香港 01 2x") || strings.Contains(body, "日本 01") || !strings.Contains(body, `dialer-proxy: "中转节点"`) {
+		t.Fatalf("filtered chain profile:\n%s", body)
+	}
 }

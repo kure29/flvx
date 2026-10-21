@@ -55,7 +55,11 @@ type subPipeline struct {
 	ChainLandingOwn     bool     `json:"chainLandingOwn"`
 	ChainNoneNames      []string `json:"chainNoneNames"`
 	ChainHideRelays     bool     `json:"chainHideRelays"`
-	Script              string   `json:"script"`
+	// ChainSourceFilters narrows a chain source to the nodes whose name
+	// matches; ChainDropUnused leaves the rest of its nodes out.
+	ChainSourceFilters map[int64]string `json:"chainSourceFilters,omitempty"`
+	ChainDropUnused    bool             `json:"chainDropUnused"`
+	Script             string           `json:"script"`
 	// Templates picks a subscription template per kind (kernel.TemplateClash,
 	// ...): template ids; a kind without one renders the built-in profile.
 	Templates map[string]int64 `json:"templates,omitempty"`
@@ -70,6 +74,7 @@ func (p subPipeline) options() kernel.SubOptions {
 		ChainLandingNames: p.ChainLandingNames, ChainRelayNames: p.ChainRelayNames, Script: p.Script,
 		ChainLandingSources: p.ChainLandingSources, ChainRelaySources: p.ChainRelaySources,
 		ChainLandingOwn: p.ChainLandingOwn, ChainNoneNames: p.ChainNoneNames, ChainHideRelays: p.ChainHideRelays,
+		ChainSourceFilters: p.ChainSourceFilters, ChainDropUnused: p.ChainDropUnused,
 	}
 }
 
@@ -115,6 +120,21 @@ func (p *subPipeline) normalize() error {
 	if p.ChainRelaySources, err = normalizeIDs(p.ChainRelaySources); err != nil {
 		return err
 	}
+	// Filters are kept for the sources in the chain only.
+	inChain := map[int64]bool{}
+	for _, id := range append(append([]int64{}, p.ChainLandingSources...), p.ChainRelaySources...) {
+		inChain[id] = true
+	}
+	filters := map[int64]string{}
+	for id, expr := range p.ChainSourceFilters {
+		if expr = strings.TrimSpace(expr); expr != "" && inChain[id] {
+			if len(expr) > 1000 {
+				return errText("规则太长")
+			}
+			filters[id] = expr
+		}
+	}
+	p.ChainSourceFilters = filters
 	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
 	templates := map[string]int64{}
 	for _, kind := range kernel.TemplateSlots {

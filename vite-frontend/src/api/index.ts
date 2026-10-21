@@ -725,6 +725,10 @@ export interface SubPipeline {
   chainNoneNames: string[];
   /** Relay nodes stay out of the node lists; they are only in the relay group. */
   chainHideRelays: boolean;
+  /** Per chain source (by id): only nodes whose original name matches take its role. */
+  chainSourceFilters?: Record<string, string>;
+  /** A chain source's nodes that end up without a role are left out. */
+  chainDropUnused: boolean;
   /** JavaScript `function operator(nodes)` run after the other steps. */
   script: string;
   /** Subscription template id per client kind; a kind without one gets the built-in profile. */

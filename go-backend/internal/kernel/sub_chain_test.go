@@ -178,3 +178,41 @@ func TestSubscriptionChainBySource(t *testing.T) {
 		}
 	}
 }
+
+// Only an airport's matching nodes relay; with ChainDropUnused the rest
+// of it is left out, while own nodes and per-node picks stay.
+func TestSubscriptionChainSourceFilter(t *testing.T) {
+	eps := namedEndpoints("自建 美国", "香港 IEPL 01 1.5x", "日本 IEPL 01", "美国 普通 01", "台湾 01")
+	for i := 1; i < len(eps); i++ {
+		eps[i].SourceID = 7
+	}
+	opts := SubOptions{ChainRelaySources: []int64{7}, ChainLandingOwn: true,
+		ChainSourceFilters: map[int64]string{7: "香港|日本"}, ChainLandingNames: []string{"台湾 01"}}
+	roles := func(list []Endpoint) string {
+		out := []string{}
+		for _, e := range list {
+			out = append(out, e.Name+"="+e.ChainRole)
+		}
+		return strings.Join(out, ",")
+	}
+	if got := roles(ApplySubOptions(eps, opts)); got != "自建 美国=landing,香港 IEPL 01 1.5x=relay,日本 IEPL 01=relay,美国 普通 01=,台湾 01=landing" {
+		t.Fatalf("filter: %s", got)
+	}
+	opts.ChainDropUnused = true
+	if got := roles(ApplySubOptions(eps, opts)); got != "自建 美国=landing,香港 IEPL 01 1.5x=relay,日本 IEPL 01=relay,台湾 01=landing" {
+		t.Fatalf("drop unused: %s", got)
+	}
+	opts.ChainSourceFilters = map[int64]string{7: "/(?i)iepl/"}
+	if got := roles(ApplySubOptions(eps, opts)); got != "自建 美国=landing,香港 IEPL 01 1.5x=relay,日本 IEPL 01=relay,台湾 01=landing" {
+		t.Fatalf("regex filter: %s", got)
+	}
+	// Without a chain (no relay matches) nothing is dropped.
+	opts.ChainSourceFilters = map[int64]string{7: "新加坡"}
+	opts.ChainLandingNames = nil
+	if got := ApplySubOptions(eps, opts); len(got) != len(eps) {
+		t.Fatalf("no chain, nothing dropped: %s", roles(got))
+	}
+	if err := (SubOptions{ChainSourceFilters: map[int64]string{7: "/(/"}}).Validate(); err == nil {
+		t.Fatal("a bad filter must be rejected")
+	}
+}

@@ -52,6 +52,11 @@ type SubOptions struct {
 	ChainRelaySources   []int64
 	ChainLandingOwn     bool
 	ChainNoneNames      []string
+	// ChainSourceFilters narrows a chain source to the nodes whose original
+	// name matches (a filter expression, like Include); ChainDropUnused
+	// leaves a chain source's nodes without a role out of the subscription.
+	ChainSourceFilters map[int64]string
+	ChainDropUnused    bool
 	// ChainHideRelays keeps relay nodes out of the node lists and groups:
 	// they are only in the relay group.
 	ChainHideRelays bool
@@ -159,6 +164,11 @@ func (o SubOptions) Validate() error {
 	}
 	if _, err := ParseMatcher(o.ChainRelay); err != nil {
 		return fmt.Errorf("中转节点：%v", err)
+	}
+	for _, expr := range o.ChainSourceFilters {
+		if _, err := ParseMatcher(expr); err != nil {
+			return fmt.Errorf("订阅源筛选：%v", err)
+		}
 	}
 	return ValidateSubScript(o.Script)
 }
@@ -289,8 +299,7 @@ func ApplySubOptions(endpoints []Endpoint, opts SubOptions) []Endpoint {
 	if scripted, err := ApplySubScript(out, opts.Script); err == nil {
 		out = scripted
 	}
-	markChain(out, opts)
-	return out
+	return markChain(out, opts)
 }
 
 // SubScriptError is the error the subscription's script gives on these

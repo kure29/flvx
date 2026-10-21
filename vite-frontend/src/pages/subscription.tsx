@@ -98,6 +98,8 @@ const EMPTY_PIPELINE: SubPipeline = {
   chainLandingOwn: false,
   chainNoneNames: [],
   chainHideRelays: false,
+  chainSourceFilters: {},
+  chainDropUnused: false,
   script: "",
   templates: {},
 };
@@ -474,16 +476,26 @@ function Editor({
   ).length;
 
   const runPreview = async () => {
+    // The chain editor lists the nodes dropping would hide too, so they
+    // can be picked back in.
+    const forChain = page === "rules" && o.chainDropUnused;
+
     setPreviewing(true);
     try {
-      const res = await previewSubscription(toPayload(draft));
+      const res = await previewSubscription(
+        toPayload(
+          forChain
+            ? { ...draft, options: { ...o, chainDropUnused: false } }
+            : draft,
+        ),
+      );
 
       if (res.code !== 0) {
         toast.error(res.msg || "预览失败");
 
         return;
       }
-      setPreview(res.data);
+      if (!forChain) setPreview(res.data);
       if (page === "rules") setChainNodes(res.data.items);
     } finally {
       setPreviewing(false);
@@ -497,16 +509,20 @@ function Editor({
     if (page === "rules" && !chainNodes && !previewing) void runPreview();
   }, [page, preview, chainNodes]);
 
-  // The role a node gets from its source (or being self-built), before
-  // any per-node choice.
-  const groupRole = (n: SubPreviewItem): ChainRole =>
-    n.sourceId && o.chainLandingSources.includes(n.sourceId)
-      ? "landing"
-      : n.sourceId && o.chainRelaySources.includes(n.sourceId)
-        ? "relay"
-        : n.own && o.chainLandingOwn
-          ? "landing"
-          : "";
+  const sourceFilter = (id: number) => o.chainSourceFilters?.[id] ?? "";
+  // The role a node gets from its source (narrowed by the source's name
+  // filter) or being self-built, before any per-node choice.
+  const groupRole = (n: SubPreviewItem): ChainRole => {
+    if (n.sourceId) {
+      const match = nameMatcher(sourceFilter(n.sourceId));
+
+      if (match && !match(n.original)) return "";
+      if (o.chainLandingSources.includes(n.sourceId)) return "landing";
+      if (o.chainRelaySources.includes(n.sourceId)) return "relay";
+    }
+
+    return n.own && o.chainLandingOwn ? "landing" : "";
+  };
   const pickedRole = (original: string): ChainRole | null =>
     o.chainLandingNames.includes(original)
       ? "landing"
@@ -543,6 +559,9 @@ function Editor({
   const setSourceRole = (id: number, role: ChainRole) => {
     const without = (list: number[]) => list.filter((x) => x !== id);
 
+    const filters = { ...o.chainSourceFilters };
+
+    if (!role) delete filters[id];
     setOpts({
       chainLandingSources:
         role === "landing"
@@ -552,6 +571,7 @@ function Editor({
         role === "relay"
           ? [...without(o.chainRelaySources), id]
           : without(o.chainRelaySources),
+      chainSourceFilters: filters,
       chainLanding: "",
       chainRelay: "",
     });
@@ -1148,21 +1168,47 @@ function Editor({
                           ? "relay"
                           : "";
 
+                      const filter = sourceFilter(src.id);
+                      const ofSource =
+                        chainNodes?.filter((n) => n.sourceId === src.id) ?? [];
+                      const match = nameMatcher(filter);
+                      const matched = match
+                        ? ofSource.filter((n) => match(n.original)).length
+                        : ofSource.length;
+
                       return (
-                        <div
-                          key={src.id}
-                          className="flex items-center gap-3 px-3 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm">{src.name}</div>
-                            <div className="truncate text-xs text-default-400">
-                              {src.nodeCount} 个节点
+                        <div key={src.id} className="space-y-2 px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm">{src.name}</div>
+                              <div className="truncate text-xs text-default-400">
+                                {role && filter && chainNodes
+                                  ? `匹配 ${matched} / ${ofSource.length} 个节点`
+                                  : `${src.nodeCount} 个节点`}
+                              </div>
                             </div>
+                            <ChainRoleButtons
+                              value={role}
+                              onChange={(r) => setSourceRole(src.id, r)}
+                            />
                           </div>
-                          <ChainRoleButtons
-                            value={role}
-                            onChange={(r) => setSourceRole(src.id, r)}
-                          />
+                          {role && (
+                            <Input
+                              aria-label={`${src.name} 名称筛选`}
+                              placeholder="名称筛选，如 香港|日本；留空用全部"
+                              size="sm"
+                              value={filter}
+                              variant="bordered"
+                              onChange={(e) =>
+                                setOpts({
+                                  chainSourceFilters: {
+                                    ...o.chainSourceFilters,
+                                    [src.id]: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          )}
                         </div>
                       );
                     })}
@@ -1175,6 +1221,16 @@ function Editor({
                   value={o.chainHideRelays}
                   onChange={(chainHideRelays) => setOpts({ chainHideRelays })}
                 />
+                {(o.chainLandingSources.length > 0 ||
+                  o.chainRelaySources.length > 0) && (
+                  <ToggleRow
+                    hint="链式代理里的订阅源，没筛选上（或单独设成不用）的节点不放进订阅；不影响其他来源"
+                    id="chain-drop-unused"
+                    label="没用上的节点不放进订阅"
+                    value={o.chainDropUnused}
+                    onChange={(chainDropUnused) => setOpts({ chainDropUnused })}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1914,4 +1970,41 @@ function ChainRoleButtons({
       ))}
     </div>
   );
+}
+
+/**
+ * The panel's filter expression (as the backend parses it): /regex/, or
+ * keywords separated by "|", any of them, case-insensitive. Null when
+ * empty. Go's leading (?i) becomes the i flag.
+ */
+function nameMatcher(expr: string): ((name: string) => boolean) | null {
+  const e = expr.trim();
+
+  if (!e) return null;
+  if (e.length > 2 && e.startsWith("/") && e.endsWith("/")) {
+    let body = e.slice(1, -1);
+    let flags = "";
+
+    if (body.startsWith("(?i)")) {
+      body = body.slice(4);
+      flags = "i";
+    }
+    try {
+      const re = new RegExp(body, flags);
+
+      return (name) => re.test(name);
+    } catch {
+      return () => false;
+    }
+  }
+  const words = e
+    .split("|")
+    .map((w) => w.trim().toLowerCase())
+    .filter(Boolean);
+
+  return (name) => {
+    const lower = name.toLowerCase();
+
+    return words.some((w) => lower.includes(w));
+  };
 }
