@@ -187,11 +187,18 @@ func TestTemplateBuilderGroupIcons(t *testing.T) {
 		}
 	}
 	b := builderFixture()
-	b.Rules = append(b.Rules, TemplateBuilderRule{Type: "category", Value: "youtube", Target: builderMain})
+	b.Groups = append(b.Groups, TemplateBuilderGroup{Name: "手动", Type: "select"}, TemplateBuilderGroup{Name: "日本", Type: "select", Icon: "https://example.com/jp.png"})
+	b.Rules = append(b.Rules,
+		TemplateBuilderRule{Type: "category", Value: "youtube", Target: builderMain},
+		TemplateBuilderRule{Type: "category", Value: "google", Target: builderMain})
+	b.Icons = map[string]string{"google": "https://example.com/g.png?size=64", IconFinal: "https://example.com/final.png"}
 	youtube := builderGroupIcons["youtube"]
 	for kind, want := range map[string][]string{
-		TemplateClash: {`icon: "` + youtube + `"`, `icon: "` + builderGroupIcons[builderMain] + `"`, `icon: "` + builderGroupIcons["__final"] + `"`, `icon: "` + qureIcon("Auto") + `"`},
-		TemplateSurge: {"YouTube = select, 节点选择, 美国优选, DIRECT, REJECT, include-all-proxies=1, icon-url=" + youtube + "\n", "icon-url=" + qureIcon("Auto") + "\n"},
+		TemplateClash: {`icon: "` + youtube + `"`, `icon: "` + builderGroupIcons[IconMain] + `"`, `icon: "https://example.com/final.png"`,
+			`icon: "` + builderGroupIcons[IconAuto] + `"`, `icon: "https://example.com/g.png?size=64"`, `icon: "https://example.com/jp.png"`},
+		TemplateSurge: {"YouTube = select, 节点选择, 美国优选, 手动, 日本, DIRECT, REJECT, include-all-proxies=1, icon-url=" + youtube + "\n",
+			"icon-url=" + builderGroupIcons[IconAuto] + "\n", "icon-url=https://example.com/g.png?size=64\n", "icon-url=https://example.com/final.png\n",
+			"手动 = select, include-all-proxies=1\n", "日本 = select, include-all-proxies=1, icon-url=https://example.com/jp.png\n"},
 	} {
 		content, err := BuildSubscriptionTemplate(kind, b)
 		if err != nil {
@@ -205,6 +212,38 @@ func TestTemplateBuilderGroupIcons(t *testing.T) {
 			if !strings.Contains(string(body), w) {
 				t.Fatalf("%s: missing %q in\n%s", kind, w, body)
 			}
+		}
+	}
+	for _, bad := range []map[string]string{
+		{"google": "https://example.com/a,b.png"},
+		{"google": "javascript:alert(1)"},
+		{"google": "https://example.com/a.png\nFINAL,DIRECT"},
+		{"nope": "https://example.com/a.png"},
+	} {
+		b.Icons = bad
+		if _, err := BuildSubscriptionTemplate(TemplateSurge, b); err == nil {
+			t.Fatalf("accepted icons %v", bad)
+		}
+	}
+	b.Icons = nil
+	b.Groups[2].Icon = "https://example.com/a b.png"
+	if _, err := BuildSubscriptionTemplate(TemplateClash, b); err == nil {
+		t.Fatal("accepted a group icon with a space")
+	}
+}
+
+func TestParseIconLibrary(t *testing.T) {
+	lib, err := ParseIconLibrary("\ufeff" + `{"name":"Qure","icons":[{"name":"YouTube.png","url":"https://x.test/YouTube.png"},{"name":"bad","url":"https://x.test/a,b.png"},{"name":"","url":"https://x.test/Final.png"},{"name":"dup","url":"https://x.test/YouTube.png"}]}`)
+	if err != nil || lib.Name != "Qure" || len(lib.Icons) != 2 || lib.Icons[1].Name != "Final.png" {
+		t.Fatalf("%+v %v", lib, err)
+	}
+	lib, _ = ParseIconLibrary(`{"icons":[{"name":"a","url":"https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Proxy.png"},{"name":"b","url":"https://raw.githubusercontent.com/o/r/refs/heads/main/b.png"}]}`)
+	if lib.Icons[0].URL != builderGroupIcons[IconMain] || lib.Icons[1].URL != "https://cdn.jsdelivr.net/gh/o/r@main/b.png" {
+		t.Fatalf("jsDelivr: %+v", lib.Icons)
+	}
+	for _, body := range []string{"not json", `{"name":"x","icons":[]}`, `{"icons":[{"url":"ftp://x"}]}`} {
+		if _, err := ParseIconLibrary(body); err == nil {
+			t.Fatalf("accepted %s", body)
 		}
 	}
 }

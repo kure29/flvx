@@ -22,12 +22,16 @@ type TemplateBuilder struct {
 	Groups        []TemplateBuilderGroup `json:"groups"`
 	Rules         []TemplateBuilderRule  `json:"rules"`
 	Final         string                 `json:"final"`
+	// Icons overrides group icons by category key, IconMain or IconFinal;
+	// a missing key keeps the default.
+	Icons map[string]string `json:"icons,omitempty"`
 }
 
 type TemplateBuilderGroup struct {
 	Name   string `json:"name"`
 	Type   string `json:"type"`
 	Filter string `json:"filter"`
+	Icon   string `json:"icon,omitempty"`
 }
 
 type TemplateBuilderRule struct {
@@ -56,8 +60,21 @@ const (
 
 func qureIcon(name string) string { return qureIconURL + name + ".png" }
 
+// Icon keys besides the category keys.
+const (
+	IconMain  = "__main"
+	IconFinal = "__final"
+	IconAuto  = "__auto" // default for url-test groups
+)
+
+// BuilderDefaultIcons are the default icons of the groups that are not
+// categories.
+func BuilderDefaultIcons() map[string]string {
+	return map[string]string{IconMain: builderGroupIcons[IconMain], IconFinal: builderGroupIcons[IconFinal], IconAuto: builderGroupIcons[IconAuto]}
+}
+
 var builderGroupIcons = map[string]string{
-	builderMain: qureIcon("Proxy"), "__final": qureIcon("Final"),
+	IconMain: qureIcon("Proxy"), IconFinal: qureIcon("Final"), IconAuto: qureIcon("Auto"),
 	"private": qureIcon("WiFi"), "ads": qureIcon("Advertising"), "ai": qureIcon("AI"),
 	"github": qureIcon("GitHub"), "youtube": qureIcon("YouTube"), "netflix": qureIcon("Netflix"),
 	"spotify": qureIcon("Spotify"), "abema": qureIcon("AbemaTV"), "media": qureIcon("ForeignMedia"),
@@ -150,12 +167,26 @@ func (b TemplateBuilder) validate() error {
 		if _, err := regexp.Compile(g.Filter); err != nil {
 			return fmt.Errorf("策略组「%s」的正则表达式无效：%w", g.Name, err)
 		}
+		if g.Icon != "" && !ValidIconURL(g.Icon) {
+			return fmt.Errorf("策略组「%s」的图标地址无效", g.Name)
+		}
 		targets[g.Name] = true
 	}
 	if !targets[b.Final] || b.Final == "REJECT" {
 		return fmt.Errorf("兜底去向请选择节点选择、策略组或直连")
 	}
 	categories, seen := builderCategories(), map[string]bool{}
+	if len(b.Icons) > 64 {
+		return fmt.Errorf("图标设置过多")
+	}
+	for key, icon := range b.Icons {
+		if _, ok := categories[key]; !ok && key != IconMain && key != IconFinal {
+			return fmt.Errorf("未知的图标位置：%s", key)
+		}
+		if !ValidIconURL(icon) {
+			return fmt.Errorf("图标地址无效：%s", icon)
+		}
+	}
 	for i, r := range b.Rules {
 		if !targets[r.Target] {
 			return fmt.Errorf("第 %d 条规则的策略组不存在：%s", i+1, r.Target)
@@ -183,6 +214,31 @@ func (b TemplateBuilder) validate() error {
 		}
 	}
 	return nil
+}
+
+// ValidIconURL accepts an http(s) image address that fits in a Surge group
+// line (comma-separated) and a YAML scalar.
+func ValidIconURL(s string) bool {
+	if len(s) > 500 || !(strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://")) || len(s) <= len("https://") {
+		return false
+	}
+	return !strings.ContainsAny(s, ", \t\r\n\"'\\`")
+}
+
+// groupIcon is a group's icon: the recipe's choice, else the default.
+func (b TemplateBuilder) groupIcon(key string) string {
+	if icon, ok := b.Icons[key]; ok && icon != "" {
+		return icon
+	}
+	return builderGroupIcons[key]
+}
+
+// userGroupIcon is a node group's icon; url-test groups default to Auto.
+func userGroupIcon(g TemplateBuilderGroup) string {
+	if g.Icon != "" || g.Type != "url-test" {
+		return g.Icon
+	}
+	return builderGroupIcons[IconAuto]
 }
 
 func validBuilderDomain(s string) bool {
@@ -233,20 +289,23 @@ func buildClashTemplate(b TemplateBuilder) string {
 		members = append(members, g.Name)
 	}
 	members = append(members, "DIRECT")
-	groups := []interface{}{yamlNode{{"name", builderMain}, {"type", "select"}, {"include-all", true}, {"proxies", members}, {"icon", builderGroupIcons[builderMain]}}}
+	groups := []interface{}{yamlNode{{"name", builderMain}, {"type", "select"}, {"include-all", true}, {"proxies", members}, {"icon", b.groupIcon(IconMain)}}}
 	for _, g := range b.Groups {
 		v := yamlNode{{"name", g.Name}, {"type", g.Type}, {"include-all", true}}
 		if g.Filter != "" {
 			v = append(v, yamlField{"filter", g.Filter})
 		}
 		if g.Type == "url-test" {
-			v = append(v, yamlField{"url", "https://www.gstatic.com/generate_204"}, yamlField{"interval", 300}, yamlField{"icon", qureIcon("Auto")})
+			v = append(v, yamlField{"url", "https://www.gstatic.com/generate_204"}, yamlField{"interval", 300})
+		}
+		if icon := userGroupIcon(g); icon != "" {
+			v = append(v, yamlField{"icon", icon})
 		}
 		groups = append(groups, v)
 	}
 	for _, g := range services {
 		v := yamlNode{{"name", g.Name}, {"type", "select"}, {"proxies", g.Members}, {"include-all", true}}
-		if icon := builderGroupIcons[g.Key]; icon != "" {
+		if icon := b.groupIcon(g.Key); icon != "" {
 			v = append(v, yamlField{"icon", icon})
 		}
 		groups = append(groups, v)
@@ -388,7 +447,7 @@ func buildSurgeTemplate(b TemplateBuilder) string {
 	for _, g := range b.Groups {
 		members = append(members, g.Name)
 	}
-	members = append(members, "DIRECT", "include-all-proxies=1", "icon-url="+builderGroupIcons[builderMain])
+	members = append(members, "DIRECT", "include-all-proxies=1", "icon-url="+b.groupIcon(IconMain))
 	out.WriteString(builderMain + " = select, " + strings.Join(members, ", ") + "\n")
 	for _, g := range b.Groups {
 		line := g.Name + " = " + g.Type + ", include-all-proxies=1"
@@ -396,13 +455,16 @@ func buildSurgeTemplate(b TemplateBuilder) string {
 			line += ", policy-regex-filter=" + g.Filter
 		}
 		if g.Type == "url-test" {
-			line += ", url=https://www.gstatic.com/generate_204, interval=300, icon-url=" + qureIcon("Auto")
+			line += ", url=https://www.gstatic.com/generate_204, interval=300"
+		}
+		if icon := userGroupIcon(g); icon != "" {
+			line += ", icon-url=" + icon
 		}
 		out.WriteString(line + "\n")
 	}
 	for _, g := range services {
 		line := g.Name + " = select, " + strings.Join(g.Members, ", ") + ", include-all-proxies=1"
-		if icon := builderGroupIcons[g.Key]; icon != "" {
+		if icon := b.groupIcon(g.Key); icon != "" {
 			line += ", icon-url=" + icon
 		}
 		out.WriteString(line + "\n")

@@ -5,30 +5,22 @@ import type {
 } from "@/api";
 
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+
+import {
+  GroupIcon,
+  IconPicker,
+  loadLibraryIcons,
+  matchIcon,
+  useIconLibraries,
+} from "./icon-picker";
 
 import { getSubTemplateCatalog } from "@/api";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Input } from "@/shadcn-bridge/heroui/input";
 
 const MAIN = "节点选择";
-
-/** A category's icon, the same image exported Mihomo / Surge groups show. */
-function CategoryIcon({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-
-  if (!src || failed) return <span aria-hidden className="h-5 w-5 shrink-0" />;
-
-  return (
-    <img
-      alt=""
-      className="h-5 w-5 shrink-0 object-contain"
-      loading="lazy"
-      src={src}
-      onError={() => setFailed(true)}
-    />
-  );
-}
 
 /**
  * A group name is committed on blur: rules follow the renamed group, and a
@@ -90,6 +82,48 @@ const RULE_TYPES = [
   ["ip_cidr", "IP / CIDR"],
 ] as const;
 
+// File names icon libraries use for each group, tried in order.
+const ICON_NAMES: Record<string, string[]> = {
+  __main: ["Proxy", "节点选择", "Select"],
+  __final: ["Final", "漏网之鱼", "Match"],
+  private: ["Lan", "Private", "Router", "WiFi", "Home", "Direct"],
+  ads: ["Advertising", "AdBlack", "AdBlock", "Ad", "Reject", "Hijacking"],
+  ai: ["AI", "ChatGPT", "OpenAI", "Claude"],
+  github: ["GitHub"],
+  youtube: ["YouTube"],
+  netflix: ["Netflix"],
+  spotify: ["Spotify"],
+  abema: ["AbemaTV", "Abema"],
+  media: ["ForeignMedia", "Streaming", "Media", "GlobalMedia"],
+  telegram: ["Telegram"],
+  google: ["Google_Search", "Google"],
+  microsoft: ["Microsoft"],
+  apple: ["Apple"],
+  bilibili: ["bilibili", "BiliBili"],
+  games: ["Game", "Games", "Steam"],
+  pixiv: ["Pixiv"],
+  scholar: ["Scholar", "Education", "Study"],
+  cn: ["China", "CN", "Domestic", "DomesticMedia"],
+  noncn: ["Global", "Foreign", "World"],
+};
+const REGION_ICON_NAMES: Array<[RegExp, string[]]> = [
+  [/港|HK|Hong ?Kong/i, ["Hong_Kong", "HK", "HongKong"]],
+  [/台|TW|Taiwan/i, ["Taiwan", "TW"]],
+  [/日本|JP|Japan/i, ["Japan", "JP"]],
+  [/新加坡|狮城|SG|Singapore/i, ["Singapore", "SG"]],
+  [/韩国|KR|Korea/i, ["Korea", "KR", "South_Korea"]],
+  [/美国|US|United States/, ["United_States", "US", "USA"]],
+];
+
+function groupIconNames(g: SubTemplateBuilder["groups"][number]) {
+  const region = REGION_ICON_NAMES.find(([re]) => re.test(g.name));
+
+  return [
+    ...(region?.[1] ?? []),
+    ...(g.type === "url-test" ? ["Auto", "Speedtest"] : ["Static"]),
+  ];
+}
+
 export const newTemplateBuilder = (): SubTemplateBuilder => ({
   version: 1,
   serviceGroups: true,
@@ -111,6 +145,11 @@ export function TemplateBuilder({
   const [catalog, setCatalog] = useState<SubTemplateCategory[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const { libraries, setLibraries, defaults } = useIconLibraries();
+  const [library, setLibrary] = useState("");
+  const [applying, setApplying] = useState(false);
+  // The icon being picked: a category key, "__main", "__final" or "group:<i>".
+  const [picking, setPicking] = useState<string | null>(null);
   const [custom, setCustom] = useState<SubTemplateBuilder["rules"][number]>({
     type: "domain_suffix",
     value: "",
@@ -237,6 +276,90 @@ export function TemplateBuilder({
     });
   };
 
+  const activeLibrary = library || libraries[0]?.url || "";
+  const serviceGroups = value.serviceGroups !== false;
+  // Every group the profile gets, in profile order. Category and 兜底
+  // groups only exist with independent service groups.
+  const iconSlots = [
+    { key: "__main", name: MAIN, fallback: defaults.__main },
+    ...value.groups.map((g, i) => ({
+      key: `group:${i}`,
+      name: g.name,
+      fallback: g.type === "url-test" ? defaults.__auto : undefined,
+    })),
+    ...(serviceGroups
+      ? [
+          ...catalog
+            .filter((c) => selected.has(c.key))
+            .map((c) => ({ key: c.key, name: c.name, fallback: c.icon })),
+          { key: "__final", name: "漏网之鱼", fallback: defaults.__final },
+        ]
+      : []),
+  ];
+  const iconOf = (key: string) =>
+    key.startsWith("group:")
+      ? (value.groups[Number(key.slice(6))]?.icon ?? "")
+      : (value.icons?.[key] ?? "");
+  const setIcons = (
+    patch: Record<string, string>,
+    groupIcons?: Record<number, string>,
+  ) => {
+    const icons = { ...value.icons, ...patch };
+
+    for (const k of Object.keys(icons)) if (!icons[k]) delete icons[k];
+    onChange({
+      ...value,
+      icons,
+      groups: groupIcons
+        ? value.groups.map((g, i) =>
+            i in groupIcons ? { ...g, icon: groupIcons[i] || undefined } : g,
+          )
+        : value.groups,
+    });
+  };
+  const setIcon = (key: string, url: string) =>
+    key.startsWith("group:")
+      ? setIcons({}, { [Number(key.slice(6))]: url })
+      : setIcons({ [key]: url });
+  const applyLibrary = async () => {
+    setApplying(true);
+    try {
+      const icons = await loadLibraryIcons(activeLibrary);
+      const patch: Record<string, string> = {};
+      const groupIcons: Record<number, string> = {};
+      let matched = 0;
+
+      for (const slot of iconSlots) {
+        if (slot.key.startsWith("group:")) {
+          const i = Number(slot.key.slice(6));
+          const url = matchIcon(icons, groupIconNames(value.groups[i]));
+
+          if (url) {
+            // The default stays the default, not a copy of it.
+            groupIcons[i] = url === slot.fallback ? "" : url;
+            matched++;
+          }
+        } else {
+          const url = matchIcon(icons, ICON_NAMES[slot.key] ?? [slot.name]);
+
+          if (url) {
+            patch[slot.key] = url === slot.fallback ? "" : url;
+            matched++;
+          }
+        }
+      }
+      setIcons(patch, groupIcons);
+      toast.success(
+        `已套用 ${matched} 个图标${matched < iconSlots.length ? `，${iconSlots.length - matched} 个没匹配到，保持原样` : ""}`,
+      );
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setApplying(false);
+    }
+  };
+  const pickingSlot = iconSlots.find((s) => s.key === picking);
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -313,7 +436,7 @@ export function TemplateBuilder({
                   type="checkbox"
                   onChange={() => toggle(c)}
                 />
-                <CategoryIcon src={c.icon} />
+                <GroupIcon src={value.icons?.[c.key] || c.icon} />
                 <span>{c.name}</span>
               </label>
             ))}
@@ -580,6 +703,92 @@ export function TemplateBuilder({
         </div>
       </details>
 
+      <details className="rounded-xl border border-divider p-3">
+        <summary className="cursor-pointer text-sm font-medium">
+          策略组图标 · {iconSlots.length} 个
+        </summary>
+        <p className="my-3 text-xs text-default-500">
+          Mihomo / Stash 写入 icon，Surge 写入 icon-url；sing-box
+          不支持策略组图标。
+          {!serviceGroups &&
+            "关闭独立策略组时，只有节点选择和节点分组是策略组。"}
+        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <select
+            aria-label="图标库"
+            className={`${selectClass} min-w-40 flex-1`}
+            disabled={!libraries.length}
+            value={activeLibrary}
+            onChange={(e) => setLibrary(e.target.value)}
+          >
+            {libraries.map((l) => (
+              <option key={l.url} value={l.url}>
+                {l.name}
+                {l.builtin ? "（内置）" : ""}
+              </option>
+            ))}
+          </select>
+          <Button
+            isDisabled={!activeLibrary}
+            isLoading={applying}
+            size="sm"
+            variant="flat"
+            onPress={applyLibrary}
+          >
+            一键套用
+          </Button>
+          <Button
+            isDisabled={
+              !Object.keys(value.icons ?? {}).length &&
+              !value.groups.some((g) => g.icon)
+            }
+            size="sm"
+            variant="light"
+            onPress={() =>
+              onChange({
+                ...value,
+                icons: undefined,
+                groups: value.groups.map((g) => ({ ...g, icon: undefined })),
+              })
+            }
+          >
+            全部恢复默认
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {iconSlots.map((slot) => {
+            const icon = iconOf(slot.key);
+
+            return (
+              <button
+                key={slot.key}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-default-100"
+                type="button"
+                onClick={() => setPicking(slot.key)}
+              >
+                <GroupIcon size="h-7 w-7" src={icon || slot.fallback} />
+                <span className="min-w-0 flex-1 truncate">{slot.name}</span>
+                <span className="shrink-0 text-xs text-default-400">
+                  {icon ? "自定义" : slot.fallback ? "默认" : "无图标"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </details>
+      <IconPicker
+        fallback={pickingSlot?.fallback}
+        isOpen={Boolean(pickingSlot)}
+        libraries={libraries}
+        library={activeLibrary}
+        title={pickingSlot?.name ?? ""}
+        value={picking ? iconOf(picking) : ""}
+        onClose={() => setPicking(null)}
+        onLibraries={setLibraries}
+        onLibrary={setLibrary}
+        onPick={(url) => picking && setIcon(picking, url)}
+      />
+
       <div className="flex items-center justify-between gap-3">
         <label className="text-sm font-medium" htmlFor="template-rule-final">
           未匹配流量（兜底）
@@ -661,7 +870,9 @@ export function TemplateRulePreview({
             <div className="min-w-0 flex-1 text-xs">
               {category ? (
                 <span className="flex items-center gap-1.5">
-                  <CategoryIcon src={category.icon} />
+                  <GroupIcon
+                    src={value.icons?.[category.key] || category.icon}
+                  />
                   {category.name}
                 </span>
               ) : (

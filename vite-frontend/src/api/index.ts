@@ -731,7 +731,13 @@ export interface SubTemplateBuilder {
   serviceGroups?: boolean;
   version: 1;
   preset: "minimal" | "balanced" | "full" | "custom";
-  groups: Array<{ name: string; type: "select" | "url-test"; filter: string }>;
+  groups: Array<{
+    name: string;
+    type: "select" | "url-test";
+    filter: string;
+    /** Image URL; empty keeps the default (Auto for url-test, none for select). */
+    icon?: string;
+  }>;
   rules: Array<{
     type:
       | "category"
@@ -743,6 +749,8 @@ export interface SubTemplateBuilder {
     target: string;
   }>;
   final: string;
+  /** Group icon overrides by category key, "__main" or "__final". */
+  icons?: Record<string, string>;
 }
 export interface SubTemplateCategory {
   key: string;
@@ -754,6 +762,32 @@ export interface SubTemplateCategory {
 }
 export const getSubTemplateCatalog = () =>
   Network.post<SubTemplateCategory[]>("/subscription/template/catalog");
+
+/** An icon subscription (Quantumult X / Loon / BoxJs format) to pick group icons from. */
+export interface SubIconLibrary {
+  name: string;
+  url: string;
+  builtin?: boolean;
+}
+export interface SubIconLibraryIcon {
+  name: string;
+  url: string;
+}
+export const getSubIconLibraries = () =>
+  Network.post<{
+    libraries: SubIconLibrary[];
+    /** Default icons for "__main", "__final" and "__auto" (url-test groups). */
+    defaults: Record<string, string>;
+  }>("/subscription/icon-library/list");
+export const getSubIconLibraryIcons = (url: string) =>
+  Network.post<{ name: string; icons: SubIconLibraryIcon[] }>(
+    "/subscription/icon-library/icons",
+    { url },
+  );
+export const saveSubIconLibrary = (url: string) =>
+  Network.post<SubIconLibrary[]>("/subscription/icon-library/save", { url });
+export const deleteSubIconLibrary = (url: string) =>
+  Network.post<SubIconLibrary[]>("/subscription/icon-library/delete", { url });
 
 export type SubTemplateKind = "clash" | "singbox" | "surge";
 /** Clients a subscription picks a template for; Stash and Shadowrocket take Mihomo ("clash") templates. */
