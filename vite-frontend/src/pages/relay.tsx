@@ -47,6 +47,60 @@ const TABS: Array<{ key: RelayTab; label: string }> = [
   { key: "quality", label: "质量" },
 ];
 
+/**
+ * A line's own part of its name: "腾讯成都-YT → TW | Seednet FH" is shown
+ * under that landing, so only "腾讯成都-YT" is new.
+ */
+function relayLabel(l: InboundRelayApiItem): string {
+  const full = l.name || l.tunnelName || "中转";
+  const cut = full.lastIndexOf(" → ");
+
+  return cut > 0 ? full.slice(0, cut) : full;
+}
+
+/** A landing's relay lines: one row each, its relay and its latency. */
+function RelayLines({
+  lines,
+  renderLatency,
+}: {
+  lines: InboundRelayApiItem[];
+  renderLatency: (l: InboundRelayApiItem) => React.ReactNode;
+}) {
+  return (
+    <div className="divide-y divide-divider/70 rounded-xl bg-default-100/60">
+      {lines.map((l) => {
+        const entry = l.entries[0];
+        const ok = l.forwardExists && l.forwardStatus === 1;
+
+        return (
+          <div
+            key={l.id}
+            className="flex min-h-9 min-w-0 items-center gap-2 px-3 py-1.5"
+          >
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${ok ? "bg-success" : "bg-warning"}`}
+              title={ok ? "转发正常" : "转发已暂停或被删除"}
+            />
+            <span
+              className="min-w-0 flex-1 truncate text-sm text-default-700"
+              title={l.name || l.tunnelName}
+            >
+              {relayLabel(l)}
+            </span>
+            <span className="shrink-0 text-xs">
+              {renderLatency(l) ?? (
+                <span className="font-mono text-default-400">
+                  {entry ? `${l.shareHost || entry.Host}:${entry.Port}` : "-"}
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Tunnel latency, throughput and errors over time (was 监控 → 隧道). */
 function QualityView() {
   const [viewMode, setViewMode] = useViewMode("monitor");
@@ -207,27 +261,31 @@ function LinesView() {
             const broken = lines.some(
               (l) => !(l.forwardExists && l.forwardStatus === 1),
             );
-            const lineTexts = lines.map((l) => {
-              const entry = l.entries[0];
-
-              return `${l.name || l.tunnelName}${
-                entry ? ` ${l.shareHost || entry.Host}:${entry.Port}` : ""
-              }`;
-            });
-            const empty = `${i.external ? "导入的节点" : i.nodeName} · 无中转，点击添加`;
+            const landing = i.external ? "导入的节点" : i.nodeName;
+            const summary =
+              lines.length === 0
+                ? `${landing} · 无中转，点击添加`
+                : `${landing} · ${lines.length} 条中转${broken ? " · 有暂停" : ""}`;
+            const lineList = lines.length > 0 && (
+              <RelayLines lines={lines} renderLatency={latencyOf} />
+            );
 
             if (card) {
               return (
                 <InfoCard
                   key={i.id}
-                  actions={[
-                    {
-                      key: "manage",
-                      label: lines.length > 0 ? "管理中转" : "添加中转",
-                      color: "primary",
-                      onPress: () => setEditing(i),
-                    },
-                  ]}
+                  actions={
+                    lines.length === 0
+                      ? [
+                          {
+                            key: "add",
+                            label: "添加中转",
+                            color: "primary",
+                            onPress: () => setEditing(i),
+                          },
+                        ]
+                      : undefined
+                  }
                   badges={
                     i.relayOnly && (
                       <Chip size="sm" variant="flat">
@@ -235,7 +293,19 @@ function LinesView() {
                       </Chip>
                     )
                   }
-                  rows={[["落地", i.external ? "导入的节点" : i.nodeName]]}
+                  headerRight={
+                    lines.length > 0 && (
+                      <Button
+                        className="h-7 min-w-0 px-2.5 text-xs"
+                        size="sm"
+                        variant="light"
+                        onPress={() => setEditing(i)}
+                      >
+                        管理
+                      </Button>
+                    )
+                  }
+                  rows={[]}
                   status={
                     lines.length === 0
                       ? "无中转"
@@ -253,33 +323,12 @@ function LinesView() {
                   }
                   onPress={() => setEditing(i)}
                 >
-                  {lines.length > 0 && (
-                    <div className="-mt-1 space-y-2">
-                      {lines.map((l) => {
-                        const entry = l.entries[0];
-
-                        return (
-                          <div
-                            key={l.id}
-                            className="flex min-w-0 items-center justify-between gap-2 text-sm"
-                          >
-                            <span className="min-w-0 truncate text-default-600">
-                              {l.name || l.tunnelName}
-                            </span>
-                            <span className="shrink-0 text-xs">
-                              {latencyOf(l) ?? (
-                                <span className="font-mono">
-                                  {entry
-                                    ? `${l.shareHost || entry.Host}:${entry.Port}`
-                                    : "-"}
-                                </span>
-                              )}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <p className="truncate text-xs text-default-500">
+                      落地：{landing}
+                    </p>
+                    {lineList}
+                  </div>
                 </InfoCard>
               );
             }
@@ -294,27 +343,10 @@ function LinesView() {
                     </Chip>
                   )
                 }
-                meta={lineTexts.length === 0 ? empty : lineTexts.join(" · ")}
-                right={
-                  lines.some((l) => l.forwardExists) ? (
-                    <span className="flex flex-col items-end gap-1">
-                      {lines.map((l) => (
-                        <span key={l.id} className="flex items-center gap-1.5">
-                          {lines.length > 1 && (
-                            <span className="max-w-24 truncate text-xs text-default-400">
-                              {l.name || l.tunnelName}
-                            </span>
-                          )}
-                          {latencyOf(l)}
-                        </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-default-500">
-                      {lines.length > 0 ? `${lines.length} 条` : ""}
-                    </span>
-                  )
+                footer={
+                  lineList && <div className="mt-2 lg:max-w-xl">{lineList}</div>
                 }
+                meta={summary}
                 status={lines.length === 0 ? "off" : broken ? "warn" : "ok"}
                 statusTitle={
                   lines.length === 0

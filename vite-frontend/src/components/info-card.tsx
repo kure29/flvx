@@ -119,7 +119,7 @@ export function InfoCard({
 
       <CardBody className="flex flex-1 flex-col pb-3 pt-0 md:pb-3 md:pt-0">
         {badges && <div className="mb-3 flex flex-wrap gap-1.5">{badges}</div>}
-        <div className="mb-4 space-y-2">
+        <div className="mb-4 space-y-2 empty:hidden">
           {rows.map(([label, value]) => (
             <div
               key={label}
