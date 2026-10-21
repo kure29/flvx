@@ -39,6 +39,7 @@ import {
   getPeerRemoteUsageList,
   dismissNodeExpiryReminder,
   probeNodeLatency,
+  getNodeMonthTraffic,
   type ReleaseChannel,
 } from "@/api";
 import { LatencyCell } from "@/components/latency-cell";
@@ -99,6 +100,12 @@ import {
   UpgradeNodeModal,
 } from "@/pages/node/agent-modals";
 import { NodeFilterModal } from "@/pages/node/filter-modal";
+import { NodeLiveStats } from "@/pages/node/node-live-stats";
+import {
+  toggleStatusPublic,
+  useStatusPage,
+} from "@/pages/node/status-page-store";
+import { Switch } from "@/shadcn-bridge/heroui/switch";
 
 export default function NodePage({
   embedded = false,
@@ -256,6 +263,33 @@ export default function NodePage({
     useState<ReleaseChannel>("stable");
   const [selectedVersion, setSelectedVersion] = useState("");
   const [batchUpgradeLoading, setBatchUpgradeLoading] = useState(false);
+  // This month's traffic per node, and the public status page (its 公开
+  // switch shows on the rows while the page is on).
+  const [monthTraffic, setMonthTraffic] = useState<
+    Record<string, [number, number]>
+  >({});
+  const statusPage = useStatusPage();
+  const statusPublic = new Map(
+    (statusPage?.nodes ?? []).map((n) => [n.id, n.public]),
+  );
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const res = await getNodeMonthTraffic();
+
+      if (active && res.code === 0 && res.data) setMonthTraffic(res.data);
+    };
+
+    void load();
+    const timer = window.setInterval(load, 60_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const [upgradeProgress, setUpgradeProgress] = useState<
     Record<number, { stage: string; percent: number; message: string }>
   >({});
@@ -2173,10 +2207,41 @@ export default function NodePage({
                             )}
                           </>
                         }
+                        footer={
+                          !isRemoteNode && (
+                            <NodeLiveStats
+                              info={online ? (node.systemInfo ?? null) : null}
+                              month={monthTraffic[String(node.id)]}
+                              variant="footer"
+                            />
+                          )
+                        }
                         meta={meta.filter(Boolean).join(" · ")}
                         right={
                           <>
-                            {renderLatency(node, "list")}
+                            {!isRemoteNode && (
+                              <NodeLiveStats
+                                info={online ? (node.systemInfo ?? null) : null}
+                                month={monthTraffic[String(node.id)]}
+                                variant="row"
+                              />
+                            )}
+                            {/* A fixed slot keeps the stats in line across rows. */}
+                            <div className="contents lg:flex lg:w-36 lg:justify-end">
+                              {renderLatency(node, "list")}
+                            </div>
+                            {statusPage?.settings.enabled &&
+                              statusPublic.has(node.id) && (
+                                <Switch
+                                  aria-label={`${node.name} 显示在公开状态页`}
+                                  isSelected={statusPublic.get(node.id)}
+                                  size="sm"
+                                  title="显示在公开状态页"
+                                  onValueChange={(on) =>
+                                    toggleStatusPublic(node.id, on)
+                                  }
+                                />
+                              )}
                             {!isDisplayFiltered && (
                               <span
                                 className="cursor-grab touch-none p-1 text-default-300 hover:text-default-500 active:cursor-grabbing"

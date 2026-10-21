@@ -19,10 +19,11 @@ import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import ForwardPage from "@/pages/forward";
 import { RelayModal } from "@/pages/inbound/relay-modal";
 import TunnelPage from "@/pages/tunnel";
+import { TunnelMonitorView } from "@/pages/node/tunnel-monitor-view";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 
-type RelayTab = "lines" | "tunnels" | "rules";
+type RelayTab = "lines" | "tunnels" | "rules" | "quality";
 
 const TAB_KEY = "flvx_relay_tab";
 
@@ -30,7 +31,8 @@ function readTab(): RelayTab {
   try {
     const v = localStorage.getItem(TAB_KEY);
 
-    if (v === "lines" || v === "tunnels" || v === "rules") return v;
+    if (v === "lines" || v === "tunnels" || v === "rules" || v === "quality")
+      return v;
   } catch {
     // Remembering the tab is only a convenience.
   }
@@ -42,7 +44,22 @@ const TABS: Array<{ key: RelayTab; label: string }> = [
   { key: "lines", label: "线路" },
   { key: "tunnels", label: "隧道" },
   { key: "rules", label: "规则" },
+  { key: "quality", label: "质量" },
 ];
+
+/** Tunnel latency, throughput and errors over time (was 监控 → 隧道). */
+function QualityView() {
+  const [viewMode, setViewMode] = useViewMode("monitor");
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      </div>
+      <TunnelMonitorView card={viewMode === "card"} />
+    </div>
+  );
+}
 
 /** Relay lines grouped by the landing they lead to. */
 function LinesView() {
@@ -346,6 +363,8 @@ export default function RelayPage() {
         <LinesView />
       ) : tab === "tunnels" ? (
         <TunnelPage embedded />
+      ) : tab === "quality" ? (
+        <QualityView />
       ) : (
         <ForwardPage embedded />
       )}

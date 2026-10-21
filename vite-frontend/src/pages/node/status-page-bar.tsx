@@ -1,9 +1,13 @@
-import type { StatusPageSettings } from "@/api";
-
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 
-import { getStatusPage, saveStatusPage, setNodeStatusPublic } from "@/api";
+import {
+  setStatusPageSettings,
+  toggleStatusPublic,
+  useStatusPage,
+} from "./status-page-store";
+
+import { saveStatusPage } from "@/api";
 import { copyText } from "@/pages/inbound/share";
 import { ToggleRow } from "@/pages/subscription/controls";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -27,27 +31,13 @@ const pageLink = (slug: string) => `${window.location.origin}/status/${slug}`;
  * a dialog for the title, a new link and the nodes it shows.
  */
 export function StatusPageBar() {
-  const [settings, setSettings] = useState<StatusPageSettings | null>(null);
-  const [nodes, setNodes] = useState<
-    Array<{ id: number; name: string; public: boolean }>
-  >([]);
+  const data = useStatusPage();
+  const settings = data?.settings ?? null;
+  const nodes = data?.nodes ?? [];
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [enabled, setEnabled] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await getStatusPage();
-
-    if (res.code === 0 && res.data) {
-      setSettings(res.data.settings);
-      setNodes(res.data.nodes);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const open = () => {
     setTitle(settings?.title ?? "");
@@ -65,7 +55,7 @@ export function StatusPageBar() {
 
         return;
       }
-      setSettings(res.data);
+      setStatusPageSettings(res.data);
       if (newSlug) toast.success("已换新链接，旧链接已失效");
       else {
         toast.success("已保存");
@@ -73,18 +63,6 @@ export function StatusPageBar() {
       }
     } finally {
       setSaving(false);
-    }
-  };
-
-  const toggleNode = async (id: number, on: boolean) => {
-    setNodes((list) =>
-      list.map((n) => (n.id === id ? { ...n, public: on } : n)),
-    );
-    const res = await setNodeStatusPublic(id, on);
-
-    if (res.code !== 0) {
-      toast.error(res.msg || "保存失败");
-      void load();
     }
   };
 
@@ -191,7 +169,7 @@ export function StatusPageBar() {
                     key={n.id}
                     className="w-full"
                     isSelected={n.public}
-                    onValueChange={(on) => toggleNode(n.id, on)}
+                    onValueChange={(on) => toggleStatusPublic(n.id, on)}
                   >
                     <span className="text-sm">{n.name}</span>
                   </Checkbox>

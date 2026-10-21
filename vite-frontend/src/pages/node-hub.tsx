@@ -8,8 +8,9 @@ import { PageHeader, PageTabs } from "@/components/page-kit";
 import NodePage from "@/pages/node";
 import { KernelsTab } from "@/pages/node/kernels-tab";
 import { StatusPageBar } from "@/pages/node/status-page-bar";
+import { NodeMonitorTab } from "@/pages/monitor";
 
-type NodeTab = "nodes" | "kernels";
+type NodeTab = "nodes" | "monitor" | "kernels";
 
 /** Where other pages send someone to install a kernel (route state). */
 export interface NodeHubState {
@@ -21,7 +22,9 @@ const TAB_KEY = "flvx_node_tab";
 
 function readTab(): NodeTab {
   try {
-    return localStorage.getItem(TAB_KEY) === "kernels" ? "kernels" : "nodes";
+    const t = localStorage.getItem(TAB_KEY);
+
+    return t === "kernels" || t === "monitor" ? t : "nodes";
   } catch {
     return "nodes"; // remembering the tab is only a convenience
   }
@@ -60,7 +63,9 @@ export default function NodeHubPage() {
         description={
           tab === "kernels"
             ? "节点上安装的 Xray / sing-box / Snell 等内核，落地的入站跑在内核上"
-            : "装了 agent 的服务器，用来搭建落地和中转"
+            : tab === "monitor"
+              ? "每个节点的历史图表和服务监控"
+              : "装了 agent 的服务器：实时状态和管理都在这里"
         }
         // The kernel tab has its own 安装内核 button.
         primary={
@@ -77,12 +82,15 @@ export default function NodeHubPage() {
       <PageTabs
         tabs={[
           { key: "nodes", label: "节点" },
+          { key: "monitor", label: "监控" },
           { key: "kernels", label: "内核" },
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === "kernels" ? (
+      {tab === "monitor" ? (
+        <NodeMonitorTab />
+      ) : tab === "kernels" ? (
         <KernelsTab
           installRequest={install}
           onInstallRequestHandled={() => setInstall(null)}

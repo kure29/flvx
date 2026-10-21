@@ -349,6 +349,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/node/status-page/get", h.nodeStatusPageGet)
 	mux.HandleFunc("/api/v1/node/status-page/save", h.nodeStatusPageSave)
 	mux.HandleFunc("/api/v1/node/status-public", h.nodeStatusPublic)
+	mux.HandleFunc("/api/v1/node/traffic/month", h.nodeTrafficMonth)
 	mux.HandleFunc("/api/v1/monitor/nodes/", h.monitorNodeMetricsHandler)
 	mux.HandleFunc("/api/v1/monitor/nodes", h.monitorNodeListHandler)
 	mux.HandleFunc("/api/v1/monitor/tunnels", h.monitorTunnelListHandler)

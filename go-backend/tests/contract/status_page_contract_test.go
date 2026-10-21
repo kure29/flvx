@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"go-backend/internal/auth"
 )
@@ -63,6 +64,17 @@ func TestStatusPageContract(t *testing.T) {
 	got := kernelContractPost(t, router, admin, "/api/v1/node/status-page/get", `{}`).Data.(map[string]interface{})
 	if list := got["nodes"].([]interface{}); len(list) != 2 || list[0].(map[string]interface{})["public"] != true || list[1].(map[string]interface{})["public"] != false {
 		t.Fatalf("nodes: %v", got)
+	}
+
+	if err := r.DB().Exec(`INSERT INTO node_traffic(node_id, hour, in_bytes, out_bytes) VALUES(?, ?, 300, 200)`, shown, time.Now().UnixMilli()-time.Now().UnixMilli()%3600000).Error; err != nil {
+		t.Fatal(err)
+	}
+	month := kernelContractPost(t, router, admin, "/api/v1/node/traffic/month", `{"tzOffset":480}`).Data.(map[string]interface{})
+	if v := month[jsonInt64(shown)].([]interface{}); valueAsInt(v[0]) != 300 || valueAsInt(v[1]) != 200 {
+		t.Fatalf("month traffic: %v", month)
+	}
+	if out := kernelContractPost(t, router, user, "/api/v1/node/traffic/month", `{}`); out.Code == 0 {
+		t.Fatal("node traffic is for admins")
 	}
 
 	// A new path retires the old link; turning the page off hides it.

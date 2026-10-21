@@ -174,6 +174,8 @@ export default function AdminLayout({
     },
     {
       path: "/monitor",
+      // Admins find monitoring under 节点 and 中转.
+      userOnly: true,
       section: "系统",
       label: "监控",
       icon: (
