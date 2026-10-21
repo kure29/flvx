@@ -4,6 +4,13 @@
 
 完整的提交记录见 [GitHub Releases](https://github.com/kure29/flyx/releases)。
 
+## 3.3.31
+
+2026-10-21
+
+- Stash 订阅带上分流规则：内置规则改用 Stash 能读的 YAML 规则集，和 Mihomo 用同一套规则；订阅只给 Mihomo 选了模板时，Stash 也沿用这个模板（模板里有 `mrs` 规则集时除外），见 [订阅模板](./guide/subscription-templates.md#在订阅里使用)
+- **落地** 页的自建入站不再重复显示所在节点的延迟和回程，只显示能不能连上；延迟和回程在 **节点** 页看。导入的节点照旧显示面板测到它的延迟
+
 ## 3.3.30
 
 2026-10-21
