@@ -162,6 +162,52 @@ const getColorByUsage = (usage?: number) => {
   return "success";
 };
 
+const BAR_TONE: Record<string, string> = {
+  success: "bg-success",
+  primary: "bg-primary",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  default: "bg-default-300",
+};
+
+/** A labelled usage bar for a list row (CPU, 内存). */
+function UsageMini({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <div className="flex items-baseline justify-between gap-2 text-[11px]">
+        <span className="text-default-500">{label}</span>
+        <span className="font-mono font-medium">{value.toFixed(1)}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-default-100">
+        <div
+          className={`h-full rounded-full ${BAR_TONE[getColorByUsage(value)]}`}
+          style={{ width: `${Math.max(2, Math.min(100, value))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Live CPU, memory and network speed of a node, under its list row. */
+function NodeMetricsStrip({ metric }: { metric: RealtimeNodeMetric }) {
+  return (
+    <div className="grid max-w-2xl grid-cols-3 gap-3">
+      <UsageMini label="CPU" value={metric.cpuUsage} />
+      <UsageMini label="内存" value={metric.memoryUsage} />
+      <div className="min-w-0 space-y-0.5 font-mono text-[11px] leading-4">
+        <div className="truncate">
+          <span className="font-bold text-primary-500">↑</span>{" "}
+          {formatBytesPerSecond(metric.netOutSpeed)}
+        </div>
+        <div className="truncate">
+          <span className="font-bold text-success-500">↓</span>{" "}
+          {formatBytesPerSecond(metric.netInSpeed)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** A node in the card view (the original upstream design). */
 function ServerCard({
   node,
@@ -1346,31 +1392,17 @@ export function MonitorView({
                 return (
                   <ListRow
                     key={node.id}
+                    footer={live ? <NodeMetricsStrip metric={metric} /> : null}
                     meta={
-                      live ? (
-                        <span className="flex flex-wrap gap-x-3 whitespace-normal font-mono">
-                          <span>CPU {metric.cpuUsage.toFixed(1)}%</span>
-                          <span>内存 {metric.memoryUsage.toFixed(1)}%</span>
-                          <span>
-                            ↑{formatBytesPerSecond(metric.netOutSpeed)} ↓
-                            {formatBytesPerSecond(metric.netInSpeed)}
-                          </span>
-                          <span>
-                            流量 ↑{formatBytes(metric.netOutBytes)} ↓
-                            {formatBytes(metric.netInBytes)}
-                          </span>
-                          <span className="hidden sm:inline">
-                            连接 {metric.tcpConns + metric.udpConns}
-                          </span>
-                          <span className="hidden sm:inline">
-                            运行 {formatUptime(metric.uptime)}
-                          </span>
-                        </span>
-                      ) : isOnline ? (
-                        "在线 · 等待指标"
-                      ) : (
-                        "离线"
-                      )
+                      live
+                        ? [
+                            `连接 ${metric.tcpConns + metric.udpConns}`,
+                            `运行 ${formatUptime(metric.uptime)}`,
+                            `流量 ↑${formatBytes(metric.netOutBytes)} ↓${formatBytes(metric.netInBytes)}`,
+                          ].join(" · ")
+                        : isOnline
+                          ? "在线 · 等待指标"
+                          : "离线"
                     }
                     status={isOnline ? "ok" : "bad"}
                     statusTitle={isOnline ? "在线" : "离线"}
