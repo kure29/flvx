@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-import { AnimatedPage } from "@/components/animated-page";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
@@ -9,6 +8,7 @@ import {
   ListGroup,
   ListRow,
   PageHeader,
+  PageShell,
   PageTabs,
   PageToolbar,
   formatDate,
@@ -82,7 +82,11 @@ interface GroupPermission {
 
 type GroupTab = "tunnel" | "user" | "perm";
 
-export default function GroupPage() {
+export default function GroupPage({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [isAdmin] = useState(getAdminFlag());
   const [activeTab, setActiveTab] = useState<GroupTab>("tunnel");
@@ -506,11 +510,13 @@ export default function GroupPage() {
   );
 
   return (
-    <AnimatedPage className="px-3 lg:px-6 py-6">
-      <PageHeader
-        description="把隧道和用户编组，再按组授予隧道使用权限"
-        title="分组"
-      />
+    <PageShell embedded={embedded}>
+      {!embedded && (
+        <PageHeader
+          description="把隧道和用户编组，再按组授予隧道使用权限"
+          title="分组"
+        />
+      )}
       <PageTabs
         tabs={[
           { key: "tunnel", label: "隧道分组", badge: tunnelGroups.length },
@@ -1038,6 +1044,6 @@ export default function GroupPage() {
           </Modal>
         </>
       )}
-    </AnimatedPage>
+    </PageShell>
   );
 }

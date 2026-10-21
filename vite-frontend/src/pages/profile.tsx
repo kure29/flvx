@@ -4,9 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Activity,
   ChevronRight,
-  Gauge,
   KeyRound,
-  Layers,
   LogOut,
   Settings,
   Share2,
@@ -121,13 +119,6 @@ export default function ProfilePage() {
       onPress: go("/monitor"),
     },
     {
-      key: "/limit",
-      label: "限速管理",
-      description: "管理用户限速策略",
-      icon: Gauge,
-      onPress: go("/limit"),
-    },
-    {
       key: "/panel-sharing",
       label: "面板共享",
       description: "与其他面板进行联邦共享",
@@ -135,16 +126,9 @@ export default function ProfilePage() {
       onPress: go("/panel-sharing"),
     },
     {
-      key: "/group",
-      label: "分组管理",
-      description: "管理用户和隧道分组",
-      icon: Layers,
-      onPress: go("/group"),
-    },
-    {
       key: "/user",
       label: "用户管理",
-      description: "管理系统用户",
+      description: "用户、分组和限速",
       icon: Users,
       onPress: go("/user"),
     },

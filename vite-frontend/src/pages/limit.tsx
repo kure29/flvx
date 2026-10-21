@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 
-import { AnimatedPage } from "@/components/animated-page";
 import { ActionSheet } from "@/components/action-sheet";
 import {
   EmptyHint,
   ListGroup,
   ListRow,
   PageHeader,
+  PageShell,
   PageToolbar,
 } from "@/components/page-kit";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -44,7 +44,11 @@ interface SpeedLimitForm {
   status: number;
 }
 
-export default function LimitPage() {
+export default function LimitPage({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [rules, setRules] = useState<SpeedLimitRule[]>([]);
   const [searchKeyword, setSearchKeyword] = useLocalStorageState(
@@ -221,14 +225,21 @@ export default function LimitPage() {
   const sheetRule = rules.find((r) => r.id === sheetRuleId) ?? null;
 
   return (
-    <AnimatedPage className="px-3 lg:px-6 py-6">
-      <PageHeader
-        description="分配隧道权限时可选的带宽上限"
-        primary={{ key: "add", label: "新建限速规则", onPress: handleAdd }}
-        title="限速"
-      />
+    <PageShell embedded={embedded}>
+      {!embedded && (
+        <PageHeader
+          description="分配隧道权限时可选的带宽上限"
+          primary={{ key: "add", label: "新建限速规则", onPress: handleAdd }}
+          title="限速"
+        />
+      )}
       <PageToolbar
         placeholder="搜索规则名称"
+        primary={
+          embedded
+            ? { key: "add", label: "新建限速规则", onPress: handleAdd }
+            : undefined
+        }
         search={searchKeyword}
         onSearch={setSearchKeyword}
       />
@@ -415,6 +426,6 @@ export default function LimitPage() {
           )}
         </ModalContent>
       </Modal>
-    </AnimatedPage>
+    </PageShell>
   );
 }

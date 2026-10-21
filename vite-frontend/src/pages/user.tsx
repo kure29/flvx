@@ -4,13 +4,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import toast from "react-hot-toast";
 import { parseDate } from "@internationalized/date";
 
-import { AnimatedPage } from "@/components/animated-page";
 import { ActionSheet } from "@/components/action-sheet";
 import {
   EmptyHint,
   ListGroup,
   ListRow,
   PageHeader,
+  PageShell,
   PageToolbar,
   formatDate,
   type RowStatus,
@@ -132,6 +132,26 @@ const calculateUserTotalUsedFlow = (user: User): number => {
   return (user.inFlow || 0) + (user.outFlow || 0);
 };
 
+/** Used share of a user's traffic limit; nothing for unlimited users. */
+function UsageBar({ user }: { user: User }) {
+  if (user.flow === 99999 && !user.flowMiB) return null;
+  const limit = flowLimitBytes(user.flow, user.flowMiB);
+
+  if (limit <= 0) return null;
+  const pct = Math.min(100, (calculateUserTotalUsedFlow(user) / limit) * 100);
+  const tone =
+    pct >= 100 ? "bg-danger" : pct >= 90 ? "bg-warning" : "bg-primary";
+
+  return (
+    <div className="h-1.5 max-w-md overflow-hidden rounded-full bg-default-100">
+      <div
+        className={`h-full rounded-full ${tone}`}
+        style={{ width: `${Math.max(2, pct)}%` }}
+      />
+    </div>
+  );
+}
+
 const calculateTunnelUsedFlow = (tunnel: UserTunnel): number => {
   const inFlow = tunnel.inFlow || 0;
   const outFlow = tunnel.outFlow || 0;
@@ -243,7 +263,7 @@ function SubscriptionPicker({
   );
 }
 
-export default function UserPage() {
+export default function UserPage({ embedded = false }: { embedded?: boolean }) {
   // 状态管理
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1111,15 +1131,22 @@ export default function UserPage() {
   const sheetUser = users.find((u) => u.id === sheetUserId) ?? null;
 
   return (
-    <AnimatedPage className="px-3 lg:px-6 py-6">
-      <PageHeader
-        description="面板账号，分配隧道权限、流量和到期时间"
-        primary={{ key: "add", label: "新建用户", onPress: handleAdd }}
-        title="用户"
-      />
+    <PageShell embedded={embedded}>
+      {!embedded && (
+        <PageHeader
+          description="面板账号，分配隧道权限、流量和到期时间"
+          primary={{ key: "add", label: "新建用户", onPress: handleAdd }}
+          title="用户"
+        />
+      )}
       <PageToolbar
         more={[{ key: "refresh", label: "刷新列表", onPress: handleSearch }]}
         placeholder="搜索用户名"
+        primary={
+          embedded
+            ? { key: "add", label: "新建用户", onPress: handleAdd }
+            : undefined
+        }
         search={searchKeyword}
         onSearch={setSearchKeyword}
       />
@@ -1188,6 +1215,7 @@ export default function UserPage() {
                     ) : null}
                   </>
                 }
+                footer={<UsageBar user={user} />}
                 meta={meta.join(" · ")}
                 status={state.status}
                 statusTitle={state.text}
@@ -2330,6 +2358,6 @@ export default function UserPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </AnimatedPage>
+    </PageShell>
   );
 }

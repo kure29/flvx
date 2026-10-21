@@ -31,6 +31,8 @@ interface MenuItem {
   // Hidden for admins: the page lives under 中转 for them.
   userOnly?: boolean;
   adminLabel?: string;
+  // Admin menu heading shown above this item.
+  section?: string;
 }
 
 interface PasswordForm {
@@ -67,8 +69,7 @@ export default function AdminLayout({
   });
   const isMobile = useMobileBreakpoint();
 
-  // 菜单项配置
-  // 菜单项配置：管理员按 落地 → 中转 → 订阅 排列，普通用户保持原样
+  // 菜单项配置：管理员按 线路 / 分发 / 系统 分组（用户页含分组和限速），普通用户保持原样
   const menuItems: MenuItem[] = [
     {
       path: "/dashboard",
@@ -108,6 +109,7 @@ export default function AdminLayout({
     },
     {
       path: "/node",
+      section: "线路",
       label: "节点",
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -150,38 +152,12 @@ export default function AdminLayout({
     },
     {
       path: "/subscription",
+      section: "分发",
       label: "订阅",
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
           <path d="M5 3a1 1 0 000 2c5.523 0 10 4.477 10 10a1 1 0 102 0C17 8.373 11.627 3 5 3z" />
           <path d="M4 9a1 1 0 011-1 7 7 0 017 7 1 1 0 11-2 0 5 5 0 00-5-5 1 1 0 01-1-1zM3 15a2 2 0 114 0 2 2 0 01-4 0z" />
-        </svg>
-      ),
-      adminOnly: true,
-    },
-    {
-      path: "/monitor",
-      label: "监控",
-      icon: (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            clipRule="evenodd"
-            d="M3 3a1 1 0 000 2v11a1 1 0 001 1h13a1 1 0 100-2H5V5a1 1 0 00-1-1H3zm13.707 4.293a1 1 0 00-1.414 0L12 10.586 10.707 9.293a1 1 0 00-1.414 0L7 11.586l-1.293-1.293a1 1 0 10-1.414 1.414l2 2a1 1 0 001.414 0L10 11.414l1.293 1.293a1 1 0 001.414 0l3-3a1 1 0 000-1.414z"
-            fillRule="evenodd"
-          />
-        </svg>
-      ),
-    },
-    {
-      path: "/limit",
-      label: "限速",
-      icon: (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            clipRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-            fillRule="evenodd"
-          />
         </svg>
       ),
       adminOnly: true,
@@ -197,14 +173,18 @@ export default function AdminLayout({
       adminOnly: true,
     },
     {
-      path: "/group",
-      label: "分组",
+      path: "/monitor",
+      section: "系统",
+      label: "监控",
       icon: (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 2a3 3 0 100 6 3 3 0 000-6zM4 9a3 3 0 100 6 3 3 0 000-6zm12 0a3 3 0 100 6 3 3 0 000-6M4 16a2 2 0 00-2 2h4a2 2 0 00-2-2zm12 0a2 2 0 00-2 2h4a2 2 0 00-2-2zm-6 0a2 2 0 00-2 2h4a2 2 0 00-2-2z" />
+          <path
+            clipRule="evenodd"
+            d="M3 3a1 1 0 000 2v11a1 1 0 001 1h13a1 1 0 100-2H5V5a1 1 0 00-1-1H3zm13.707 4.293a1 1 0 00-1.414 0L12 10.586 10.707 9.293a1 1 0 00-1.414 0L7 11.586l-1.293-1.293a1 1 0 10-1.414 1.414l2 2a1 1 0 001.414 0L10 11.414l1.293 1.293a1 1 0 001.414 0l3-3a1 1 0 000-1.414z"
+            fillRule="evenodd"
+          />
         </svg>
       ),
-      adminOnly: true,
     },
     {
       path: "/panel-sharing",
@@ -449,23 +429,34 @@ export default function AdminLayout({
 
         {/* 菜单导航 */}
         <nav className="flex-1 px-4 overflow-y-auto overflow-x-hidden scrollbar-hide">
-          <ul className="space-y-2">
+          <ul className="space-y-1">
             {filteredMenuItems.map((item) => {
               const isActive =
                 location.pathname === item.path ||
                 (item.path === "/relay" &&
                   isAdmin &&
-                  ["/tunnel", "/forward"].includes(location.pathname));
+                  ["/tunnel", "/forward"].includes(location.pathname)) ||
+                (item.path === "/user" &&
+                  ["/group", "/limit"].includes(location.pathname));
               const isMonitor = item.path === "/monitor";
               const isMonitorBlocked = isMonitor && monitorAllowed !== true;
 
               return (
                 <li key={item.path}>
+                  {isAdmin &&
+                    item.section &&
+                    (isCollapsed ? (
+                      <div className="mx-3 my-2 border-t border-default-200/70" />
+                    ) : (
+                      <div className="px-3 pb-1 pt-3 text-[11px] font-medium tracking-wide text-default-400">
+                        {item.section}
+                      </div>
+                    ))}
                   <motion.button
                     aria-disabled={isMonitorBlocked}
                     className={`
-                       w-full flex items-center p-3 rounded-2xl text-left
-                       relative min-h-[48px] overflow-hidden transition-colors
+                       w-full flex items-center px-3 py-2.5 rounded-2xl text-left
+                       relative min-h-[44px] overflow-hidden transition-colors
                        ${isMonitorBlocked ? "opacity-60" : ""}
                        ${
                          isActive
