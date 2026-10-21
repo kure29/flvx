@@ -12,6 +12,7 @@ import (
 
 	"go-backend/internal/http/response"
 	"go-backend/internal/kernel"
+	"go-backend/internal/store/model"
 )
 
 // The public status page: a read-only view of the nodes an admin marked
@@ -29,6 +30,8 @@ const (
 	statusRateWindow   = time.Minute
 	statusRatePerIP    = 120
 	statusMaxTitleRune = 50
+	// statusHistLen latency rounds (about an hour) per reference point.
+	statusHistLen = 20
 )
 
 type statusLatency struct {
@@ -39,6 +42,8 @@ type statusLatency struct {
 	// Route is the return route's name (e.g. CN2 GIA), never its hops.
 	Route   string `json:"route,omitempty"`
 	RouteV6 string `json:"routeV6,omitempty"`
+	// Hist is the last rounds, oldest first: [ms, loss %], [0, 100] failed.
+	Hist [][2]float64 `json:"hist,omitempty"`
 }
 
 // statusNode is everything the status page shows about a node.
@@ -95,6 +100,7 @@ func (h *Handler) buildStatusView(publicOnly bool, tzOffset int, title string) (
 	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	traffic, _ := h.repo.NodeTrafficSince(month.UnixMilli())
 	view := statusView{Title: title, Nodes: []statusNode{}, UpdatedAt: time.Now().UnixMilli()}
+	hist := h.statusLatencyHistory(nodes, publicOnly)
 	for _, n := range nodes {
 		if publicOnly && n.StatusPublic != 1 {
 			continue
@@ -108,12 +114,48 @@ func (h *Handler) buildStatusView(publicOnly bool, tzOffset int, title string) (
 		if p, ok := h.nodeLatency.get(n.ID); ok && item.Online {
 			for _, pt := range h.withRoutes(n.ID, p).Points {
 				item.Latency = append(item.Latency, statusLatency{Name: pt.Name, OK: pt.OK, Ms: pt.LatencyMs, LossPct: pt.LossPct,
-					Route: pt.Route, RouteV6: pt.RouteV6})
+					Route: pt.Route, RouteV6: pt.RouteV6, Hist: hist[latencyHistKey{n.ID, pt.Name}]})
 			}
 		}
 		view.Nodes = append(view.Nodes, item)
 	}
 	return view, nil
+}
+
+type latencyHistKey struct {
+	node  int64
+	point string
+}
+
+// statusLatencyHistory reads the last statusHistLen rounds of each shown
+// node's reference points in one query.
+func (h *Handler) statusLatencyHistory(nodes []model.Node, publicOnly bool) map[latencyHistKey][][2]float64 {
+	var ids []int64
+	for _, n := range nodes {
+		if n.Status == 1 && (!publicOnly || n.StatusPublic == 1) {
+			ids = append(ids, n.ID)
+		}
+	}
+	since := time.Now().Add(-time.Duration(statusHistLen+3) * reachProbeInterval).UnixMilli()
+	samples, err := h.repo.ListLatencySamplesSince(ids, since)
+	out := make(map[latencyHistKey][][2]float64)
+	if err != nil {
+		return out
+	}
+	for _, s := range samples {
+		k := latencyHistKey{s.NodeID, s.Point}
+		v := [2]float64{0, 100}
+		if s.OK == 1 {
+			v = [2]float64{float64(s.LatencyMs), s.LossPct}
+		}
+		out[k] = append(out[k], v)
+	}
+	for k, v := range out {
+		if len(v) > statusHistLen {
+			out[k] = v[len(v)-statusHistLen:]
+		}
+	}
+	return out
 }
 
 // statusCache keeps the public answer per time zone for statusCacheTTL;

@@ -694,6 +694,8 @@ export interface StatusNode {
     lossPct?: number;
     route?: string;
     routeV6?: string;
+    /** Last rounds, oldest first: [ms, loss %]; a failed round is [0, 100]. */
+    hist?: Array<[number, number]>;
   }>;
 }
 
