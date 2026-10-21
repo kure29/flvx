@@ -110,10 +110,13 @@ import { Switch } from "@/shadcn-bridge/heroui/switch";
 export default function NodePage({
   embedded = false,
   addRequest = 0,
+  onOpenMonitor,
 }: {
   embedded?: boolean;
   /** Bumped by the 节点 page header's 新建节点 when embedded. */
   addRequest?: number;
+  /** Opens a node's history charts and service monitors. */
+  onOpenMonitor?: (nodeId: number) => void;
 }) {
   const [nodeList, setNodeList] = useState<Node[]>([]);
   const [nodeOrder, setNodeOrder] = useState<number[]>([]);
@@ -2354,6 +2357,16 @@ export default function NodePage({
                       },
                     ]
                   : [
+                      ...(onOpenMonitor
+                        ? [
+                            {
+                              key: "monitor",
+                              label: "监控",
+                              color: "primary" as const,
+                              onPress: () => onOpenMonitor(node.id),
+                            },
+                          ]
+                        : []),
                       {
                         key: "install",
                         label: "安装命令",

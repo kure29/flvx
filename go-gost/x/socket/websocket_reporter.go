@@ -52,6 +52,7 @@ type SystemInfo struct {
 	UDPConns         int64   `json:"udp_conns"`
 	NetInSpeed       int64   `json:"net_in_speed"`
 	NetOutSpeed      int64   `json:"net_out_speed"`
+	CPUCores         int     `json:"cpu_cores"`
 }
 
 // NetworkStats 网络统计信息
@@ -634,6 +635,7 @@ func (w *WebSocketReporter) collectSystemInfo() SystemInfo {
 		UDPConns:         connInfo.UDPConns,
 		NetInSpeed:       netInSpeed,
 		NetOutSpeed:      netOutSpeed,
+		CPUCores:         runtime.NumCPU(),
 	}
 }
 

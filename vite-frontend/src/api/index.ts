@@ -141,6 +141,10 @@ export interface StatusPageSettings {
   enabled: boolean;
   title: string;
   slug: string;
+  /** Image URL behind the page, "" for none. */
+  background: string;
+  /** 10–100; below 100 the background shows through the cards. */
+  cardOpacity: number;
 }
 export const getStatusPage = () =>
   Network.post<{
@@ -152,6 +156,9 @@ export const saveStatusPage = (data: {
   title: string;
   /** Give the page a new link; the old one stops working. */
   newSlug?: boolean;
+  /** Left out, these stay as they are. */
+  background?: string;
+  cardOpacity?: number;
 }) => Network.post<StatusPageSettings>("/node/status-page/save", data);
 export const setNodeStatusPublic = (id: number, isPublic: boolean) =>
   Network.post("/node/status-public", { id, public: isPublic });
@@ -669,6 +676,8 @@ export const runServiceMonitor = (id: number) =>
 
 /** One node on the status page (the backend's statusNode). */
 export interface StatusNode {
+  /** Opens the node's details on the public page; changes with the link. */
+  key?: string;
   name: string;
   /** Region group like "🇭🇰 香港", or "" when the name has none. */
   region: string;
@@ -679,6 +688,8 @@ export interface StatusNode {
   mem: number;
   disk: number;
   load: number;
+  /** CPU count; missing from older agents. */
+  cores?: number;
   /** Bytes per second. */
   netIn: number;
   netOut: number;
@@ -694,14 +705,34 @@ export interface StatusNode {
     lossPct?: number;
     route?: string;
     routeV6?: string;
-    /** Last rounds, oldest first: [ms, loss %]; a failed round is [0, 100]. */
-    hist?: Array<[number, number]>;
+    /** Last rounds, oldest first: [ms, loss %, unix ms]; a failed round
+     * has ms 0 and loss 100. */
+    hist?: Array<[number, number, number]>;
+  }>;
+}
+
+/** A public node's history for the status page's detail view. */
+export interface StatusDetail {
+  name: string;
+  region: string;
+  online: boolean;
+  cores?: number;
+  hours: number;
+  /** [unix ms, cpu %, mem %, disk %, load1, net in B/s, net out B/s]. */
+  metrics: Array<[number, number, number, number, number, number, number]>;
+  latency: Array<{
+    name: string;
+    route?: string;
+    /** [unix ms, ms, loss %]; a failed round has ms 0 and loss 100. */
+    samples: Array<[number, number, number]>;
   }>;
 }
 
 /** The status page: public (no login) or for users allowed to see monitoring. */
 export interface StatusView {
   title: string;
+  background?: string;
+  cardOpacity: number;
   nodes: StatusNode[];
   updatedAt: number;
 }

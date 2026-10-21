@@ -61,6 +61,26 @@ func TestStatusPageContract(t *testing.T) {
 			t.Fatalf("public view leaks %q: %s", leak, body)
 		}
 	}
+	// A public node's details: its key from the view, never its ID.
+	key, _ := view.Data.Nodes[0]["key"].(string)
+	if len(key) != 12 {
+		t.Fatalf("node key: %v", view.Data.Nodes[0])
+	}
+	code, body = get("/api/v1/open_api/status/" + slug + "/node/" + key + "?hours=6")
+	if code != 200 || !strings.Contains(body, `"name":"香港 HKT"`) || !strings.Contains(body, `"hours":6`) {
+		t.Fatalf("detail: %d %s", code, body)
+	}
+	for _, leak := range []string{"203.0.113.10", "secret", "30000", "\"id\""} {
+		if strings.Contains(body, leak) {
+			t.Fatalf("detail leaks %q: %s", leak, body)
+		}
+	}
+	for _, bad := range []string{"/node/" + strings.Repeat("0", 12), "/node/", "/other/" + key} {
+		if code, _ := get("/api/v1/open_api/status/" + slug + bad); code != http.StatusNotFound {
+			t.Fatalf("%s: %d", bad, code)
+		}
+	}
+
 	got := kernelContractPost(t, router, admin, "/api/v1/node/status-page/get", `{}`).Data.(map[string]interface{})
 	if list := got["nodes"].([]interface{}); len(list) != 2 || list[0].(map[string]interface{})["public"] != true || list[1].(map[string]interface{})["public"] != false {
 		t.Fatalf("nodes: %v", got)
@@ -77,11 +97,25 @@ func TestStatusPageContract(t *testing.T) {
 		t.Fatal("node traffic is for admins")
 	}
 
+	// A background must be a plain URL; the view carries it and the opacity.
+	if out := kernelContractPost(t, router, admin, "/api/v1/node/status-page/save", `{"enabled":true,"title":"我的节点","background":"javascript:alert(1)"}`); out.Code == 0 {
+		t.Fatal("a script URL must not be a background")
+	}
+	if out := kernelContractPost(t, router, admin, "/api/v1/node/status-page/save", `{"enabled":true,"title":"我的节点","background":"https://img.example.com/bg.webp","cardOpacity":70}`); out.Code != 0 {
+		t.Fatalf("background: %+v", out)
+	}
+	if _, body := get("/api/v1/open_api/status/" + slug); !strings.Contains(body, `"background":"https://img.example.com/bg.webp"`) || !strings.Contains(body, `"cardOpacity":70`) {
+		t.Fatalf("view without background: %s", body)
+	}
+
 	// A new path retires the old link; turning the page off hides it.
 	out = kernelContractPost(t, router, admin, "/api/v1/node/status-page/save", `{"enabled":true,"newSlug":true}`)
 	next := out.Data.(map[string]interface{})["slug"].(string)
 	if code, _ := get("/api/v1/open_api/status/" + slug); code != http.StatusNotFound || next == slug {
 		t.Fatalf("old slug after a new one: %d", code)
+	}
+	if code, _ := get("/api/v1/open_api/status/" + next + "/node/" + key); code != http.StatusNotFound {
+		t.Fatalf("old node key after a new link: %d", code)
 	}
 	kernelContractPost(t, router, admin, "/api/v1/node/status-page/save", `{"enabled":false}`)
 	if code, _ := get("/api/v1/open_api/status/" + next); code != http.StatusNotFound {

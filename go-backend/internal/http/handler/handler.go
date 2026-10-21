@@ -148,6 +148,7 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 			UDPConns:         info.UDPConns,
 			NetInSpeed:       info.NetInSpeed,
 			NetOutSpeed:      info.NetOutSpeed,
+			CPUCores:         info.CPUCores,
 		}
 		h.metrics.RecordNodeMetric(nodeID, metricInfo)
 	})

@@ -7,9 +7,9 @@ import { AnimatedPage } from "@/components/animated-page";
 import { PageHeader, PageTabs } from "@/components/page-kit";
 import NodePage from "@/pages/node";
 import { KernelsTab } from "@/pages/node/kernels-tab";
-import { NodeMonitorTab } from "@/pages/monitor";
+import { NodeMonitorDetail } from "@/pages/monitor";
 
-type NodeTab = "nodes" | "monitor" | "kernels";
+type NodeTab = "nodes" | "kernels";
 
 /** Where other pages send someone to install a kernel (route state). */
 export interface NodeHubState {
@@ -23,7 +23,7 @@ function readTab(): NodeTab {
   try {
     const t = localStorage.getItem(TAB_KEY);
 
-    return t === "kernels" || t === "monitor" ? t : "nodes";
+    return t === "kernels" ? t : "nodes";
   } catch {
     return "nodes"; // remembering the tab is only a convenience
   }
@@ -41,9 +41,12 @@ export default function NodeHubPage() {
     state.install ?? null,
   );
   const [addNode, setAddNode] = useState(0);
+  // A node's 监控 replaces the list; the list stays mounted underneath.
+  const [monitorNode, setMonitorNode] = useState<number | null>(null);
 
   const setTab = (t: NodeTab) => {
     setTabState(t);
+    setMonitorNode(null);
     try {
       localStorage.setItem(TAB_KEY, t);
     } catch {
@@ -62,13 +65,11 @@ export default function NodeHubPage() {
         description={
           tab === "kernels"
             ? "节点上安装的 Xray / sing-box / Snell 等内核，落地的入站跑在内核上"
-            : tab === "monitor"
-              ? "每个节点的历史图表和服务监控"
-              : "装了 agent 的服务器：实时状态和管理都在这里"
+            : "装了 agent 的服务器：实时状态、监控和管理都在这里"
         }
         // The kernel tab has its own 安装内核 button.
         primary={
-          tab === "nodes"
+          tab === "nodes" && monitorNode === null
             ? {
                 key: "add",
                 label: "新建节点",
@@ -81,21 +82,33 @@ export default function NodeHubPage() {
       <PageTabs
         tabs={[
           { key: "nodes", label: "节点" },
-          { key: "monitor", label: "监控" },
           { key: "kernels", label: "内核" },
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === "monitor" ? (
-        <NodeMonitorTab />
-      ) : tab === "kernels" ? (
+      {tab === "kernels" ? (
         <KernelsTab
           installRequest={install}
           onInstallRequestHandled={() => setInstall(null)}
         />
       ) : (
-        <NodePage embedded addRequest={addNode} />
+        <>
+          {monitorNode !== null && (
+            <NodeMonitorDetail
+              key={monitorNode}
+              nodeId={monitorNode}
+              onBack={() => setMonitorNode(null)}
+            />
+          )}
+          <div className={monitorNode !== null ? "hidden" : ""}>
+            <NodePage
+              embedded
+              addRequest={addNode}
+              onOpenMonitor={setMonitorNode}
+            />
+          </div>
+        </>
       )}
     </AnimatedPage>
   );

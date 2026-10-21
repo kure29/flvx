@@ -1,45 +1,40 @@
 import type { StatusNode } from "@/api";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, LayoutGrid, List } from "lucide-react";
+import { LayoutGrid, List } from "lucide-react";
 
-import { RouteTag } from "@/components/route-tag";
+import {
+  Latency,
+  MAX_POINTS,
+  Month,
+  PointRow,
+  SegMeter,
+  Speed,
+  bytes,
+  loadMeter,
+  tone,
+  uptimeText,
+} from "./parts";
 
 const ALL = "全部";
 
-function bytes(v: number): string {
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  let i = 0;
-
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i++;
-  }
-
-  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
-}
-
-function uptimeText(s: number): string {
-  const d = Math.floor(s / 86400);
-
-  if (d > 0) return `在线 ${d} 天`;
-  const h = Math.floor(s / 3600);
-
-  return h > 0 ? `在线 ${h} 小时` : "刚上线";
-}
-
-/** Green below 60%, amber below 85%, red above. */
-function tone(v: number): string {
-  return v >= 85 ? "bg-danger" : v >= 60 ? "bg-warning" : "bg-success";
-}
-
-function Meter({ label, value }: { label: string; value?: number }) {
+function Meter({
+  label,
+  value,
+  text,
+  title,
+}: {
+  label: string;
+  value?: number;
+  text?: string;
+  title?: string;
+}) {
   return (
-    <div className="min-w-0 space-y-1.5">
+    <div className="min-w-0 space-y-1.5" title={title}>
       <div className="flex items-baseline justify-between gap-1 text-xs">
         <span className="sr-only">{label}</span>
         <span className="font-semibold tabular-nums">
-          {value === undefined ? "—" : `${value.toFixed(0)}%`}
+          {value === undefined ? "—" : (text ?? `${value.toFixed(0)}%`)}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-default-100">
@@ -49,102 +44,6 @@ function Meter({ label, value }: { label: string; value?: number }) {
             style={{ width: `${Math.min(100, Math.max(2, value))}%` }}
           />
         )}
-      </div>
-    </div>
-  );
-}
-
-type Point = StatusNode["latency"][number];
-
-/** Points the board lists; the rest are counted. */
-const MAX_POINTS = 4;
-
-function msTone(p: Point): string {
-  if (!p.ok || (p.ms ?? 0) >= 300 || (p.lossPct ?? 0) >= 50) {
-    return "text-rose-600 dark:text-rose-400";
-  }
-  if ((p.ms ?? 0) >= 100 || (p.lossPct ?? 0) > 0) {
-    return "text-amber-600 dark:text-amber-400";
-  }
-
-  return "text-emerald-600 dark:text-emerald-400";
-}
-
-function msText(p: Point): string {
-  if (!p.ok) return "超时";
-
-  return p.lossPct ? `${p.ms} ms · 丢${p.lossPct.toFixed(0)}%` : `${p.ms} ms`;
-}
-
-/** Latency and return route to each reference point, one line per point. */
-function Latency({ n }: { n: StatusNode }) {
-  if (!n.online) {
-    return <span className="text-xs text-default-400">离线</span>;
-  }
-  if (n.latency.length === 0) {
-    return <span className="text-xs text-default-400">—</span>;
-  }
-  const more = n.latency.length - MAX_POINTS;
-
-  return (
-    <div className="space-y-1">
-      {n.latency.slice(0, MAX_POINTS).map((p) => (
-        <div key={p.name} className="flex min-w-0 items-center gap-2 text-xs">
-          <span className="w-14 shrink-0 truncate text-default-500">
-            {p.name}
-          </span>
-          <span className={`shrink-0 font-medium tabular-nums ${msTone(p)}`}>
-            {msText(p)}
-          </span>
-          <RouteTag short route={p.route} />
-          {p.routeV6 && p.routeV6 !== p.route && (
-            <span className="inline-flex items-center gap-0.5">
-              <span className="text-[10px] text-default-400">v6</span>
-              <RouteTag short route={p.routeV6} />
-            </span>
-          )}
-        </div>
-      ))}
-      {more > 0 && (
-        <div className="text-[11px] text-default-400">还有 {more} 个测试点</div>
-      )}
-    </div>
-  );
-}
-
-/** Upload over download, each with its arrow. */
-function Speed({ n }: { n: StatusNode }) {
-  const row = (up: boolean, v: number) => (
-    <div className="flex items-center gap-1.5">
-      {up ? (
-        <ArrowUp className="h-3 w-3 shrink-0 text-emerald-500" />
-      ) : (
-        <ArrowDown className="h-3 w-3 shrink-0 text-sky-500" />
-      )}
-      <span className="font-medium tabular-nums">
-        {n.online ? `${bytes(v)}/s` : "—"}
-      </span>
-    </div>
-  );
-
-  return (
-    <div className="space-y-1 text-xs">
-      {row(true, n.netOut)}
-      {row(false, n.netIn)}
-    </div>
-  );
-}
-
-/** This month's total, upload and download under it. */
-function Month({ n }: { n: StatusNode }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-sm font-semibold tabular-nums">
-        {bytes(n.monthIn + n.monthOut)}
-      </div>
-      <div className="flex flex-wrap gap-x-1.5 text-[11px] tabular-nums text-default-400">
-        <span className="whitespace-nowrap">↑{bytes(n.monthOut)}</span>
-        <span className="whitespace-nowrap">↓{bytes(n.monthIn)}</span>
       </div>
     </div>
   );
@@ -176,7 +75,7 @@ function Summary({ nodes }: { nodes: StatusNode[] }) {
       {cards.map(([label, value, sub], i) => (
         <div
           key={label}
-          className="space-y-2 rounded-2xl bg-content1 p-4 shadow-sm"
+          className="status-surface space-y-2 rounded-2xl bg-content1 p-4 shadow-sm"
         >
           <div className="text-xs text-default-500">{label}</div>
           <div className="text-2xl font-bold tabular-nums">{value}</div>
@@ -198,148 +97,46 @@ function Summary({ nodes }: { nodes: StatusNode[] }) {
   );
 }
 
-/** Latency tones: green under 100 ms, amber under 300, red above or down. */
-function sampleTone(ms: number, loss: number): string {
-  if (loss >= 100 || ms >= 300 || loss >= 50) return "bg-rose-500";
-  if (ms >= 100 || loss > 0) return "bg-amber-400";
-
-  return "bg-emerald-500";
-}
-
-function lossTone(loss: number): string {
-  if (loss >= 50) return "bg-rose-500";
-  if (loss > 0) return "bg-amber-400";
-
-  return "bg-emerald-500";
-}
-
-const EMPTY_SEG = "bg-default-200/70 dark:bg-default-100";
-
-/** A row of small blocks, one class each; missing ones on the left. */
-function SegBar({ segs, total }: { segs: string[]; total: number }) {
-  const shown = segs.slice(-total);
-  const pad = total - shown.length;
-
-  return (
-    <div className="flex h-2 gap-[2px]">
-      {Array.from({ length: total }, (_, i) => (
-        <span
-          key={i}
-          className={`flex-1 rounded-[2px] ${i < pad ? EMPTY_SEG : shown[i - pad]}`}
-        />
-      ))}
-    </div>
-  );
-}
-
-const METER_SEGS = 16;
-
-function SegMeter({ label, value }: { label: string; value?: number }) {
-  const filled =
-    value === undefined
-      ? 0
-      : Math.max(value > 0 ? 1 : 0, Math.round((value / 100) * METER_SEGS));
-  const on = value === undefined ? EMPTY_SEG : tone(value);
-
-  return (
-    <div className="min-w-0 space-y-1.5">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-default-500">{label}</span>
-        <span className="font-semibold tabular-nums">
-          {value === undefined ? "—" : `${Math.round(value)}%`}
-        </span>
-      </div>
-      <SegBar
-        segs={Array.from({ length: METER_SEGS }, (_, i) =>
-          i < filled ? on : EMPTY_SEG,
-        )}
-        total={METER_SEGS}
-      />
-    </div>
-  );
-}
-
-const HIST_SEGS = 20;
-
-/** One reference point: latency and route left, packet loss right, each
- * over the last rounds (about an hour). */
-function PointRow({ p }: { p: Point }) {
-  const hist: Array<[number, number]> = p.hist?.length
-    ? p.hist
-    : [[p.ms ?? 0, p.ok ? (p.lossPct ?? 0) : 100]];
-  const loss = p.ok ? (p.lossPct ?? 0) : 100;
-
-  return (
-    <>
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-default-600">{p.name}</span>
-            <RouteTag short route={p.route} />
-          </span>
-          <span className={`shrink-0 font-semibold tabular-nums ${msTone(p)}`}>
-            {p.ok ? (
-              <>
-                {p.ms}
-                <span className="ml-0.5 text-[10px] font-normal text-default-400">
-                  ms
-                </span>
-              </>
-            ) : (
-              "超时"
-            )}
-          </span>
-        </div>
-        <SegBar
-          segs={hist.map(([ms, l]) => sampleTone(ms, l))}
-          total={HIST_SEGS}
-        />
-      </div>
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-default-500">丢包</span>
-          <span
-            className={`font-semibold tabular-nums ${loss >= 50 ? "text-rose-600 dark:text-rose-400" : loss > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}
-          >
-            {loss.toFixed(loss % 1 ? 1 : 0)}
-            <span className="ml-0.5 text-[10px] font-normal text-default-400">
-              %
-            </span>
-          </span>
-        </div>
-        <SegBar segs={hist.map(([, l]) => lossTone(l))} total={HIST_SEGS} />
-      </div>
-    </>
-  );
-}
-
 /** A node as a card: the phone layout and the desktop card mode. */
-function NodeCard({ n }: { n: StatusNode }) {
+export function NodeCard({
+  n,
+  onSelect,
+}: {
+  n: StatusNode;
+  onSelect?: (n: StatusNode) => void;
+}) {
+  const load = loadMeter(n);
+
   return (
     <div
-      className={`space-y-4 rounded-2xl bg-content1 p-4 shadow-sm ${n.online ? "" : "opacity-60"}`}
+      className={`status-surface space-y-4 rounded-2xl bg-content1 p-4 shadow-sm ${n.online ? "" : "opacity-60"}`}
     >
-      <div className="flex min-w-0 items-center gap-2.5">
+      <button
+        className="flex w-full min-w-0 items-center gap-2.5 text-left disabled:cursor-default"
+        disabled={!onSelect}
+        type="button"
+        onClick={() => onSelect?.(n)}
+      >
         <span
           className={`h-2.5 w-2.5 shrink-0 rounded-full ${n.online ? "bg-success" : "bg-default-400"}`}
         />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold">{n.name}</div>
           <div className="truncate text-xs text-default-500">
-            {[
-              n.region,
-              n.online ? uptimeText(n.uptime) : "离线",
-              n.online ? `负载 ${n.load.toFixed(2)}` : "",
-            ]
+            {[n.region, n.online ? uptimeText(n.uptime) : "离线"]
               .filter(Boolean)
               .join(" · ")}
           </div>
         </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <SegMeter label="CPU" value={n.online ? n.cpu : undefined} />
-        <SegMeter label="内存" value={n.online ? n.mem : undefined} />
-        <SegMeter label="磁盘" value={n.online ? n.disk : undefined} />
+        {onSelect && (
+          <span className="shrink-0 text-xs text-primary">详情 ›</span>
+        )}
+      </button>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <SegMeter label="CPU" pct={n.online ? n.cpu : undefined} />
+        <SegMeter label="内存" pct={n.online ? n.mem : undefined} />
+        <SegMeter label="磁盘" pct={n.online ? n.disk : undefined} />
+        <SegMeter label="负载" {...load} />
       </div>
       <div className="grid grid-cols-3 divide-x divide-divider rounded-xl bg-default-50 py-2.5 dark:bg-default-50/50">
         <div className="min-w-0 px-3">
@@ -376,59 +173,117 @@ function NodeCard({ n }: { n: StatusNode }) {
 }
 
 type Layout = "list" | "card";
-const LAYOUT_KEY = "flyx-status-layout";
+type Sort = "default" | "name" | "speed" | "traffic" | "latency";
 
-function savedLayout(): Layout {
+const SORTS: Array<[Sort, string]> = [
+  ["default", "默认排序"],
+  ["name", "按名称"],
+  ["speed", "按实时网速"],
+  ["traffic", "按本月流量"],
+  ["latency", "按延迟"],
+];
+
+const LAYOUT_KEY = "flyx-status-layout";
+const SORT_KEY = "flyx-status-sort";
+
+function saved<T extends string>(key: string, allowed: T[], fallback: T): T {
   try {
-    return localStorage.getItem(LAYOUT_KEY) === "card" ? "card" : "list";
+    const v = localStorage.getItem(key) as T | null;
+
+    return v && allowed.includes(v) ? v : fallback;
   } catch {
-    return "list";
+    return fallback;
   }
 }
 
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Not saved; it still applies until the page reloads.
+  }
+}
+
+/** Best reachable point's latency; offline and unmeasured nodes last. */
+function bestMs(n: StatusNode): number {
+  const ok = n.latency.filter((p) => p.ok).map((p) => p.ms ?? 0);
+
+  return n.online && ok.length ? Math.min(...ok) : Infinity;
+}
+
+function sorted(nodes: StatusNode[], by: Sort): StatusNode[] {
+  if (by === "default") return nodes;
+  const list = [...nodes];
+
+  if (by === "name") list.sort((a, b) => a.name.localeCompare(b.name, "zh"));
+  if (by === "speed") {
+    list.sort((a, b) => b.netIn + b.netOut - (a.netIn + a.netOut));
+  }
+  if (by === "traffic") {
+    list.sort((a, b) => b.monthIn + b.monthOut - (a.monthIn + a.monthOut));
+  }
+  if (by === "latency") list.sort((a, b) => bestMs(a) - bestMs(b));
+
+  return list;
+}
+
 const GRID =
-  "grid grid-cols-[minmax(10rem,1.3fr)_repeat(3,minmax(4rem,0.7fr))_6.5rem_7.5rem_minmax(13rem,1.3fr)] items-center gap-5";
+  "grid grid-cols-[minmax(10rem,1.3fr)_repeat(4,minmax(3.5rem,0.6fr))_6.5rem_7.5rem_minmax(13rem,1.3fr)] items-center gap-5";
 
 /**
  * Nodes' live state, read only: the public status page and the view for
  * users allowed to see monitoring. summary adds the totals on top. Phones
- * always get cards; wide screens choose between a list and cards.
+ * always get cards; wide screens choose between a list and cards. With
+ * onSelect, a node opens its details.
  */
 export function StatusBoard({
   nodes,
   summary,
+  onSelect,
 }: {
   nodes: StatusNode[];
   summary?: boolean;
+  onSelect?: (n: StatusNode) => void;
 }) {
   const [region, setRegion] = useState(ALL);
-  const [layout, setLayoutState] = useState<Layout>(savedLayout);
+  const [layout, setLayoutState] = useState<Layout>(() =>
+    saved<Layout>(LAYOUT_KEY, ["list", "card"], "list"),
+  );
+  const [sort, setSortState] = useState<Sort>(() =>
+    saved<Sort>(
+      SORT_KEY,
+      SORTS.map(([s]) => s),
+      "default",
+    ),
+  );
   const regions = [...new Set(nodes.map((n) => n.region || "其他"))];
-  const shown =
+  const shown = sorted(
     region === ALL
       ? nodes
-      : nodes.filter((n) => (n.region || "其他") === region);
+      : nodes.filter((n) => (n.region || "其他") === region),
+    sort,
+  );
 
   const setLayout = (l: Layout) => {
     setLayoutState(l);
-    try {
-      localStorage.setItem(LAYOUT_KEY, l);
-    } catch {
-      // Not saved; it still applies until the page reloads.
-    }
+    remember(LAYOUT_KEY, l);
+  };
+  const setSort = (s: Sort) => {
+    setSortState(s);
+    remember(SORT_KEY, s);
   };
 
   return (
     <div className="space-y-4">
       {summary && <Summary nodes={nodes} />}
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="flex flex-1 flex-wrap gap-2">
           {regions.length > 1 &&
             [ALL, ...regions].map((r) => (
               <button
                 key={r}
                 aria-pressed={region === r}
-                className={`flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm transition-colors ${region === r ? "border-primary bg-primary-50 font-semibold text-primary dark:bg-primary-500/20" : "border-divider bg-content1 text-default-600 hover:bg-default-100"}`}
+                className={`status-surface flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm transition-colors ${region === r ? "border-primary bg-primary-50 font-semibold text-primary dark:bg-primary-500/20" : "border-divider bg-content1 text-default-600 hover:bg-default-100"}`}
                 type="button"
                 onClick={() => setRegion(r)}
               >
@@ -441,29 +296,43 @@ export function StatusBoard({
               </button>
             ))}
         </div>
-        <div className="hidden shrink-0 rounded-full border border-divider bg-content1 p-1 lg:flex">
-          {(
-            [
-              ["list", "列表", List],
-              ["card", "卡片", LayoutGrid],
-            ] as const
-          ).map(([value, label, Icon]) => (
-            <button
-              key={value}
-              aria-label={label}
-              aria-pressed={layout === value}
-              className={`flex h-7 w-8 items-center justify-center rounded-full transition-colors ${layout === value ? "bg-primary-50 text-primary dark:bg-primary-500/20" : "text-default-500 hover:text-default-700"}`}
-              title={label}
-              type="button"
-              onClick={() => setLayout(value)}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          ))}
+        <div className="flex shrink-0 items-center gap-2">
+          <select
+            aria-label="排序"
+            className="status-surface h-9 rounded-full border border-divider bg-content1 px-3 text-sm text-default-600 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+          >
+            {SORTS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <div className="status-surface hidden rounded-full border border-divider bg-content1 p-1 lg:flex">
+            {(
+              [
+                ["list", "列表", List],
+                ["card", "卡片", LayoutGrid],
+              ] as const
+            ).map(([value, label, Icon]) => (
+              <button
+                key={value}
+                aria-label={label}
+                aria-pressed={layout === value}
+                className={`flex h-7 w-8 items-center justify-center rounded-full transition-colors ${layout === value ? "bg-primary-50 text-primary dark:bg-primary-500/20" : "text-default-500 hover:text-default-700"}`}
+                title={label}
+                type="button"
+                onClick={() => setLayout(value)}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {layout === "list" && shown.length > 0 && (
-        <div className="hidden overflow-hidden rounded-2xl bg-content1 shadow-sm lg:block">
+        <div className="status-surface hidden overflow-hidden rounded-2xl bg-content1 shadow-sm lg:block">
           <div
             className={`bg-default-100/60 px-6 py-3 text-xs text-default-500 ${GRID}`}
           >
@@ -471,49 +340,69 @@ export function StatusBoard({
             <span>CPU</span>
             <span>内存</span>
             <span>磁盘</span>
+            <span>负载</span>
             <span>网速</span>
             <span>本月流量</span>
             <span>延迟 · 回程</span>
           </div>
-          {shown.map((n, i) => (
-            <div
-              key={`${n.name}-${i}`}
-              className={`border-t border-divider px-6 py-4 ${GRID} ${n.online ? "" : "opacity-60"}`}
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${n.online ? "bg-success" : "bg-default-400"}`}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{n.name}</div>
-                  <div className="truncate text-xs text-default-500">
-                    {[n.region, n.online ? uptimeText(n.uptime) : "离线"]
-                      .filter(Boolean)
-                      .join(" · ")}
+          {shown.map((n, i) => {
+            const load = loadMeter(n);
+
+            return (
+              <div
+                key={`${n.name}-${i}`}
+                className={`border-t border-divider px-6 py-4 ${GRID} ${n.online ? "" : "opacity-60"} ${onSelect ? "cursor-pointer transition-colors hover:bg-default-50" : ""}`}
+                role={onSelect ? "button" : undefined}
+                tabIndex={onSelect ? 0 : undefined}
+                onClick={() => onSelect?.(n)}
+                onKeyDown={(e) => {
+                  if (onSelect && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    onSelect(n);
+                  }
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${n.online ? "bg-success" : "bg-default-400"}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold">{n.name}</div>
+                    <div className="truncate text-xs text-default-500">
+                      {[n.region, n.online ? uptimeText(n.uptime) : "离线"]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
                   </div>
                 </div>
+                <Meter label="CPU" value={n.online ? n.cpu : undefined} />
+                <Meter label="内存" value={n.online ? n.mem : undefined} />
+                <Meter label="磁盘" value={n.online ? n.disk : undefined} />
+                <Meter
+                  label="负载"
+                  text={load.text}
+                  title={load.title}
+                  value={load.pct}
+                />
+                <Speed n={n} />
+                <Month n={n} />
+                <div className="min-w-0">
+                  <Latency n={n} />
+                </div>
               </div>
-              <Meter label="CPU" value={n.online ? n.cpu : undefined} />
-              <Meter label="内存" value={n.online ? n.mem : undefined} />
-              <Meter label="磁盘" value={n.online ? n.disk : undefined} />
-              <Speed n={n} />
-              <Month n={n} />
-              <div className="min-w-0">
-                <Latency n={n} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       <div
         className={`grid gap-3 lg:grid-cols-2 2xl:grid-cols-3 ${layout === "list" ? "lg:hidden" : ""}`}
       >
         {shown.map((n, i) => (
-          <NodeCard key={`${n.name}-${i}`} n={n} />
+          <NodeCard key={`${n.name}-${i}`} n={n} onSelect={onSelect} />
         ))}
       </div>
       {shown.length === 0 && (
-        <p className="rounded-2xl bg-content1 py-12 text-center text-sm text-default-500 shadow-sm">
+        <p className="status-surface rounded-2xl bg-content1 py-12 text-center text-sm text-default-500 shadow-sm">
           还没有节点
         </p>
       )}

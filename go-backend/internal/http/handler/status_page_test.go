@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -56,7 +55,7 @@ func TestStatusViewLatencyHistory(t *testing.T) {
 		}
 	}
 
-	view, err := h.buildStatusView(true, 0, "")
+	view, err := h.buildStatusView(true, 0, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +63,31 @@ func TestStatusViewLatencyHistory(t *testing.T) {
 		t.Fatalf("view = %+v", view)
 	}
 	want := [][2]float64{{30, 0}, {0, 100}, {45, 25}}
-	if got := view.Nodes[0].Latency[0].Hist; !reflect.DeepEqual(got, want) {
+	got := view.Nodes[0].Latency[0].Hist
+	if len(got) != len(want) {
 		t.Fatalf("hist = %v, want %v", got, want)
+	}
+	for i, h := range got {
+		if [2]float64{h[0], h[1]} != want[i] || h[2] <= 0 {
+			t.Fatalf("hist = %v, want %v with times", got, want)
+		}
+	}
+}
+
+func TestValidStatusBackground(t *testing.T) {
+	for v, want := range map[string]bool{
+		"":                                   true,
+		"https://img.example.com/bg.webp":    true,
+		"http://img.example.com/a/b.jpg?x=1": true,
+		"/assets/bg.jpg":                     true,
+		"//evil.example.com/x.png":           false,
+		"javascript:alert(1)":                false,
+		"https://x.example.com/a.png\");}":   false,
+		"https://x.example.com/a b.png":      false,
+		"data:image/png;base64,AAAA":         false,
+	} {
+		if got := validStatusBackground(v); got != want {
+			t.Errorf("validStatusBackground(%q) = %v, want %v", v, got, want)
+		}
 	}
 }

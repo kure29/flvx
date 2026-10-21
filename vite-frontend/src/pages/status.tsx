@@ -1,9 +1,16 @@
 import type { StatusView } from "@/api";
 
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 
 import { StatusBoard } from "@/pages/status/status-board";
+
+const NodeDetail = lazy(() => import("@/pages/status/node-detail"));
 
 const POLL_MS = 5000;
 
@@ -16,6 +23,14 @@ const apiBase = import.meta.env.VITE_API_BASE ?? "";
  */
 export default function StatusPage() {
   const { slug = "" } = useParams();
+  // ?node=<key> opens a node's details; the browser's back closes them.
+  const [params, setParams] = useSearchParams();
+  const nodeKey = params.get("node");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromBoard = Boolean(
+    (location.state as { fromBoard?: boolean } | null)?.fromBoard,
+  );
   const [view, setView] = useState<StatusView | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "gone" | "error">(
     "loading",
@@ -78,9 +93,26 @@ export default function StatusPage() {
     document.title = title;
   }, [title]);
 
+  const background = view?.background ?? "";
+  const opacity = view?.cardOpacity ?? 100;
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-8 sm:py-9">
+    <div
+      className={`relative min-h-screen bg-background text-foreground ${background ? "status-glass" : ""}`}
+      style={
+        {
+          "--status-card-opacity": `${opacity}%`,
+        } as React.CSSProperties
+      }
+    >
+      {background && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${background}")` }}
+        />
+      )}
+      <main className="relative mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-8 sm:py-9">
         <header className="flex items-center gap-3">
           <svg
             aria-hidden="true"
@@ -95,11 +127,13 @@ export default function StatusPage() {
             <path d="M4 19c5-4 9-4 14 0s9 4 14 0" strokeOpacity="0.7" />
             <path d="M4 26c5-4 9-4 14 0s9 4 14 0" strokeOpacity="0.4" />
           </svg>
-          <h1 className="min-w-0 flex-1 truncate text-xl font-bold sm:text-2xl">
+          <h1
+            className={`min-w-0 flex-1 truncate text-xl font-bold sm:text-2xl ${background ? "drop-shadow-[0_1px_2px_rgb(0_0_0/0.25)]" : ""}`}
+          >
             {title}
           </h1>
           {state === "ok" && (
-            <span className="flex items-center gap-2 rounded-full bg-content1 px-3 py-1.5 text-xs text-default-600 shadow-sm">
+            <span className="status-surface flex items-center gap-2 rounded-full bg-content1 px-3 py-1.5 text-xs text-default-600 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-success" />
               实时
             </span>
@@ -121,9 +155,46 @@ export default function StatusPage() {
             暂时连不上，稍后自动重试
           </p>
         )}
-        {view && state !== "gone" && <StatusBoard summary nodes={view.nodes} />}
-        <footer className="pt-2 text-center text-xs text-default-400">
-          由 FLYX 提供
+        {view &&
+          state !== "gone" &&
+          (() => {
+            const node = nodeKey
+              ? view.nodes.find((n) => n.key === nodeKey)
+              : undefined;
+
+            return node ? (
+              <Suspense
+                fallback={
+                  <p className="py-24 text-center text-sm text-default-500">
+                    正在加载…
+                  </p>
+                }
+              >
+                <NodeDetail
+                  node={node}
+                  slug={slug}
+                  onBack={() =>
+                    fromBoard ? navigate(-1) : setParams({}, { replace: true })
+                  }
+                />
+              </Suspense>
+            ) : (
+              <StatusBoard
+                summary
+                nodes={view.nodes}
+                onSelect={(n) =>
+                  n.key &&
+                  setParams({ node: n.key }, { state: { fromBoard: true } })
+                }
+              />
+            );
+          })()}
+        <footer className="flex justify-center pt-2">
+          <span
+            className={`text-xs text-default-400 ${background ? "status-surface rounded-full bg-content1 px-3 py-1" : ""}`}
+          >
+            由 FLYX 提供
+          </span>
         </footer>
       </main>
     </div>

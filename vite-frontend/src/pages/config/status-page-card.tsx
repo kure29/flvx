@@ -38,18 +38,28 @@ export function StatusPageSettings() {
   const nodes = data?.nodes ?? [];
   const [title, setTitle] = useState("");
   const [enabled, setEnabled] = useState(false);
+  const [background, setBackground] = useState("");
+  const [opacity, setOpacity] = useState(100);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
     setTitle(settings.title);
     setEnabled(settings.enabled);
+    setBackground(settings.background);
+    setOpacity(settings.cardOpacity);
   }, [settings]);
 
   const save = async (newSlug = false) => {
     setSaving(true);
     try {
-      const res = await saveStatusPage({ enabled, title, newSlug });
+      const res = await saveStatusPage({
+        enabled,
+        title,
+        newSlug,
+        background: background.trim(),
+        cardOpacity: opacity,
+      });
 
       if (res.code !== 0 || !res.data) {
         toast.error(res.msg || "保存失败");
@@ -67,7 +77,11 @@ export function StatusPageSettings() {
     return <p className="text-sm text-default-500">加载中...</p>;
   }
   const shown = nodes.filter((n) => n.public).length;
-  const dirty = enabled !== settings.enabled || title !== settings.title;
+  const dirty =
+    enabled !== settings.enabled ||
+    title !== settings.title ||
+    background.trim() !== settings.background ||
+    opacity !== settings.cardOpacity;
 
   return (
     <>
@@ -90,6 +104,40 @@ export function StatusPageSettings() {
           value={title}
           variant="bordered"
           onChange={(e) => setTitle(e.target.value)}
+        />
+      </Field>
+      <Field
+        help="图片地址（https://… 或面板上以 / 开头的路径），留空不用背景"
+        label="背景图"
+      >
+        <Input
+          aria-label="背景图"
+          placeholder="https://example.com/bg.webp"
+          value={background}
+          variant="bordered"
+          onChange={(e) => setBackground(e.target.value)}
+        />
+      </Field>
+      <Field
+        help="低于 100% 时背景图会透过卡片显示；字看不清就调高"
+        label={
+          <>
+            卡片不透明度
+            <span className="ml-1.5 font-normal text-default-400">
+              {opacity}%
+            </span>
+          </>
+        }
+      >
+        <input
+          aria-label="卡片不透明度"
+          className="w-full accent-primary"
+          max={100}
+          min={10}
+          step={5}
+          type="range"
+          value={opacity}
+          onChange={(e) => setOpacity(Number(e.target.value))}
         />
       </Field>
       <div className="flex justify-end">
