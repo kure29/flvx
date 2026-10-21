@@ -12,6 +12,7 @@ import (
 
 	"go-backend/internal/http/response"
 	"go-backend/internal/store/repo"
+	"go-backend/internal/ws"
 )
 
 type federationRuntimeReservePortRequest struct {
@@ -449,17 +450,18 @@ func (h *Handler) federationRuntimeDiagnose(w http.ResponseWriter, r *http.Reque
 		commandTimeout = diagnosisCommandTimeout
 	}
 
-	commandType := "TcpPing"
-	if isUDPBasedProtocol(req.Protocol) {
-		commandType = "UdpPing"
-	}
-
-	res, err := h.sendNodeCommandWithTimeout(share.NodeID, commandType, map[string]interface{}{
+	data := map[string]interface{}{
 		"ip":      req.IP,
 		"port":    req.Port,
 		"count":   req.Count,
 		"timeout": req.Timeout,
-	}, commandTimeout, false, false)
+	}
+	var res ws.CommandResult
+	if isUDPBasedProtocol(req.Protocol) {
+		res, err = h.sendNodeCommandWithTimeout(share.NodeID, "UdpPing", data, commandTimeout, false, false)
+	} else {
+		res, err = h.sendTCPPing(share.NodeID, data, commandTimeout)
+	}
 	if err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
@@ -522,7 +524,7 @@ func (h *Handler) federationRuntimeCommand(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if strings.EqualFold(cmd, "tcpping") {
-		res, err := h.sendNodeCommand(share.NodeID, "TcpPing", req.Data, false, false)
+		res, err := h.sendTCPPing(share.NodeID, req.Data, defaultNodeCommandTimeout)
 		if err != nil {
 			response.WriteJSON(w, response.ErrDefault(err.Error()))
 			return

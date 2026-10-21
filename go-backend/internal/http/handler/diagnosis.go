@@ -932,12 +932,12 @@ func (h *Handler) tcpPingViaNode(nodeID int64, ip string, port int, options diag
 	if pingCount <= 0 {
 		pingCount = 4
 	}
-	res, err := h.sendNodeCommandWithTimeout(nodeID, "TcpPing", map[string]interface{}{
+	res, err := h.sendTCPPing(nodeID, map[string]interface{}{
 		"ip":      ip,
 		"port":    port,
 		"count":   pingCount,
 		"timeout": options.pingTimeoutMS,
-	}, options.commandTimeout, false, false)
+	}, options.commandTimeout)
 	if err != nil {
 		return nil, err
 	}

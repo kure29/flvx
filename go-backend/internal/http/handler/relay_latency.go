@@ -257,27 +257,42 @@ func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64
 		hops[rw.ID] = make([]relayHop, len(plan.legs))
 	}
 
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, latencyParallel)
+	type job struct {
+		id  int64
+		i   int
+		l   relayLeg
+		hop relayHop
+	}
+	var jobs []job
 	for id, plan := range plans {
 		for i, l := range plan.legs {
 			hop := relayHop{From: l.fromName, To: l.toName, Error: l.err}
-			if l.err != "" || ctx.Err() != nil {
+			if l.err != "" {
 				hops[id][i] = hop
 				continue
 			}
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(id int64, i int, l relayLeg, hop relayHop) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				data, err := nodeLatencyPing(h, l.fromID, l.host, l.port)
-				p := latencyPointFrom(latencyTarget{}, data, err)
-				hop.OK, hop.LatencyMs, hop.LossPct, hop.Error = p.OK, p.LatencyMs, p.LossPct, p.Error
-				// Each goroutine writes its own slot.
-				hops[id][i] = hop
-			}(id, i, l, hop)
+			jobs = append(jobs, job{id, i, l, hop})
 		}
+	}
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, latencyParallel)
+	for _, j := range interleaveByNode(jobs, func(j job) int64 { return j.l.fromID }) {
+		if ctx.Err() != nil {
+			hops[j.id][j.i] = j.hop
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(j job) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			data, err := nodeLatencyPing(h, j.l.fromID, j.l.host, j.l.port)
+			p := latencyPointFrom(latencyTarget{}, data, err)
+			hop := j.hop
+			hop.OK, hop.LatencyMs, hop.LossPct, hop.Error = p.OK, p.LatencyMs, p.LossPct, p.Error
+			// Each goroutine writes its own slot.
+			hops[j.id][j.i] = hop
+		}(j)
 	}
 	wg.Wait()
 
