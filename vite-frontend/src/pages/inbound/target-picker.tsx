@@ -1,7 +1,14 @@
 import type { InboundApiItem } from "@/api/types";
 
 import { useState } from "react";
-import { Ban, Check, ChevronRight, Search, Waypoints } from "lucide-react";
+import {
+  Ban,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Waypoints,
+} from "lucide-react";
 
 import {
   Modal,
@@ -105,6 +112,11 @@ export function TargetPicker({
     : targets;
   const groups = [...new Set(shown.map(targetSource))];
 
+  const close = () => {
+    setQuery("");
+    onClose();
+  };
+
   const row = (k: TargetKey, name: string, sub?: string) => (
     <button
       key={k}
@@ -112,8 +124,7 @@ export function TargetPicker({
       type="button"
       onClick={() => {
         onPick(k);
-        setQuery("");
-        onClose();
+        close();
       }}
     >
       <TargetIcon k={k} />
@@ -137,29 +148,34 @@ export function TargetPicker({
       placement="center"
       scrollBehavior="inside"
       size="md"
-      onOpenChange={(open) => {
-        if (!open) {
-          setQuery("");
-          onClose();
-        }
-      }}
+      onOpenChange={(open) => !open && close()}
     >
       <ModalContent>
-        <ModalHeader>
+        {/* The list can outgrow a phone screen: keep a way back and the
+            search box above it, not inside the scrolled body. */}
+        <ModalHeader className="flex items-center gap-2">
+          <button
+            aria-label="返回"
+            className="rounded-lg p-1 text-default-500 hover:bg-default-100"
+            type="button"
+            onClick={close}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
           <h2 className="text-lg font-bold">{title}</h2>
         </ModalHeader>
+        {targets.length >= SEARCH_FROM && (
+          <label className="flex shrink-0 items-center gap-2 rounded-xl border border-divider bg-content1 px-3 py-2">
+            <Search className="h-4 w-4 text-default-400" />
+            <input
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              placeholder="搜索节点"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        )}
         <ModalBody className="space-y-1 pb-4">
-          {targets.length >= SEARCH_FROM && (
-            <label className="mb-2 flex items-center gap-2 rounded-xl border border-divider bg-content1 px-3 py-2">
-              <Search className="h-4 w-4 text-default-400" />
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                placeholder="搜索节点"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
-          )}
           {!q && (
             <div className="rounded-xl bg-content1">
               {row("direct", "直连", "从本节点出去")}

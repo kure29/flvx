@@ -747,6 +747,7 @@ export interface SubTemplateBuilder {
 export interface SubTemplateCategory {
   key: string;
   name: string;
+  /** Image URL, also written into exported Mihomo / Surge groups. */
   icon: string;
   target: string;
   presets: string[];

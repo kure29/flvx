@@ -179,3 +179,32 @@ func TestServiceSelectorsDefaultAndRouting(t *testing.T) {
 		}
 	}
 }
+
+func TestTemplateBuilderGroupIcons(t *testing.T) {
+	for _, c := range TemplateRuleCategories() {
+		if !strings.HasPrefix(c.Icon, "https://") {
+			t.Fatalf("%s has no icon", c.Key)
+		}
+	}
+	b := builderFixture()
+	b.Rules = append(b.Rules, TemplateBuilderRule{Type: "category", Value: "youtube", Target: builderMain})
+	youtube := builderGroupIcons["youtube"]
+	for kind, want := range map[string][]string{
+		TemplateClash: {`icon: "` + youtube + `"`, `icon: "` + builderGroupIcons[builderMain] + `"`, `icon: "` + builderGroupIcons["__final"] + `"`, `icon: "` + qureIcon("Auto") + `"`},
+		TemplateSurge: {"YouTube = select, 节点选择, 美国优选, DIRECT, REJECT, include-all-proxies=1, icon-url=" + youtube + "\n", "icon-url=" + qureIcon("Auto") + "\n"},
+	} {
+		content, err := BuildSubscriptionTemplate(kind, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _, err := Subscription(kind, namedEndpoints("美国 01"), SubOptions{Templates: map[string]string{kind: content}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, w := range want {
+			if !strings.Contains(string(body), w) {
+				t.Fatalf("%s: missing %q in\n%s", kind, w, body)
+			}
+		}
+	}
+}

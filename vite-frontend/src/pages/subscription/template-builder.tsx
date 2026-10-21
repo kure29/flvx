@@ -13,6 +13,23 @@ import { Input } from "@/shadcn-bridge/heroui/input";
 
 const MAIN = "节点选择";
 
+/** A category's icon, the same image exported Mihomo / Surge groups show. */
+function CategoryIcon({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) return <span aria-hidden className="h-5 w-5 shrink-0" />;
+
+  return (
+    <img
+      alt=""
+      className="h-5 w-5 shrink-0 object-contain"
+      loading="lazy"
+      src={src}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 /**
  * A group name is committed on blur: rules follow the renamed group, and a
  * half-typed name must not take over another target's rules. Taken names
@@ -296,7 +313,7 @@ export function TemplateBuilder({
                   type="checkbox"
                   onChange={() => toggle(c)}
                 />
-                <span aria-hidden>{c.icon}</span>
+                <CategoryIcon src={c.icon} />
                 <span>{c.name}</span>
               </label>
             ))}
@@ -643,8 +660,9 @@ export function TemplateRulePreview({
             </span>
             <div className="min-w-0 flex-1 text-xs">
               {category ? (
-                <span>
-                  {category.icon} {category.name}
+                <span className="flex items-center gap-1.5">
+                  <CategoryIcon src={category.icon} />
+                  {category.name}
                 </span>
               ) : (
                 <>
