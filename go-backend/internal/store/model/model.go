@@ -98,6 +98,8 @@ type Node struct {
 	// LatencyTargets is the node's own choice of latency reference points as
 	// JSON {"points":[...],"pinned":[...]}; empty follows the defaults.
 	LatencyTargets string `gorm:"column:latency_targets;type:text;not null;default:''"`
+	// StatusPublic shows the node on the public status page.
+	StatusPublic int `gorm:"column:status_public;not null;default:0"`
 }
 
 func (Node) TableName() string { return "node" }
@@ -602,6 +604,7 @@ type NodeBackup struct {
 	RemoteConfig  string `json:"remoteConfig,omitempty"`
 	// LatencyTargets is the node's own latency reference point choice.
 	LatencyTargets string `json:"latencyTargets,omitempty"`
+	StatusPublic   int    `json:"statusPublic,omitempty"`
 }
 
 type TunnelBackup struct {
@@ -901,6 +904,18 @@ type NodeMetric struct {
 }
 
 func (NodeMetric) TableName() string { return "node_metric" }
+
+// NodeTraffic is a node's network traffic in one hour (Hour: unix ms the
+// hour starts at), summed from the agent's byte counters.
+type NodeTraffic struct {
+	ID       int64 `gorm:"primaryKey;autoIncrement"`
+	NodeID   int64 `gorm:"column:node_id;not null;uniqueIndex:idx_node_traffic_hour,priority:1"`
+	Hour     int64 `gorm:"not null;uniqueIndex:idx_node_traffic_hour,priority:2;index:idx_node_traffic_time"`
+	InBytes  int64 `gorm:"column:in_bytes;not null;default:0"`
+	OutBytes int64 `gorm:"column:out_bytes;not null;default:0"`
+}
+
+func (NodeTraffic) TableName() string { return "node_traffic" }
 
 type TunnelMetric struct {
 	ID           int64   `gorm:"primaryKey;autoIncrement" json:"id"`

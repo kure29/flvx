@@ -136,6 +136,25 @@ export const getUserPackageInfo = () =>
 export const createNode = (data: NodeMutationPayload) =>
   Network.post("/node/create", data);
 export const getNodeList = () => Network.post<NodeApiItem[]>("/node/list");
+/** The public status page (/status/<slug>): settings and the nodes it can show. */
+export interface StatusPageSettings {
+  enabled: boolean;
+  title: string;
+  slug: string;
+}
+export const getStatusPage = () =>
+  Network.post<{
+    settings: StatusPageSettings;
+    nodes: Array<{ id: number; name: string; public: boolean }>;
+  }>("/node/status-page/get", {});
+export const saveStatusPage = (data: {
+  enabled: boolean;
+  title: string;
+  /** Give the page a new link; the old one stops working. */
+  newSlug?: boolean;
+}) => Network.post<StatusPageSettings>("/node/status-page/save", data);
+export const setNodeStatusPublic = (id: number, isPublic: boolean) =>
+  Network.post("/node/status-public", { id, public: isPublic });
 export const getDashboardNodeExpiryList = () =>
   Network.post<NodeApiItem[]>("/node/list", {});
 export const updateNode = (data: NodeMutationPayload) =>
@@ -643,6 +662,41 @@ export const getServiceMonitorLatestResults = () =>
 export const runServiceMonitor = (id: number) =>
   Network.post<ServiceMonitorResultApiItem>("/monitor/services/run", { id });
 
+/** One node on the status page (the backend's statusNode). */
+export interface StatusNode {
+  name: string;
+  /** Region group like "🇭🇰 香港", or "" when the name has none. */
+  region: string;
+  online: boolean;
+  /** Seconds since the server booted. */
+  uptime: number;
+  cpu: number;
+  mem: number;
+  disk: number;
+  load: number;
+  /** Bytes per second. */
+  netIn: number;
+  netOut: number;
+  /** Bytes since the 1st of this month. */
+  monthIn: number;
+  monthOut: number;
+  tcp: number;
+  udp: number;
+  latency: Array<{ name: string; ok: boolean; ms?: number; lossPct?: number }>;
+}
+
+/** The status page: public (no login) or for users allowed to see monitoring. */
+export interface StatusView {
+  title: string;
+  nodes: StatusNode[];
+  updatedAt: number;
+}
+
+/** Every node's live state, read only (users allowed to see monitoring). */
+export const getMonitorStatus = () =>
+  Network.get<StatusView>("/monitor/status", {
+    tz: -new Date().getTimezoneOffset(),
+  });
 export const getMonitorNodes = () =>
   Network.get<MonitorNodeApiItem[]>("/monitor/nodes");
 

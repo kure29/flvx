@@ -23,6 +23,8 @@ import { PageLoadingState } from "@/components/page-state";
 const ChangePasswordPage = lazy(() => import("@/pages/change-password"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const MonitorPage = lazy(() => import("@/pages/monitor"));
+// The public status page: no login, outside the layouts.
+const StatusPage = lazy(() => import("@/pages/status"));
 const ForwardPage = lazy(() => import("@/pages/forward"));
 const TunnelPage = lazy(() => import("@/pages/tunnel"));
 // 用户 hosts the 分组 and 限速 tabs; each tab keeps its address.
@@ -98,7 +100,12 @@ function App() {
   // 全局登录状态监听，当检测到未登录且不在首页时，跳转到首页
   useEffect(() => {
     const handleSessionUpdate = () => {
-      if (!isLoggedIn() && location.pathname !== "/") {
+      // The public status page needs no login.
+      if (
+        !isLoggedIn() &&
+        location.pathname !== "/" &&
+        !location.pathname.startsWith("/status/")
+      ) {
         navigate("/", { replace: true });
       }
     };
@@ -180,6 +187,14 @@ function App() {
     <AnimatePresence mode="wait">
       <Routes key={location.pathname} location={location}>
         <Route element={<LoginRoute />} path="/" />
+        <Route
+          element={
+            <Suspense fallback={<PageLoadingState message="正在加载..." />}>
+              <StatusPage />
+            </Suspense>
+          }
+          path="/status/:slug"
+        />
         <Route
           element={
             <ProtectedRoute skipLayout={true}>

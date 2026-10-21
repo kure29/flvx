@@ -402,3 +402,56 @@ func (r *Repository) PruneServiceMonitorResults(olderThanMs int64) error {
 	}
 	return r.db.Where("timestamp < ?", olderThanMs).Delete(&model.ServiceMonitorResult{}).Error
 }
+
+// AddNodeTraffic adds hourly traffic to the nodes' rows.
+func (r *Repository) AddNodeTraffic(rows []model.NodeTraffic) error {
+	if r == nil || r.db == nil || len(rows) == 0 {
+		return nil
+	}
+	return r.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "node_id"}, {Name: "hour"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"in_bytes":  gorm.Expr("node_traffic.in_bytes + excluded.in_bytes"),
+			"out_bytes": gorm.Expr("node_traffic.out_bytes + excluded.out_bytes"),
+		}),
+	}).Create(&rows).Error
+}
+
+// NodeTrafficSince sums each node's traffic from fromMs on.
+func (r *Repository) NodeTrafficSince(fromMs int64) (map[int64][2]int64, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var rows []struct {
+		NodeID   int64
+		InBytes  int64
+		OutBytes int64
+	}
+	err := r.db.Model(&model.NodeTraffic{}).Select("node_id, SUM(in_bytes) AS in_bytes, SUM(out_bytes) AS out_bytes").
+		Where("hour >= ?", fromMs).Group("node_id").Scan(&rows).Error
+	out := make(map[int64][2]int64, len(rows))
+	for _, row := range rows {
+		out[row.NodeID] = [2]int64{row.InBytes, row.OutBytes}
+	}
+	return out, err
+}
+
+// PruneNodeTraffic drops the hours before beforeMs.
+func (r *Repository) PruneNodeTraffic(beforeMs int64) error {
+	if r == nil || r.db == nil {
+		return nil
+	}
+	return r.db.Where("hour < ?", beforeMs).Delete(&model.NodeTraffic{}).Error
+}
+
+// SetNodeStatusPublic shows or hides a node on the public status page.
+func (r *Repository) SetNodeStatusPublic(id int64, public bool) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	v := 0
+	if public {
+		v = 1
+	}
+	return r.db.Model(&model.Node{}).Where("id = ?", id).Update("status_public", v).Error
+}

@@ -33,6 +33,8 @@ var sensitiveConfigKeys = map[string]struct{}{
 	// backups, like the other secrets.
 	"notify_telegram_bot_token": {},
 	"notify_webhook_url":        {},
+	// The public status page's path: whoever knows it can read the page.
+	"status_page_slug": {},
 }
 
 var systemManagedConfigKeys = map[string]struct{}{
