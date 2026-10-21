@@ -252,7 +252,7 @@ function NodeMetricsStrip({ metric }: { metric: RealtimeNodeMetric }) {
         <MetricPair
           bottom={`已运行 ${formatUptime(metric.uptime)}`}
           label="连接 / 运行"
-          top={`${metric.tcpConns + metric.udpConns} 个连接`}
+          top={`TCP ${metric.tcpConns} · UDP ${metric.udpConns}`}
         />
       </div>
     </div>
@@ -1449,7 +1449,7 @@ export function MonitorView({
                         // Wider screens show these in the metrics strip.
                         <span className="md:hidden">
                           {[
-                            `连接 ${metric.tcpConns + metric.udpConns}`,
+                            `TCP ${metric.tcpConns} · UDP ${metric.udpConns}`,
                             `运行 ${formatUptime(metric.uptime)}`,
                             `流量 ↑${formatBytes(metric.netOutBytes)} ↓${formatBytes(metric.netInBytes)}`,
                           ].join(" · ")}
