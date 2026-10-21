@@ -10,6 +10,7 @@ import { EmptyHint, PageHeader } from "@/components/page-kit";
 import { PageLoadingState } from "@/components/page-state";
 import { QrImage, copyText, panelOrigin } from "@/pages/inbound/share";
 import { SubClientGrid } from "@/pages/subscription/client-grid";
+import { SubTrafficStats } from "@/pages/subscription/traffic-stats";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import {
   Modal,
@@ -120,6 +121,7 @@ function SubscriptionCard({
 }) {
   const [label, tone] = status(s);
   const usable = s.status === "ok";
+  const [traffic, setTraffic] = useState(false);
 
   return (
     <div className="space-y-4 rounded-2xl border border-divider bg-content1 p-4 shadow-sm sm:p-5">
@@ -140,6 +142,18 @@ function SubscriptionCard({
         />
       </div>
       <Traffic s={s} />
+      <button
+        aria-expanded={traffic}
+        className="flex w-full items-center justify-between text-sm font-medium text-default-600"
+        type="button"
+        onClick={() => setTraffic(!traffic)}
+      >
+        流量统计
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${traffic ? "rotate-180" : ""}`}
+        />
+      </button>
+      {traffic && <SubTrafficStats mine id={s.id} />}
       {!usable && (
         <p className="text-xs text-danger">
           {s.status === "over_quota"

@@ -961,6 +961,29 @@ export const getMySubscriptions = () =>
 /** Gives one of the user's subscriptions a new link and credentials. */
 export const resetMySubscription = (id: number) =>
   Network.post<UserSubscription>("/user/subscription/reset", { id });
+export type SubTrafficRange = "hour" | "day" | "month";
+/** A subscription's traffic: 24 hours, 30 days or 12 months in the viewer's time zone. */
+export interface SubTraffic {
+  range: SubTrafficRange;
+  /** Each bucket's start (unix ms) and bytes. */
+  points: Array<{ time: number; up: number; down: number }>;
+  up: number;
+  down: number;
+}
+const trafficQuery = (id: number, range: SubTrafficRange) => ({
+  id,
+  range,
+  tzOffset: -new Date().getTimezoneOffset(),
+});
+
+export const getSubscriptionTraffic = (id: number, range: SubTrafficRange) =>
+  Network.post<SubTraffic>("/subscription/traffic", trafficQuery(id, range));
+/** The same for one of the logged-in user's subscriptions. */
+export const getMySubscriptionTraffic = (id: number, range: SubTrafficRange) =>
+  Network.post<SubTraffic>(
+    "/user/subscription/traffic",
+    trafficQuery(id, range),
+  );
 /** What a source's nodes are for in a chain: plain nodes, relays (前置) or landing nodes. */
 export type RemoteSourceRole = "" | "relay" | "landing";
 export interface RemoteSourceItem {

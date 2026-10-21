@@ -69,6 +69,18 @@ type SubscriptionCounter struct {
 
 func (SubscriptionCounter) TableName() string { return "subscription_counter" }
 
+// SubscriptionTraffic is a subscription's traffic in one hour; Hour is the
+// unix ms the hour starts at. Days and months are summed from it.
+type SubscriptionTraffic struct {
+	ID             int64 `gorm:"primaryKey;autoIncrement"`
+	SubscriptionID int64 `gorm:"column:subscription_id;not null;uniqueIndex:idx_sub_traffic_hour,priority:1"`
+	Hour           int64 `gorm:"not null;uniqueIndex:idx_sub_traffic_hour,priority:2;index:idx_sub_traffic_time"`
+	UploadBytes    int64 `gorm:"column:upload_bytes;not null;default:0"`
+	DownloadBytes  int64 `gorm:"column:download_bytes;not null;default:0"`
+}
+
+func (SubscriptionTraffic) TableName() string { return "subscription_traffic" }
+
 // SubscriptionTemplate is a user's own Mihomo / sing-box / Surge profile that
 // subscriptions render their nodes into (kernel/sub_template.go).
 type SubscriptionTemplate struct {

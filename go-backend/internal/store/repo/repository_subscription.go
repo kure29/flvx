@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"go-backend/internal/store/model"
 
@@ -252,6 +253,9 @@ func (r *Repository) DeleteSubscription(id int64) error {
 		if err := tx.Where("subscription_id = ?", id).Delete(&model.SubscriptionCounter{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("subscription_id = ?", id).Delete(&model.SubscriptionTraffic{}).Error; err != nil {
+			return err
+		}
 		return tx.Where("id = ?", id).Delete(&model.Subscription{}).Error
 	})
 }
@@ -327,6 +331,8 @@ func (r *Repository) ApplySubscriptionCounterSamples(nodeID int64, epoch string,
 		for id := range down {
 			ids[id] = true
 		}
+		hour := now - now%int64(time.Hour/time.Millisecond)
+		var hourly []model.SubscriptionTraffic
 		for id := range ids {
 			if err := tx.Model(&model.Subscription{}).Where("id = ?", id).Updates(map[string]interface{}{
 				"upload_bytes":   gorm.Expr("upload_bytes + ?", up[id]),
@@ -334,9 +340,39 @@ func (r *Repository) ApplySubscriptionCounterSamples(nodeID int64, epoch string,
 			}).Error; err != nil {
 				return err
 			}
+			hourly = append(hourly, model.SubscriptionTraffic{SubscriptionID: id, Hour: hour, UploadBytes: up[id], DownloadBytes: down[id]})
 		}
-		return nil
+		if len(hourly) == 0 {
+			return nil
+		}
+		// The hour's history, for the traffic charts.
+		return tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "subscription_id"}, {Name: "hour"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"upload_bytes":   gorm.Expr("subscription_traffic.upload_bytes + excluded.upload_bytes"),
+				"download_bytes": gorm.Expr("subscription_traffic.download_bytes + excluded.download_bytes"),
+			}),
+		}).Create(&hourly).Error
 	})
+}
+
+// ListSubscriptionTraffic returns a subscription's hours from fromMs on,
+// oldest first.
+func (r *Repository) ListSubscriptionTraffic(id, fromMs int64) ([]model.SubscriptionTraffic, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var out []model.SubscriptionTraffic
+	err := r.db.Where("subscription_id = ? AND hour >= ?", id, fromMs).Order("hour ASC").Find(&out).Error
+	return out, err
+}
+
+// PurgeSubscriptionTraffic drops the hours before beforeMs.
+func (r *Repository) PurgeSubscriptionTraffic(beforeMs int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Where("hour < ?", beforeMs).Delete(&model.SubscriptionTraffic{}).Error
 }
 
 // ResetSubscriptionTraffic zeroes a subscription's traffic.

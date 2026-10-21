@@ -3,6 +3,8 @@ declare module "recharts" {
 
   export const LineChart: React.ComponentType<Record<string, unknown>>;
   export const Line: React.ComponentType<Record<string, unknown>>;
+  export const ComposedChart: React.ComponentType<Record<string, unknown>>;
+  export const Area: React.ComponentType<Record<string, unknown>>;
   export const XAxis: React.ComponentType<Record<string, unknown>>;
   export const YAxis: React.ComponentType<Record<string, unknown>>;
   export const CartesianGrid: React.ComponentType<Record<string, unknown>>;

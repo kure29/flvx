@@ -142,6 +142,16 @@ func TestSubscriptionContract(t *testing.T) {
 		if code, _, _ := sub(path); code != 200 {
 			t.Fatalf("after reset: %d", code)
 		}
+		// The hourly history keeps the traffic a reset zeroes.
+		for _, rg := range []string{"hour", "day", "month"} {
+			out = kernelContractPost(t, router, admin, "/api/v1/subscription/traffic", `{"id":`+jsonInt64(id)+`,"range":"`+rg+`","tzOffset":480}`)
+			v := out.Data.(map[string]interface{})
+			points := v["points"].([]interface{})
+			last := points[len(points)-1].(map[string]interface{})
+			if out.Code != 0 || valueAsInt(v["up"]) != 200 || valueAsInt(v["down"]) != 900 || valueAsInt(last["down"]) != 900 {
+				t.Fatalf("%s traffic: %+v", rg, out)
+			}
+		}
 
 		out = kernelContractPost(t, router, admin, "/api/v1/subscription/reset", `{"id":`+jsonInt64(id)+`}`)
 		newPath := out.Data.(map[string]interface{})["path"].(string)
@@ -150,6 +160,9 @@ func TestSubscriptionContract(t *testing.T) {
 			t.Fatal("reset must rotate link and credentials")
 		}
 		kernelContractPost(t, router, admin, "/api/v1/subscription/delete", `{"id":`+jsonInt64(id)+`}`)
+		if n := mustQueryInt(t, r, `SELECT COUNT(*) FROM subscription_traffic WHERE subscription_id = ?`, id); n != 0 {
+			t.Fatalf("history of a deleted subscription must go, got %d rows", n)
+		}
 		if code, _, _ := sub(newPath); code != http.StatusNotFound {
 			t.Fatal("deleted subscription link must stop working")
 		}

@@ -37,6 +37,7 @@ import { Button } from "@/shadcn-bridge/heroui/button";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import { Input, Textarea } from "@/shadcn-bridge/heroui/input";
+import { SubTrafficStats } from "@/pages/subscription/traffic-stats";
 import {
   Modal,
   ModalBody,
@@ -1411,6 +1412,11 @@ export default function SubscriptionPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState<SubscriptionItem | null>(null);
+  const [detailTab, setDetailTab] = useState<"import" | "traffic">("import");
+
+  useEffect(() => {
+    if (!detail) setDetailTab("import");
+  }, [detail]);
   const [confirm, setConfirm] = useState<"reset" | "delete" | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
   const [resettingTraffic, setResettingTraffic] = useState(false);
@@ -1744,6 +1750,7 @@ export default function SubscriptionPage() {
         isOpen={Boolean(detail) && !confirm}
         placement="center"
         scrollBehavior="inside"
+        size="lg"
         onOpenChange={(open) => !open && setDetail(null)}
       >
         <ModalContent>
@@ -1789,40 +1796,54 @@ export default function SubscriptionPage() {
                       </Button>
                     </div>
                   </div>
-                  <Button
-                    className="w-full"
-                    color="primary"
-                    startContent={<Copy className="h-4 w-4" />}
-                    variant="flat"
-                    onPress={() => copyText(url(detail), "订阅链接已复制")}
-                  >
-                    复制订阅链接（自动识别客户端）
-                  </Button>
-                  <SubClientGrid
-                    configClients={Object.entries(
-                      detail.options.templates ?? {},
-                    )
-                      .filter(([, id]) => id)
-                      .map(([slot]) => slot)}
-                    link={(format) => url(detail, format)}
-                    name={detail.name}
-                    rules={detail.options.rules}
+                  <Segmented
+                    options={[
+                      ["import", "导入"],
+                      ["traffic", "流量统计"],
+                    ]}
+                    value={detailTab}
+                    onChange={setDetailTab}
                   />
-                  <p className="text-center text-xs text-default-400">
-                    点客户端直接导入，右侧按钮复制链接
-                  </p>
-                  {detail.options.rules && (
-                    <p className="text-xs text-default-500">
-                      已开启分流规则：Shadowrocket、Loon、Quantumult X
-                      导入的是完整配置，会替换 App 里原来的配置；Loon 和
-                      Quantumult X 复制链接后在 App 的配置里从 URL 下载
-                    </p>
-                  )}
-                  {detail.sharedIds.length > 0 && (
-                    <p className="text-xs text-warning">
-                      其中 {detail.sharedIds.length}{" "}
-                      个落地用的是共用凭据，停用后已导入的配置仍能连接
-                    </p>
+                  {detailTab === "traffic" ? (
+                    <SubTrafficStats id={detail.id} />
+                  ) : (
+                    <>
+                      <Button
+                        className="w-full"
+                        color="primary"
+                        startContent={<Copy className="h-4 w-4" />}
+                        variant="flat"
+                        onPress={() => copyText(url(detail), "订阅链接已复制")}
+                      >
+                        复制订阅链接（自动识别客户端）
+                      </Button>
+                      <SubClientGrid
+                        configClients={Object.entries(
+                          detail.options.templates ?? {},
+                        )
+                          .filter(([, id]) => id)
+                          .map(([slot]) => slot)}
+                        link={(format) => url(detail, format)}
+                        name={detail.name}
+                        rules={detail.options.rules}
+                      />
+                      <p className="text-center text-xs text-default-400">
+                        点客户端直接导入，右侧按钮复制链接
+                      </p>
+                      {detail.options.rules && (
+                        <p className="text-xs text-default-500">
+                          已开启分流规则：Shadowrocket、Loon、Quantumult X
+                          导入的是完整配置，会替换 App 里原来的配置；Loon 和
+                          Quantumult X 复制链接后在 App 的配置里从 URL 下载
+                        </p>
+                      )}
+                      {detail.sharedIds.length > 0 && (
+                        <p className="text-xs text-warning">
+                          其中 {detail.sharedIds.length}{" "}
+                          个落地用的是共用凭据，停用后已导入的配置仍能连接
+                        </p>
+                      )}
+                    </>
                   )}
                 </ModalBody>
                 <ModalFooter className="flex-wrap">
