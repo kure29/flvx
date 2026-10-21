@@ -578,24 +578,15 @@ export default function InboundPage() {
         : item.nodeName;
 
     const selected = selectMode && selectedIds.has(item.id);
+    // Built inbounds show their node's latency and routes on the 节点
+    // page; only imported nodes, which have no node here, measure their own.
     const latency =
-      item.enabled && !kernelBad && item.probe?.skipped !== true ? (
+      item.external && item.enabled && item.probe?.skipped !== true ? (
         <LatencyCell
           probe={probe}
           probing={probingIds.has(item.id)}
           variant={card ? "card" : "list"}
           onProbe={() => probeOne(item.id)}
-          onShowRoute={
-            // Points come from the node, so its routes apply.
-            !item.external && probe?.points?.length
-              ? () => setRouteNode({ id: item.nodeId, name: item.nodeName })
-              : undefined
-          }
-          onShowTrend={
-            !item.external && probe?.points?.length
-              ? () => setTrendNode({ id: item.nodeId, name: item.nodeName })
-              : undefined
-          }
         />
       ) : null;
     // Cards give measured points their own block under the rows.
@@ -613,7 +604,9 @@ export default function InboundPage() {
       ? `连不上：${probe?.error ?? ""}`
       : running
         ? probe
-          ? `可连接 · ${probe.latencyMs} ms`
+          ? item.external
+            ? `可连接 · ${probe.latencyMs} ms`
+            : "可连接"
           : "运行中"
         : item.enabled
           ? `内核${KERNEL_STATUS[item.kernelStatus]?.label ?? "异常"}`
