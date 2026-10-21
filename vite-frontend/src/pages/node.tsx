@@ -100,7 +100,14 @@ import {
 } from "@/pages/node/agent-modals";
 import { NodeFilterModal } from "@/pages/node/filter-modal";
 
-export default function NodePage({ embedded = false }: { embedded?: boolean }) {
+export default function NodePage({
+  embedded = false,
+  addRequest = 0,
+}: {
+  embedded?: boolean;
+  /** Bumped by the 节点 page header's 新建节点 when embedded. */
+  addRequest?: number;
+}) {
   const [nodeList, setNodeList] = useState<Node[]>([]);
   const [nodeOrder, setNodeOrder] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -711,6 +718,11 @@ export default function NodePage({ embedded = false }: { embedded?: boolean }) {
     setProtocolDisabled(true);
     setProtocolDisabledReason("节点未在线，等待节点上线后再设置");
   };
+
+  useEffect(() => {
+    if (addRequest > 0) handleAdd();
+    // Only a new request opens the dialog.
+  }, [addRequest]);
 
   // 编辑节点
   const handleEdit = (node: Node) => {
@@ -1525,11 +1537,6 @@ export default function NodePage({ embedded = false }: { embedded?: boolean }) {
           ]}
           placeholder={
             activeTab === "remote" ? "搜索远程节点名称或 IP" : "搜索名称或 IP"
-          }
-          primary={
-            embedded
-              ? { key: "add", label: "新建节点", onPress: handleAdd }
-              : undefined
           }
           search={currentSearchKeyword}
           onSearch={setCurrentSearchKeyword}

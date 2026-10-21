@@ -20,7 +20,7 @@ import {
   ModalHeader,
 } from "@/shadcn-bridge/heroui/modal";
 
-/** Edits where an inbound's traffic leaves: its default exit and 分流 rules. */
+/** 出站: where an inbound's traffic leaves — IP version, default exit and 分流 rules. */
 export function SplitModal({
   item,
   inbounds,
@@ -136,7 +136,7 @@ function SplitForm({
   return (
     <>
       <ModalHeader className="flex flex-col gap-1">
-        <h2 className="text-lg font-bold">分流</h2>
+        <h2 className="text-lg font-bold">出站</h2>
         <p className="truncate text-small font-normal text-default-500">
           {item.name}
         </p>

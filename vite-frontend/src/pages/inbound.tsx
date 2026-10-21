@@ -1127,7 +1127,7 @@ export default function InboundPage() {
                     : [
                         {
                           key: "split",
-                          label: "分流",
+                          label: "出站",
                           color: "success" as const,
                           onPress: () => setSplitting(sheetItem),
                         },

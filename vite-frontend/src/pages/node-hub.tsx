@@ -37,6 +37,7 @@ export default function NodeHubPage() {
   const [install, setInstall] = useState<InstallRequest | null>(
     state.install ?? null,
   );
+  const [addNode, setAddNode] = useState(0);
 
   const setTab = (t: NodeTab) => {
     setTabState(t);
@@ -60,6 +61,16 @@ export default function NodeHubPage() {
             ? "节点上安装的 Xray / sing-box / Snell 等内核，落地的入站跑在内核上"
             : "装了 agent 的服务器，用来搭建落地和中转"
         }
+        // The kernel tab has its own 安装内核 button.
+        primary={
+          tab === "nodes"
+            ? {
+                key: "add",
+                label: "新建节点",
+                onPress: () => setAddNode((n) => n + 1),
+              }
+            : undefined
+        }
         title="节点"
       />
       <PageTabs
@@ -76,7 +87,7 @@ export default function NodeHubPage() {
           onInstallRequestHandled={() => setInstall(null)}
         />
       ) : (
-        <NodePage embedded />
+        <NodePage embedded addRequest={addNode} />
       )}
     </AnimatedPage>
   );
