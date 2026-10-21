@@ -443,15 +443,3 @@ func (r *Repository) PruneNodeTraffic(beforeMs int64) error {
 	}
 	return r.db.Where("hour < ?", beforeMs).Delete(&model.NodeTraffic{}).Error
 }
-
-// SetNodeStatusPublic shows or hides a node on the public status page.
-func (r *Repository) SetNodeStatusPublic(id int64, public bool) error {
-	if r == nil || r.db == nil {
-		return errors.New("repository not initialized")
-	}
-	v := 0
-	if public {
-		v = 1
-	}
-	return r.db.Model(&model.Node{}).Where("id = ?", id).Update("status_public", v).Error
-}

@@ -98,8 +98,6 @@ type Node struct {
 	// LatencyTargets is the node's own choice of latency reference points as
 	// JSON {"points":[...],"pinned":[...]}; empty follows the defaults.
 	LatencyTargets string `gorm:"column:latency_targets;type:text;not null;default:''"`
-	// StatusPublic shows the node on the public status page.
-	StatusPublic int `gorm:"column:status_public;not null;default:0"`
 }
 
 func (Node) TableName() string { return "node" }
@@ -604,7 +602,6 @@ type NodeBackup struct {
 	RemoteConfig  string `json:"remoteConfig,omitempty"`
 	// LatencyTargets is the node's own latency reference point choice.
 	LatencyTargets string `json:"latencyTargets,omitempty"`
-	StatusPublic   int    `json:"statusPublic,omitempty"`
 }
 
 type TunnelBackup struct {

@@ -35,7 +35,6 @@ export default defineConfig({
           { text: "分流与链式出站", link: "/guide/routing" },
           { text: "导入节点", link: "/guide/import" },
           { text: "延迟与回程", link: "/guide/latency" },
-          { text: "公开状态页", link: "/guide/status-page" },
         ],
       },
       {

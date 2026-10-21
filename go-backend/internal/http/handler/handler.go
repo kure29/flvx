@@ -148,7 +148,6 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 			UDPConns:         info.UDPConns,
 			NetInSpeed:       info.NetInSpeed,
 			NetOutSpeed:      info.NetOutSpeed,
-			CPUCores:         info.CPUCores,
 		}
 		h.metrics.RecordNodeMetric(nodeID, metricInfo)
 	})
@@ -345,11 +344,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/announcement/update", h.updateAnnouncement)
 
 	mux.HandleFunc("/api/v1/monitor/access", h.monitorAccessHandler)
-	mux.HandleFunc("/api/v1/monitor/status", h.monitorStatus)
-	mux.HandleFunc("/api/v1/open_api/status/", h.publicStatus)
-	mux.HandleFunc("/api/v1/node/status-page/get", h.nodeStatusPageGet)
-	mux.HandleFunc("/api/v1/node/status-page/save", h.nodeStatusPageSave)
-	mux.HandleFunc("/api/v1/node/status-public", h.nodeStatusPublic)
 	mux.HandleFunc("/api/v1/node/traffic/month", h.nodeTrafficMonth)
 	mux.HandleFunc("/api/v1/monitor/nodes/", h.monitorNodeMetricsHandler)
 	mux.HandleFunc("/api/v1/monitor/nodes", h.monitorNodeListHandler)

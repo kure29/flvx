@@ -36,18 +36,3 @@ func (r *Repository) PruneNodeLatencySamples(olderThanMs int64) error {
 	}
 	return r.db.Where("created_time < ?", olderThanMs).Delete(&model.NodeLatencySample{}).Error
 }
-
-// ListLatencySamplesSince returns the given nodes' samples since the given
-// time, oldest first.
-func (r *Repository) ListLatencySamplesSince(nodeIDs []int64, sinceMs int64) ([]model.NodeLatencySample, error) {
-	if r == nil || r.db == nil {
-		return nil, errors.New("repository not initialized")
-	}
-	var out []model.NodeLatencySample
-	if len(nodeIDs) == 0 {
-		return out, nil
-	}
-	err := r.db.Where("node_id IN ? AND created_time >= ?", nodeIDs, sinceMs).
-		Order("created_time ASC, id ASC").Find(&out).Error
-	return out, err
-}

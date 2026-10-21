@@ -45,10 +45,6 @@ import {
   latencySummary,
 } from "@/pages/config/latency-card";
 import { ConfigSection, Field, SubHeading } from "@/pages/config/section";
-import {
-  StatusPageSettings,
-  useStatusPageSummary,
-} from "@/pages/config/status-page-card";
 import { isAdmin } from "@/utils/auth";
 import { getCachedConfigs, configCache, updateSiteConfig } from "@/config/site";
 import {
@@ -282,7 +278,6 @@ type SectionKey =
   | "security"
   | "network"
   | "latency"
-  | "statusPage"
   | "notify"
   | "announcement"
   | "backup"
@@ -354,7 +349,6 @@ function panelMirrorURL(ip: string): string {
 export default function ConfigPage() {
   const navigate = useNavigate();
   const isH5 = useH5Mode();
-  const statusPageSummary = useStatusPageSummary();
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
     () => new Set(),
   );
@@ -1576,14 +1570,6 @@ export default function ConfigPage() {
           title="延迟测试点"
         >
           <LatencySettings configs={configs} onChange={handleConfigChange} />
-        </ConfigSection>
-
-        <ConfigSection
-          {...sectionProps("statusPage")}
-          summary={statusPageSummary}
-          title="公开状态页"
-        >
-          <StatusPageSettings />
         </ConfigSection>
 
         <ConfigSection

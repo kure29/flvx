@@ -101,11 +101,6 @@ import {
 } from "@/pages/node/agent-modals";
 import { NodeFilterModal } from "@/pages/node/filter-modal";
 import { NodeLiveStats } from "@/pages/node/node-live-stats";
-import {
-  toggleStatusPublic,
-  useStatusPage,
-} from "@/pages/node/status-page-store";
-import { Switch } from "@/shadcn-bridge/heroui/switch";
 
 export default function NodePage({
   embedded = false,
@@ -266,15 +261,10 @@ export default function NodePage({
     useState<ReleaseChannel>("stable");
   const [selectedVersion, setSelectedVersion] = useState("");
   const [batchUpgradeLoading, setBatchUpgradeLoading] = useState(false);
-  // This month's traffic per node, and the public status page (its 公开
-  // switch shows on the rows while the page is on).
+  // This month's traffic per node, for the rows.
   const [monthTraffic, setMonthTraffic] = useState<
     Record<string, [number, number]>
   >({});
-  const statusPage = useStatusPage();
-  const statusPublic = new Map(
-    (statusPage?.nodes ?? []).map((n) => [n.id, n.public]),
-  );
 
   useEffect(() => {
     let active = true;
@@ -2243,25 +2233,6 @@ export default function NodePage({
                             <div className="contents lg:flex lg:w-36 lg:justify-end">
                               {renderLatency(node, "list")}
                             </div>
-                            {statusPage?.settings.enabled &&
-                              statusPublic.has(node.id) && (
-                                <span
-                                  className="flex items-center gap-1.5"
-                                  title="显示在公开状态页（设置 → 公开状态页）"
-                                >
-                                  <span className="text-[11px] text-default-400">
-                                    公开
-                                  </span>
-                                  <Switch
-                                    aria-label={`${node.name} 显示在公开状态页`}
-                                    isSelected={statusPublic.get(node.id)}
-                                    size="sm"
-                                    onValueChange={(on) =>
-                                      toggleStatusPublic(node.id, on)
-                                    }
-                                  />
-                                </span>
-                              )}
                             {!isDisplayFiltered && (
                               <span
                                 className="cursor-grab touch-none p-1 text-default-300 hover:text-default-500 active:cursor-grabbing"

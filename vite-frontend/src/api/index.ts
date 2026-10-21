@@ -136,32 +136,6 @@ export const getUserPackageInfo = () =>
 export const createNode = (data: NodeMutationPayload) =>
   Network.post("/node/create", data);
 export const getNodeList = () => Network.post<NodeApiItem[]>("/node/list");
-/** The public status page (/status/<slug>): settings and the nodes it can show. */
-export interface StatusPageSettings {
-  enabled: boolean;
-  title: string;
-  slug: string;
-  /** Image URL behind the page, "" for none. */
-  background: string;
-  /** 10–100; below 100 the background shows through the cards. */
-  cardOpacity: number;
-}
-export const getStatusPage = () =>
-  Network.post<{
-    settings: StatusPageSettings;
-    nodes: Array<{ id: number; name: string; public: boolean }>;
-  }>("/node/status-page/get", {});
-export const saveStatusPage = (data: {
-  enabled: boolean;
-  title: string;
-  /** Give the page a new link; the old one stops working. */
-  newSlug?: boolean;
-  /** Left out, these stay as they are. */
-  background?: string;
-  cardOpacity?: number;
-}) => Network.post<StatusPageSettings>("/node/status-page/save", data);
-export const setNodeStatusPublic = (id: number, isPublic: boolean) =>
-  Network.post("/node/status-public", { id, public: isPublic });
 /** Each node's traffic since the 1st of this month (viewer's time zone): id → [in, out]. */
 export const getNodeMonthTraffic = () =>
   Network.post<Record<string, [number, number]>>("/node/traffic/month", {
@@ -674,74 +648,6 @@ export const getServiceMonitorLatestResults = () =>
 export const runServiceMonitor = (id: number) =>
   Network.post<ServiceMonitorResultApiItem>("/monitor/services/run", { id });
 
-/** One node on the status page (the backend's statusNode). */
-export interface StatusNode {
-  /** Opens the node's details on the public page; changes with the link. */
-  key?: string;
-  name: string;
-  /** Region group like "🇭🇰 香港", or "" when the name has none. */
-  region: string;
-  online: boolean;
-  /** Seconds since the server booted. */
-  uptime: number;
-  cpu: number;
-  mem: number;
-  disk: number;
-  load: number;
-  /** CPU count; missing from older agents. */
-  cores?: number;
-  /** Bytes per second. */
-  netIn: number;
-  netOut: number;
-  /** Bytes since the 1st of this month. */
-  monthIn: number;
-  monthOut: number;
-  tcp: number;
-  udp: number;
-  latency: Array<{
-    name: string;
-    ok: boolean;
-    ms?: number;
-    lossPct?: number;
-    route?: string;
-    routeV6?: string;
-    /** Last rounds, oldest first: [ms, loss %, unix ms]; a failed round
-     * has ms 0 and loss 100. */
-    hist?: Array<[number, number, number]>;
-  }>;
-}
-
-/** A public node's history for the status page's detail view. */
-export interface StatusDetail {
-  name: string;
-  region: string;
-  online: boolean;
-  cores?: number;
-  hours: number;
-  /** [unix ms, cpu %, mem %, disk %, load1, net in B/s, net out B/s]. */
-  metrics: Array<[number, number, number, number, number, number, number]>;
-  latency: Array<{
-    name: string;
-    route?: string;
-    /** [unix ms, ms, loss %]; a failed round has ms 0 and loss 100. */
-    samples: Array<[number, number, number]>;
-  }>;
-}
-
-/** The status page: public (no login) or for users allowed to see monitoring. */
-export interface StatusView {
-  title: string;
-  background?: string;
-  cardOpacity: number;
-  nodes: StatusNode[];
-  updatedAt: number;
-}
-
-/** Every node's live state, read only (users allowed to see monitoring). */
-export const getMonitorStatus = () =>
-  Network.get<StatusView>("/monitor/status", {
-    tz: -new Date().getTimezoneOffset(),
-  });
 export const getMonitorNodes = () =>
   Network.get<MonitorNodeApiItem[]>("/monitor/nodes");
 

@@ -330,7 +330,7 @@ func TestZeroValues(t *testing.T) {
 // baseline and a smaller counter (a reboot) counts in full.
 func TestNodeTrafficFromCounters(t *testing.T) {
 	s := NewIngestionService(nil)
-	s.RecordNodeMetric(7, SystemInfo{BytesReceived: 1000, BytesTransmitted: 500, CPUUsage: 12})
+	s.RecordNodeMetric(7, SystemInfo{BytesReceived: 1000, BytesTransmitted: 500})
 	s.RecordNodeMetric(7, SystemInfo{BytesReceived: 1600, BytesTransmitted: 900})
 	s.RecordNodeMetric(7, SystemInfo{BytesReceived: 100, BytesTransmitted: 50})
 	var in, out int64
@@ -342,8 +342,5 @@ func TestNodeTrafficFromCounters(t *testing.T) {
 	}
 	if in != 700 || out != 450 {
 		t.Fatalf("traffic in=%d out=%d", in, out)
-	}
-	if m, ok := s.LatestNodeMetric(7); !ok || m.NetInBytes != 100 {
-		t.Fatalf("latest: %+v %v", m, ok)
 	}
 }

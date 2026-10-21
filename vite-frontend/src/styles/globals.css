@@ -296,14 +296,3 @@ body {
   }
 }
 
-
-/* Public status page with a background: cards let it show through. */
-.status-glass .status-surface {
-  background-color: color-mix(
-    in srgb,
-    var(--content1) var(--status-card-opacity, 100%),
-    transparent
-  );
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}

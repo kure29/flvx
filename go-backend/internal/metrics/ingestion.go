@@ -25,8 +25,6 @@ type SystemInfo struct {
 	UDPConns         int64   `json:"udp_conns"`
 	NetInSpeed       int64   `json:"net_in_speed"`
 	NetOutSpeed      int64   `json:"net_out_speed"`
-	// CPUCores is 0 from agents that predate it.
-	CPUCores int `json:"cpu_cores"`
 }
 
 // NodeTrafficRetention keeps a little over a year of hourly node traffic.
@@ -42,10 +40,6 @@ type IngestionService struct {
 	nodeBufferMu  sync.Mutex
 	flushInterval time.Duration
 
-	// latest is each node's last report, before it reaches the database.
-	latest map[int64]model.NodeMetric
-	// cores is each node's CPU count from its last report (not stored).
-	cores map[int64]int
 	// lastBytes is each node's last byte counters (in, out); traffic adds
 	// what they grew by, per hour, until the next flush.
 	lastBytes map[int64][2]int64
@@ -57,8 +51,6 @@ func NewIngestionService(repo *repo.Repository) *IngestionService {
 		repo:          repo,
 		nodeBuffer:    make([]*model.NodeMetric, 0, 500),
 		flushInterval: 30 * time.Second,
-		latest:        map[int64]model.NodeMetric{},
-		cores:         map[int64]int{},
 		lastBytes:     map[int64][2]int64{},
 		traffic:       map[trafficKey][2]int64{},
 	}
@@ -71,22 +63,6 @@ func counterDelta(prev, cur int64) int64 {
 		return cur - prev
 	}
 	return cur
-}
-
-// LatestNodeMetric is a node's last report, if it sent one since the panel
-// started.
-func (s *IngestionService) LatestNodeMetric(nodeID int64) (model.NodeMetric, bool) {
-	s.nodeBufferMu.Lock()
-	defer s.nodeBufferMu.Unlock()
-	m, ok := s.latest[nodeID]
-	return m, ok
-}
-
-// NodeCPUCores is the node's CPU count, 0 when its agent doesn't report it.
-func (s *IngestionService) NodeCPUCores(nodeID int64) int {
-	s.nodeBufferMu.Lock()
-	defer s.nodeBufferMu.Unlock()
-	return s.cores[nodeID]
 }
 
 func (s *IngestionService) Start(ctx context.Context) {
@@ -131,8 +107,6 @@ func (s *IngestionService) RecordNodeMetric(nodeID int64, info SystemInfo) {
 	s.nodeBufferMu.Lock()
 	s.nodeBuffer = append(s.nodeBuffer, m)
 	shouldFlush := len(s.nodeBuffer) >= 200
-	s.latest[nodeID] = *m
-	s.cores[nodeID] = info.CPUCores
 	// The first report after a panel restart only sets the baseline.
 	if prev, ok := s.lastBytes[nodeID]; ok {
 		k := trafficKey{nodeID, m.Timestamp - m.Timestamp%int64(time.Hour/time.Millisecond)}
