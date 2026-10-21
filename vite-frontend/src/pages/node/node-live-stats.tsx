@@ -40,7 +40,7 @@ function Meter({ label, value }: { label: string; value?: number }) {
 /**
  * A node's live resources on its list row: CPU, memory and disk, speed
  * and this month's traffic. "row" sits at the end of a wide row, "footer"
- * under the name on narrow screens.
+ * under the name on narrow screens, "card" in a node card at any width.
  */
 export function NodeLiveStats({
   info,
@@ -50,7 +50,7 @@ export function NodeLiveStats({
   info: NodeSystemInfo | null;
   /** This month's [in, out] bytes. */
   month?: [number, number];
-  variant: "row" | "footer";
+  variant: "row" | "footer" | "card";
 }) {
   const up = info ? (info.netOutSpeed ?? info.uploadSpeed) : undefined;
   const down = info ? (info.netInSpeed ?? info.downloadSpeed) : undefined;
@@ -67,9 +67,11 @@ export function NodeLiveStats({
       : `↑${bytes(up)}/s ↓${bytes(down)}/s`;
   const monthText = month ? `本月 ${bytes(month[0] + month[1])}` : "";
 
-  if (variant === "footer") {
+  if (variant !== "row") {
     return (
-      <div className="mt-2 space-y-1.5 lg:hidden">
+      <div
+        className={`space-y-1.5 ${variant === "footer" ? "mt-2 lg:hidden" : ""}`}
+      >
         <div className="grid grid-cols-3 gap-3">{meters}</div>
         <div className="flex gap-3 font-mono text-[11px] text-default-500">
           <span>{speed}</span>
