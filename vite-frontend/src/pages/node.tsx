@@ -2232,15 +2232,22 @@ export default function NodePage({
                             </div>
                             {statusPage?.settings.enabled &&
                               statusPublic.has(node.id) && (
-                                <Switch
-                                  aria-label={`${node.name} 显示在公开状态页`}
-                                  isSelected={statusPublic.get(node.id)}
-                                  size="sm"
-                                  title="显示在公开状态页"
-                                  onValueChange={(on) =>
-                                    toggleStatusPublic(node.id, on)
-                                  }
-                                />
+                                <span
+                                  className="flex items-center gap-1.5"
+                                  title="显示在公开状态页（设置 → 公开状态页）"
+                                >
+                                  <span className="text-[11px] text-default-400">
+                                    公开
+                                  </span>
+                                  <Switch
+                                    aria-label={`${node.name} 显示在公开状态页`}
+                                    isSelected={statusPublic.get(node.id)}
+                                    size="sm"
+                                    onValueChange={(on) =>
+                                      toggleStatusPublic(node.id, on)
+                                    }
+                                  />
+                                </span>
                               )}
                             {!isDisplayFiltered && (
                               <span

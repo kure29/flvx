@@ -7,7 +7,6 @@ import { AnimatedPage } from "@/components/animated-page";
 import { PageHeader, PageTabs } from "@/components/page-kit";
 import NodePage from "@/pages/node";
 import { KernelsTab } from "@/pages/node/kernels-tab";
-import { StatusPageBar } from "@/pages/node/status-page-bar";
 import { NodeMonitorTab } from "@/pages/monitor";
 
 type NodeTab = "nodes" | "monitor" | "kernels";
@@ -96,10 +95,7 @@ export default function NodeHubPage() {
           onInstallRequestHandled={() => setInstall(null)}
         />
       ) : (
-        <>
-          <StatusPageBar />
-          <NodePage embedded addRequest={addNode} />
-        </>
+        <NodePage embedded addRequest={addNode} />
       )}
     </AnimatedPage>
   );
