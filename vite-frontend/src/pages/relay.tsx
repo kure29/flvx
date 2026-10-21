@@ -251,11 +251,7 @@ function LinesView() {
           }
         />
       ) : (
-        <div
-          className={
-            card ? CARD_GRID : "grid grid-cols-1 gap-2 2xl:grid-cols-2"
-          }
-        >
+        <div className={card ? CARD_GRID : "grid grid-cols-1 gap-2"}>
           {shown.map((i) => {
             const lines = byInbound.get(i.id) ?? [];
             const broken = lines.some(
@@ -344,9 +340,17 @@ function LinesView() {
                   )
                 }
                 footer={
-                  lineList && <div className="mt-2 lg:max-w-xl">{lineList}</div>
+                  lineList && <div className="mt-2 lg:hidden">{lineList}</div>
                 }
                 meta={summary}
+                right={
+                  lineList && (
+                    // Wide screens: the lines sit beside the landing.
+                    <div className="hidden w-[30rem] lg:block xl:w-[38rem]">
+                      {lineList}
+                    </div>
+                  )
+                }
                 status={lines.length === 0 ? "off" : broken ? "warn" : "ok"}
                 statusTitle={
                   lines.length === 0
