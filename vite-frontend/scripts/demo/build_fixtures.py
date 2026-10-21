@@ -131,6 +131,12 @@ for role, paths in raw.items():
                             "logs": ["[Info] started", "[Info] inbound listening on [::]:443", "[Info] accepted tcp connection"]}})
             e["key"] = canon(e.pop("body"))
 
+# The seeded panel has no node traffic yet: give each node a month of it.
+GB = 1024 ** 3
+raw["admin"]["node/traffic/month"] = [{"key": "", "res": {"code": 0, "msg": "操作成功", "ts": raw["recordedAt"], "data": {
+    str(nid): [int((120 + 380 * jitter(name, "in")) * GB), int((110 + 360 * jitter(name, "out")) * GB)]
+    for nid, name in node_names.items()}}}]
+
 fixtures = {"recordedAt": raw["recordedAt"], "admin": raw["admin"], "user": raw["user"]}
 json.dump(fixtures, open(out_path, "w"), ensure_ascii=False, separators=(",", ":"))
 print("written", out_path)
