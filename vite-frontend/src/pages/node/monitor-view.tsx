@@ -188,21 +188,72 @@ function UsageMini({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Live CPU, memory and network speed of a node, under its list row. */
-function NodeMetricsStrip({ metric }: { metric: RealtimeNodeMetric }) {
+/** Two stacked values (↑/↓ speed or traffic, connections/uptime). */
+function MetricPair({
+  label,
+  top,
+  bottom,
+}: {
+  label: string;
+  top: React.ReactNode;
+  bottom: React.ReactNode;
+}) {
   return (
-    <div className="grid max-w-2xl grid-cols-3 gap-3">
+    <div className="min-w-0 text-[11px] leading-4">
+      <div className="text-default-500">{label}</div>
+      <div className="truncate font-mono">{top}</div>
+      <div className="truncate font-mono">{bottom}</div>
+    </div>
+  );
+}
+
+/**
+ * Live metrics under a node's list row. Phones show CPU, memory and speed
+ * (the rest is in the row's meta line); wider screens spread every metric
+ * across the row.
+ */
+function NodeMetricsStrip({ metric }: { metric: RealtimeNodeMetric }) {
+  const up = <span className="font-bold text-primary-500">↑</span>;
+  const down = <span className="font-bold text-success-500">↓</span>;
+
+  return (
+    <div className="grid grid-cols-3 gap-3 md:grid-cols-5 md:gap-6">
       <UsageMini label="CPU" value={metric.cpuUsage} />
       <UsageMini label="内存" value={metric.memoryUsage} />
-      <div className="min-w-0 space-y-0.5 font-mono text-[11px] leading-4">
-        <div className="truncate">
-          <span className="font-bold text-primary-500">↑</span>{" "}
-          {formatBytesPerSecond(metric.netOutSpeed)}
-        </div>
-        <div className="truncate">
-          <span className="font-bold text-success-500">↓</span>{" "}
-          {formatBytesPerSecond(metric.netInSpeed)}
-        </div>
+      <MetricPair
+        bottom={
+          <>
+            {down} {formatBytesPerSecond(metric.netInSpeed)}
+          </>
+        }
+        label="网速"
+        top={
+          <>
+            {up} {formatBytesPerSecond(metric.netOutSpeed)}
+          </>
+        }
+      />
+      <div className="hidden md:block">
+        <MetricPair
+          bottom={
+            <>
+              {down} {formatBytes(metric.netInBytes)}
+            </>
+          }
+          label="累计流量"
+          top={
+            <>
+              {up} {formatBytes(metric.netOutBytes)}
+            </>
+          }
+        />
+      </div>
+      <div className="hidden md:block">
+        <MetricPair
+          bottom={`已运行 ${formatUptime(metric.uptime)}`}
+          label="连接 / 运行"
+          top={`${metric.tcpConns + metric.udpConns} 个连接`}
+        />
       </div>
     </div>
   );
@@ -1394,15 +1445,20 @@ export function MonitorView({
                     key={node.id}
                     footer={live ? <NodeMetricsStrip metric={metric} /> : null}
                     meta={
-                      live
-                        ? [
+                      live ? (
+                        // Wider screens show these in the metrics strip.
+                        <span className="md:hidden">
+                          {[
                             `连接 ${metric.tcpConns + metric.udpConns}`,
                             `运行 ${formatUptime(metric.uptime)}`,
                             `流量 ↑${formatBytes(metric.netOutBytes)} ↓${formatBytes(metric.netInBytes)}`,
-                          ].join(" · ")
-                        : isOnline
-                          ? "在线 · 等待指标"
-                          : "离线"
+                          ].join(" · ")}
+                        </span>
+                      ) : isOnline ? (
+                        "在线 · 等待指标"
+                      ) : (
+                        "离线"
+                      )
                     }
                     status={isOnline ? "ok" : "bad"}
                     statusTitle={isOnline ? "在线" : "离线"}
