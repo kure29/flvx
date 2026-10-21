@@ -92,3 +92,89 @@ func TestMarkChainClearsOneSidedMatch(t *testing.T) {
 		}
 	}
 }
+
+// An airport source relays for the panel's own nodes; 不用 and picked
+// names override the source, and hidden relays stay out of every list.
+func TestSubscriptionChainBySource(t *testing.T) {
+	eps := namedEndpoints("自建 美国", "机场 香港", "机场 日本", "机场 新加坡")
+	for i := 1; i < len(eps); i++ {
+		eps[i].SourceID = 7
+	}
+	opts := SubOptions{ChainRelaySources: []int64{7}, ChainLandingOwn: true, ChainNoneNames: []string{"机场 日本"},
+		ChainLandingNames: []string{"机场 新加坡"}, ChainHideRelays: true}
+	marked := ApplySubOptions(eps, opts)
+	roles := []string{}
+	for _, e := range marked {
+		roles = append(roles, e.ChainRole)
+	}
+	if strings.Join(roles, ",") != "landing,relay,,landing" {
+		t.Fatalf("roles: %v", roles)
+	}
+
+	clash, _, err := Subscription(FormatClash, eps, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(clash, "- name: \"中转节点\"\n    type: \"select\"\n    proxies:\n      - \"机场 香港\"\n") ||
+		!strings.Contains(clash, "name: \"机场 香港\"") {
+		t.Fatalf("the relay is a proxy and in the relay group:\n%s", clash)
+	}
+	surge, _, _ := Subscription(FormatSurge, eps, opts)
+	sb, _, _ := Subscription(FormatSingbox, eps, opts)
+	for format, body := range map[string]string{FormatClash: clash, FormatSurge: surge, FormatSingbox: sb} {
+		for _, line := range strings.Split(body, "\n") {
+			if strings.Contains(line, "机场 香港") && (strings.Contains(line, "节点选择") || strings.Contains(line, "自动选择")) {
+				t.Fatalf("%s lists the hidden relay: %s", format, line)
+			}
+		}
+	}
+	var cfg struct {
+		Outbounds []struct {
+			Tag       string   `json:"tag"`
+			Outbounds []string `json:"outbounds"`
+		} `json:"outbounds"`
+	}
+	if err := json.Unmarshal([]byte(sb), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range cfg.Outbounds {
+		if (o.Tag == "节点选择" || o.Tag == "自动选择") && strings.Contains(strings.Join(o.Outbounds, ","), "机场 香港") {
+			t.Fatalf("sing-box lists the hidden relay: %v", o)
+		}
+	}
+
+	// Templates whose groups take every node get the relays left out too.
+	for kind, tpl := range map[string]string{
+		TemplateClash:   "proxies: []\nproxy-groups:\n  - name: 全部\n    type: select\n    include-all: true\nrules:\n  - MATCH,全部\n",
+		TemplateSurge:   "[General]\n\n[Proxy]\n\n[Proxy Group]\n全部 = select, DIRECT, include-all-proxies=1, icon-url=https://x.test/a.png\n香港 = select, include-all-proxies=1, policy-regex-filter=香港\n\n[Rule]\nFINAL,全部\n",
+		TemplateSingbox: `{"outbounds":[{"type":"selector","tag":"全部","outbounds":["{all}"]},{"type":"direct","tag":"direct"}],"route":{"final":"全部"}}`,
+	} {
+		body, _, err := Subscription(kind, eps, SubOptions{Templates: map[string]string{kind: tpl}, ChainRelaySources: opts.ChainRelaySources,
+			ChainLandingOwn: true, ChainNoneNames: opts.ChainNoneNames, ChainLandingNames: opts.ChainLandingNames, ChainHideRelays: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch kind {
+		case TemplateClash:
+			if !strings.Contains(body, "  - name: \"全部\"\n    type: \"select\"\n    proxies:\n      - \"自建 美国\"\n      - \"机场 日本\"\n      - \"机场 新加坡\"\n") {
+				t.Fatalf("mihomo template:\n%s", body)
+			}
+		case TemplateSurge:
+			if !strings.Contains(body, "全部 = select, DIRECT, 自建 美国, 机场 日本, 机场 新加坡, icon-url=https://x.test/a.png\n") ||
+				!strings.Contains(body, "香港 = select, DIRECT\n") {
+				t.Fatalf("surge template:\n%s", body)
+			}
+		case TemplateSingbox:
+			var cfg struct {
+				Outbounds []struct {
+					Tag       string   `json:"tag"`
+					Outbounds []string `json:"outbounds"`
+				} `json:"outbounds"`
+			}
+			_ = json.Unmarshal([]byte(body), &cfg)
+			if cfg.Outbounds[0].Tag != "全部" || strings.Join(cfg.Outbounds[0].Outbounds, ",") != "自建 美国,机场 日本,机场 新加坡" {
+				t.Fatalf("sing-box template group: %+v", cfg.Outbounds[0])
+			}
+		}
+	}
+}

@@ -47,7 +47,15 @@ type subPipeline struct {
 	// chain, by their name before the pipeline.
 	ChainLandingNames []string `json:"chainLandingNames"`
 	ChainRelayNames   []string `json:"chainRelayNames"`
-	Script            string   `json:"script"`
+	// ChainLandingSources / ChainRelaySources take whole remote sources
+	// (their nodes join the subscription), ChainLandingOwn the panel's own
+	// nodes; ChainNoneNames are nodes set to 不用 that those would take.
+	ChainLandingSources []int64  `json:"chainLandingSources"`
+	ChainRelaySources   []int64  `json:"chainRelaySources"`
+	ChainLandingOwn     bool     `json:"chainLandingOwn"`
+	ChainNoneNames      []string `json:"chainNoneNames"`
+	ChainHideRelays     bool     `json:"chainHideRelays"`
+	Script              string   `json:"script"`
 	// Templates picks a subscription template per kind (kernel.TemplateClash,
 	// ...): template ids; a kind without one renders the built-in profile.
 	Templates map[string]int64 `json:"templates,omitempty"`
@@ -60,6 +68,8 @@ func (p subPipeline) options() kernel.SubOptions {
 		RegionGroups: p.RegionGroups, ChainLanding: p.ChainLanding, ChainRelay: p.ChainRelay,
 		Rules: p.Rules, RuleGroups: p.RuleGroups,
 		ChainLandingNames: p.ChainLandingNames, ChainRelayNames: p.ChainRelayNames, Script: p.Script,
+		ChainLandingSources: p.ChainLandingSources, ChainRelaySources: p.ChainRelaySources,
+		ChainLandingOwn: p.ChainLandingOwn, ChainNoneNames: p.ChainNoneNames, ChainHideRelays: p.ChainHideRelays,
 	}
 }
 
@@ -96,6 +106,15 @@ func (p *subPipeline) normalize() error {
 	if p.ChainRelayNames, err = normalizeNames(p.ChainRelayNames); err != nil {
 		return err
 	}
+	if p.ChainNoneNames, err = normalizeNames(p.ChainNoneNames); err != nil {
+		return err
+	}
+	if p.ChainLandingSources, err = normalizeIDs(p.ChainLandingSources); err != nil {
+		return err
+	}
+	if p.ChainRelaySources, err = normalizeIDs(p.ChainRelaySources); err != nil {
+		return err
+	}
 	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
 	templates := map[string]int64{}
 	for _, kind := range kernel.TemplateSlots {
@@ -125,7 +144,32 @@ func parsePipeline(raw string) subPipeline {
 	if p.ChainRelayNames == nil {
 		p.ChainRelayNames = []string{}
 	}
+	if p.ChainNoneNames == nil {
+		p.ChainNoneNames = []string{}
+	}
+	if p.ChainLandingSources == nil {
+		p.ChainLandingSources = []int64{}
+	}
+	if p.ChainRelaySources == nil {
+		p.ChainRelaySources = []int64{}
+	}
 	return p
+}
+
+// normalizeIDs drops zero and repeated ids.
+func normalizeIDs(ids []int64) ([]int64, error) {
+	if len(ids) > 100 {
+		return nil, errText("选的订阅源太多")
+	}
+	out := []int64{}
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if id > 0 && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }
 
 // normalizeNames trims and dedupes picked node names; a node picked as
@@ -265,7 +309,9 @@ func subInboundIDs(s *model.Subscription, rows []model.NodeInbound) []int64 {
 		picked[id] = true
 	}
 	sources := map[int64]bool{}
-	for _, id := range parseIDList(s.SourceIDs) {
+	pipeline := parsePipeline(s.Options)
+	// The chain's sources come with their nodes.
+	for _, id := range append(append(parseIDList(s.SourceIDs), pipeline.ChainLandingSources...), pipeline.ChainRelaySources...) {
 		sources[id] = true
 	}
 	for _, r := range rows {
@@ -579,7 +625,8 @@ func (req *subscriptionRequest) validate(rows []model.NodeInbound) ([]int64, err
 		}
 	}
 	req.SourceIDs = sources
-	if !req.SourceAll && len(ids) == 0 && len(sources) == 0 {
+	chainSources := len(req.Options.ChainLandingSources) + len(req.Options.ChainRelaySources)
+	if !req.SourceAll && len(ids) == 0 && len(sources) == 0 && chainSources == 0 {
 		return nil, errText("请至少选择一个入站或订阅源，或选择全部")
 	}
 	return ids, nil
@@ -761,6 +808,10 @@ type subPreviewItem struct {
 	Line     string `json:"line"` // "direct" or "relay"
 	// Chain is "landing" or "relay" when the subscription chains proxies.
 	Chain string `json:"chain,omitempty"`
+	// SourceID is the remote source of an imported node; Own marks the
+	// panel's own nodes.
+	SourceID int64 `json:"sourceId,omitempty"`
+	Own      bool  `json:"own,omitempty"`
 }
 
 // subscriptionPreview runs an (unsaved) subscription's pipeline and lists
@@ -788,7 +839,9 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	draft := &model.Subscription{SourceAll: boolToInt(req.SourceAll), InboundIDs: formatIDList(ids), SourceIDs: formatIDList(req.SourceIDs)}
+	options, _ := json.Marshal(req.Options)
+	draft := &model.Subscription{SourceAll: boolToInt(req.SourceAll), InboundIDs: formatIDList(ids), SourceIDs: formatIDList(req.SourceIDs),
+		Options: string(options)}
 	source := h.subEndpoints(draft, rows)
 	result := kernel.ApplySubOptions(source, req.Options.options())
 	items := make([]subPreviewItem, 0, len(result))
@@ -798,7 +851,7 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 			line = "direct"
 		}
 		items = append(items, subPreviewItem{Name: e.Name, Original: e.Original, Region: kernel.RegionOf(e.Name),
-			Protocol: kernel.EndpointProtocol(e), Line: line, Chain: e.ChainRole})
+			Protocol: kernel.EndpointProtocol(e), Line: line, Chain: e.ChainRole, SourceID: e.SourceID, Own: e.Proxy == nil && e.SourceID == 0})
 	}
 	scriptError := ""
 	if err := kernel.SubScriptError(source, req.Options.options()); err != nil {

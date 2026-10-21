@@ -39,16 +39,21 @@ func markChain(endpoints []Endpoint, opts SubOptions) {
 	}
 }
 
-// chainMatchers tell landing and relay nodes apart: by the picked names
-// when there are any, else by the name expressions. Nil when unset.
+// chainMatchers tell landing and relay nodes apart: by the picked names,
+// sources and own nodes when there are any, else by the name expressions.
+// Nil when unset.
 func chainMatchers(opts SubOptions) (func(Endpoint) bool, func(Endpoint) bool) {
-	if len(opts.ChainLandingNames) > 0 || len(opts.ChainRelayNames) > 0 {
-		landing, relay := toSet(opts.ChainLandingNames), toSet(opts.ChainRelayNames)
-		if len(landing) == 0 || len(relay) == 0 {
-			return nil, nil
-		}
-		return func(e Endpoint) bool { return landing[e.Original] },
-			func(e Endpoint) bool { return relay[e.Original] }
+	if len(opts.ChainLandingNames) > 0 || len(opts.ChainRelayNames) > 0 || len(opts.ChainLandingSources) > 0 ||
+		len(opts.ChainRelaySources) > 0 || opts.ChainLandingOwn {
+		landing, relay, none := toSet(opts.ChainLandingNames), toSet(opts.ChainRelayNames), toSet(opts.ChainNoneNames)
+		landingSrc, relaySrc := idSet(opts.ChainLandingSources), idSet(opts.ChainRelaySources)
+		// A picked name decides; otherwise the node's source or ownership.
+		byGroup := func(e Endpoint) bool { return !landing[e.Original] && !relay[e.Original] && !none[e.Original] }
+		return func(e Endpoint) bool {
+				return landing[e.Original] || byGroup(e) && (landingSrc[e.SourceID] || opts.ChainLandingOwn && e.Proxy == nil && e.SourceID == 0)
+			}, func(e Endpoint) bool {
+				return relay[e.Original] || byGroup(e) && relaySrc[e.SourceID]
+			}
 	}
 	landing, _ := ParseMatcher(opts.ChainLanding)
 	relay, _ := ParseMatcher(opts.ChainRelay)
@@ -57,6 +62,23 @@ func chainMatchers(opts SubOptions) (func(Endpoint) bool, func(Endpoint) bool) {
 	}
 	return func(e Endpoint) bool { return landing.match(e.Name) || landing.match(e.Original) },
 		func(e Endpoint) bool { return relay.match(e.Name) || relay.match(e.Original) }
+}
+
+// idSet holds the non-zero ids.
+func idSet(ids []int64) map[int64]bool {
+	out := map[int64]bool{}
+	for _, id := range ids {
+		if id > 0 {
+			out[id] = true
+		}
+	}
+	return out
+}
+
+// listed reports whether a node goes into the node lists and groups: with
+// ChainHideRelays a chain's relay nodes are only in the relay group.
+func listed(e Endpoint, chain bool, opts SubOptions) bool {
+	return !chain || !opts.ChainHideRelays || e.ChainRole != ChainRoleRelay
 }
 
 // chainGroups returns the landing and relay names among the endpoints a

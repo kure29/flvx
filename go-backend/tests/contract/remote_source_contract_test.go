@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"go-backend/internal/auth"
 )
 
@@ -97,4 +99,74 @@ func TestRemoteSourceContract(t *testing.T) {
 	if n := mustQueryInt(t, r, `SELECT COUNT(*) FROM node_inbound WHERE source_id = 0`); n != 2 {
 		t.Fatalf("keepNodes leaves plain imports, got %d", n)
 	}
+}
+
+// An airport uploaded as a file is the relay of a chain by source: its
+// nodes stay relays across renames and stay out of the node lists.
+func TestFileSourceChainContract(t *testing.T) {
+	secret := "contract-jwt-secret"
+	router, _ := setupContractRouter(t, secret)
+	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
+	save := func(body string) map[string]interface{} {
+		out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/save", body)
+		if out.Code != 0 {
+			t.Fatalf("save %s: %+v", body, out)
+		}
+		return out.Data.(map[string]interface{})["source"].(map[string]interface{})
+	}
+	quote := func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, `\`, `\\`), "\n", `\n`) }
+
+	if out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/save", `{"name":"机场","kind":"file"}`); out.Code == 0 {
+		t.Fatal("a file source needs a file")
+	}
+	airport := save(`{"name":"机场","kind":"file","role":"relay","url":"https://ignored.test","intervalHours":6,"content":"` +
+		quote(ssLink("203.0.113.1", "8388", "香港 01")+"\n"+ssLink("203.0.113.2", "8388", "日本 01")) + `"}`)
+	if airport["kind"] != "file" || airport["role"] != "relay" || airport["url"] != "" || valueAsInt(airport["intervalHours"]) != 0 || valueAsInt(airport["nodeCount"]) != 2 {
+		t.Fatalf("file source: %v", airport)
+	}
+	airportID := jsonInt64(int64(airport["id"].(float64)))
+	landing := save(`{"name":"落地","kind":"file","role":"landing","content":"` + quote(ssLink("198.51.100.1", "8388", "美国 落地")) + `"}`)
+	if out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/refresh", `{"id":`+airportID+`}`); out.Code == 0 {
+		t.Fatal("a file source is not refreshed from a URL")
+	}
+
+	sub := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"链式","sourceAll":false,"inboundIds":[],"sourceIds":[],"options":{`+
+		`"chainRelaySources":[`+airportID+`],"chainLandingSources":[`+jsonInt64(int64(landing["id"].(float64)))+`],"chainNoneNames":["日本 01"],"chainHideRelays":true}}`)
+	if sub.Code != 0 || valueAsInt(sub.Data.(map[string]interface{})["nodeCount"]) != 3 {
+		t.Fatalf("chain sources join the subscription: %+v", sub)
+	}
+	path := sub.Data.(map[string]interface{})["path"].(string)
+	check := func(relay string) {
+		t.Helper()
+		var cfg struct {
+			Proxies []map[string]interface{} `yaml:"proxies"`
+			Groups  []struct {
+				Name    string   `yaml:"name"`
+				Proxies []string `yaml:"proxies"`
+			} `yaml:"proxy-groups"`
+		}
+		if err := yaml.Unmarshal(getSub(t, router, path+"?format=clash", "").Body.Bytes(), &cfg); err != nil {
+			t.Fatal(err)
+		}
+		groups := map[string][]string{}
+		for _, g := range cfg.Groups {
+			groups[g.Name] = g.Proxies
+		}
+		if strings.Join(groups["中转节点"], ",") != relay || strings.Join(groups["落地节点"], ",") != "美国 落地" {
+			t.Fatalf("chain groups: %v", groups)
+		}
+		if strings.Contains(strings.Join(groups["节点选择"], ","), relay) || !strings.Contains(strings.Join(groups["节点选择"], ","), "日本 01") {
+			t.Fatalf("relays stay out of the node list, 不用 nodes stay in: %v", groups["节点选择"])
+		}
+		for _, p := range cfg.Proxies {
+			if p["name"] == "美国 落地" && p["dialer-proxy"] != "中转节点" {
+				t.Fatalf("landing dials through the relays: %v", p)
+			}
+		}
+	}
+	check("香港 01")
+	// The airport renames its node; it is still a relay.
+	save(`{"id":` + airportID + `,"name":"机场","kind":"file","role":"relay","content":"` +
+		quote(ssLink("203.0.113.1", "8388", "香港 01 2x")+"\n"+ssLink("203.0.113.2", "8388", "日本 01")) + `"}`)
+	check("香港 01 2x")
 }

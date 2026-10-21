@@ -716,6 +716,15 @@ export interface SubPipeline {
   /** Nodes picked for the chain, by their name before the pipeline. */
   chainLandingNames: string[];
   chainRelayNames: string[];
+  /** Whole remote sources in the chain (their nodes join the subscription). */
+  chainLandingSources: number[];
+  chainRelaySources: number[];
+  /** Every self-built node is a landing node. */
+  chainLandingOwn: boolean;
+  /** Nodes set to 不用 that a source or chainLandingOwn would take. */
+  chainNoneNames: string[];
+  /** Relay nodes stay out of the node lists; they are only in the relay group. */
+  chainHideRelays: boolean;
   /** JavaScript `function operator(nodes)` run after the other steps. */
   script: string;
   /** Subscription template id per client kind; a kind without one gets the built-in profile. */
@@ -904,6 +913,10 @@ export interface SubPreviewItem {
   protocol: string;
   line: "direct" | "relay";
   chain?: "landing" | "relay";
+  /** Remote source of an imported node. */
+  sourceId?: number;
+  /** A self-built node. */
+  own?: boolean;
 }
 export const getSubscriptions = () =>
   Network.post<{
@@ -944,10 +957,15 @@ export const getMySubscriptions = () =>
 /** Gives one of the user's subscriptions a new link and credentials. */
 export const resetMySubscription = (id: number) =>
   Network.post<UserSubscription>("/user/subscription/reset", { id });
+/** What a source's nodes are for in a chain: plain nodes, relays (前置) or landing nodes. */
+export type RemoteSourceRole = "" | "relay" | "landing";
 export interface RemoteSourceItem {
   id: number;
   name: string;
   url: string;
+  /** "file" sources are updated by uploading again. */
+  kind: "url" | "file";
+  role: RemoteSourceRole;
   /** 0 = refresh by hand only. */
   intervalHours: number;
   relayOnly: boolean;
@@ -971,6 +989,10 @@ export const saveRemoteSource = (data: {
   id?: number;
   name: string;
   url: string;
+  kind?: "url" | "file";
+  role?: RemoteSourceRole;
+  /** The uploaded file (file sources). */
+  content?: string;
   intervalHours: number;
   relayOnly: boolean;
   enabled?: boolean;

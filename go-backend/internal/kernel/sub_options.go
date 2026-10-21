@@ -44,6 +44,17 @@ type SubOptions struct {
 	ChainRelayNames   []string
 	ChainLanding      string
 	ChainRelay        string
+	// ChainLandingSources / ChainRelaySources take every node of these
+	// remote sources, including ones a later refresh brings, and
+	// ChainLandingOwn every node of the panel's own. ChainNoneNames keeps
+	// nodes they would take out of the chain; picked names win over all.
+	ChainLandingSources []int64
+	ChainRelaySources   []int64
+	ChainLandingOwn     bool
+	ChainNoneNames      []string
+	// ChainHideRelays keeps relay nodes out of the node lists and groups:
+	// they are only in the relay group.
+	ChainHideRelays bool
 	// Script is JavaScript run after the other steps (see sub_script.go).
 	Script string
 	// Rules adds routing rules, DNS and the service groups in RuleGroups

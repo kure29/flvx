@@ -425,7 +425,10 @@ func expandedGroup(g *yaml.Node, names []string) yamlNode {
 // Stash / Shadowrocket (slot), which get their auto groups written out;
 // Shadowrocket also gets its own node list (chained copies, no VLESS
 // Encryption or WireGuard).
-func clashTemplateProfile(content string, endpoints []Endpoint, slot string) (string, error) {
+//
+// Groups that take every node (include-all) are written out when relay
+// nodes are hidden, since Mihomo cannot leave them out by itself.
+func clashTemplateProfile(content string, endpoints []Endpoint, slot string, hideRelays bool) (string, error) {
 	doc, err := parseClashTemplate(content)
 	if err != nil {
 		return "", err
@@ -434,12 +437,13 @@ func clashTemplateProfile(content string, endpoints []Endpoint, slot string) (st
 	var proxies []interface{}
 	var names []string
 	var chainGroupNodes []interface{}
+	hidden := false
 	if slot == TemplateShadowrocket {
 		proxies, names = shadowrocketProxies(endpoints)
 	} else {
-		proxies, names, chainGroupNodes = clashTemplateProxies(endpoints)
+		proxies, names, chainGroupNodes, hidden = clashTemplateProxies(endpoints, hideRelays)
 	}
-	expand := slot == TemplateStash || slot == TemplateShadowrocket
+	expand := slot == TemplateStash || slot == TemplateShadowrocket || hidden
 	groups, gi := tplMapGet(root, "proxy-groups")
 	if root.Style&yaml.FlowStyle != 0 || groups == nil || groups.Kind != yaml.SequenceNode || groups.Style&yaml.FlowStyle != 0 {
 		if expand && groups != nil && groups.Kind == yaml.SequenceNode {
@@ -519,8 +523,9 @@ func clashTemplateProfile(content string, endpoints []Endpoint, slot string) (st
 }
 
 // clashTemplateProxies renders Mihomo / Stash proxies, with the chain
-// groups when the chain applies.
-func clashTemplateProxies(endpoints []Endpoint) (proxies []interface{}, names []string, chainNodes []interface{}) {
+// groups when the chain applies; names are the nodes groups list, and
+// hidden is set when relay nodes were left out of them.
+func clashTemplateProxies(endpoints []Endpoint, hideRelays bool) (proxies []interface{}, names []string, chainNodes []interface{}, hidden bool) {
 	var rendered []Endpoint
 	var nodes []yamlNode
 	for _, e := range endpoints {
@@ -537,7 +542,11 @@ func clashTemplateProxies(endpoints []Endpoint) (proxies []interface{}, names []
 			p = append(p, yamlField{"dialer-proxy", ChainRelayGroup})
 		}
 		proxies = append(proxies, p)
-		names = append(names, e.Name)
+		if listed(e, chain, SubOptions{ChainHideRelays: hideRelays}) {
+			names = append(names, e.Name)
+		} else {
+			hidden = true
+		}
 	}
 	if chain {
 		chainNodes = []interface{}{
@@ -545,7 +554,7 @@ func clashTemplateProxies(endpoints []Endpoint) (proxies []interface{}, names []
 			yamlNode{{"name", ChainRelayGroup}, {"type", "select"}, {"proxies", toInterfaces(relay)}},
 		}
 	}
-	return proxies, names, chainNodes
+	return proxies, names, chainNodes, hidden
 }
 
 // clashTemplateReencode handles flow-style templates ({...} documents):
@@ -685,7 +694,7 @@ func asSlice(v interface{}) []interface{} {
 	return list
 }
 
-func singboxTemplateProfile(content string, endpoints []Endpoint, snell bool) (string, error) {
+func singboxTemplateProfile(content string, endpoints []Endpoint, snell, hideRelays bool) (string, error) {
 	cfg, err := parseSingboxTemplate(content)
 	if err != nil {
 		return "", err
@@ -712,7 +721,9 @@ func singboxTemplateProfile(content string, endpoints []Endpoint, snell bool) (s
 			}
 			nodeOutbounds = append(nodeOutbounds, o)
 		}
-		names = append(names, e.Name)
+		if listed(e, chain, SubOptions{ChainHideRelays: hideRelays}) {
+			names = append(names, e.Name)
+		}
 	}
 	direct := ""
 	for _, o := range cfg["outbounds"].([]interface{}) {
@@ -864,7 +875,59 @@ func checkSurgeTemplate(content string, names []string) (TemplateSummary, error)
 	return s, nil
 }
 
-func surgeTemplateProfile(content string, endpoints []Endpoint) (string, error) {
+// surgeListed writes out the groups that take every node
+// (include-all-proxies) with the listed nodes only: Surge would add the
+// hidden relay nodes too.
+func surgeListed(lines []string, listed []string) {
+	start, ok := surgeSections(lines)["proxy group"]
+	if !ok {
+		return
+	}
+	for i := start + 1; i < surgeSectionEnd(lines, start); i++ {
+		if surgeComment(lines[i]) {
+			continue
+		}
+		name, rest, found := strings.Cut(lines[i], "=")
+		if !found {
+			continue
+		}
+		var members, params []string
+		var filter string
+		all := false
+		for j, f := range splitSurgeFields(rest) {
+			if j == 0 {
+				members = append(members, f)
+				continue
+			}
+			k, v, kv := strings.Cut(f, "=")
+			switch k = strings.TrimSpace(k); {
+			case k == "include-all-proxies":
+				v = strings.TrimSpace(v)
+				all = v == "1" || v == "true"
+			case k == "policy-regex-filter":
+				filter = strings.TrimSpace(v)
+			case kv:
+				params = append(params, f)
+			default:
+				members = append(members, f)
+			}
+		}
+		if !all {
+			continue
+		}
+		picked := listed
+		if inc, err := compileAll([]string{filter}); err == nil {
+			picked = nameFilter{include: inc}.apply(listed)
+		}
+		members = append(members, picked...)
+		if len(members) == 1 {
+			members = append(members, "DIRECT") // an empty group is rejected
+		}
+		lines[i] = strings.TrimSpace(name) + " = " + strings.Join(append(members, params...), ", ")
+	}
+}
+
+func surgeTemplateProfile(content string, endpoints []Endpoint, hideRelays bool) (string, error) {
 	if _, err := checkSurgeTemplate(content, nil); err != nil {
 		return "", err
 	}
@@ -878,12 +941,22 @@ func surgeTemplateProfile(content string, endpoints []Endpoint) (string, error) 
 		}
 	}
 	landing, relay, chain := chainGroups(rendered)
+	var listedNames []string
+	hidden := false
 	for i := range proxyLines {
 		if chain && rendered[i].ChainRole == ChainRoleLanding {
 			proxyLines[i] += ", underlying-proxy=" + ChainRelayGroup
 		}
+		if listed(rendered[i], chain, SubOptions{ChainHideRelays: hideRelays}) {
+			listedNames = append(listedNames, rendered[i].Name)
+		} else {
+			hidden = true
+		}
 	}
 	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	if hidden {
+		surgeListed(lines, listedNames)
+	}
 	insert := func(at int, add []string) {
 		lines = append(lines[:at], append(append([]string{}, add...), lines[at:]...)...)
 	}
@@ -916,11 +989,11 @@ func surgeTemplateProfile(content string, endpoints []Endpoint) (string, error) 
 func templateProfile(slot, content string, endpoints []Endpoint, opts SubOptions) (string, error) {
 	switch slot {
 	case TemplateClash, TemplateStash, TemplateShadowrocket:
-		return clashTemplateProfile(content, endpoints, slot)
+		return clashTemplateProfile(content, endpoints, slot, opts.ChainHideRelays)
 	case TemplateSingbox:
-		return singboxTemplateProfile(content, endpoints, opts.SingboxSnell)
+		return singboxTemplateProfile(content, endpoints, opts.SingboxSnell, opts.ChainHideRelays)
 	case TemplateSurge:
-		return surgeTemplateProfile(content, endpoints)
+		return surgeTemplateProfile(content, endpoints, opts.ChainHideRelays)
 	}
 	return "", fmt.Errorf("不支持的模板格式 %s", slot)
 }

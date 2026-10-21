@@ -14,9 +14,10 @@ import (
 	"go-backend/internal/store/model"
 )
 
-// Remote sources are subscription URLs whose nodes the panel keeps as
-// imported nodes (SourceID set). A refresh updates them in place, so
-// relays and subscriptions that use them keep working.
+// Remote sources are subscription URLs, or uploaded subscription files,
+// whose nodes the panel keeps as imported nodes (SourceID set). A refresh
+// (or a new upload) updates them in place, so relays and subscriptions
+// that use them keep working.
 
 var remoteSourceCheckInterval = 10 * time.Minute
 
@@ -27,6 +28,8 @@ type remoteSourceView struct {
 	ID            int64  `json:"id"`
 	Name          string `json:"name"`
 	URL           string `json:"url"`
+	Kind          string `json:"kind"`
+	Role          string `json:"role"`
 	IntervalHours int    `json:"intervalHours"`
 	RelayOnly     bool   `json:"relayOnly"`
 	Enabled       bool   `json:"enabled"`
@@ -38,10 +41,17 @@ type remoteSourceView struct {
 
 func remoteSourceViewOf(s *model.RemoteSource) remoteSourceView {
 	return remoteSourceView{
-		ID: s.ID, Name: s.Name, URL: s.URL, IntervalHours: s.IntervalHours, RelayOnly: s.RelayOnly == 1,
+		ID: s.ID, Name: s.Name, URL: s.URL, Kind: sourceKind(s), Role: s.Role, IntervalHours: s.IntervalHours, RelayOnly: s.RelayOnly == 1,
 		Enabled: s.Enabled == 1, LastFetch: s.LastFetch, LastError: s.LastError, NodeCount: s.NodeCount,
 		Userinfo: s.Userinfo,
 	}
+}
+
+func sourceKind(s *model.RemoteSource) string {
+	if s.Kind == model.RemoteSourceFile {
+		return model.RemoteSourceFile
+	}
+	return model.RemoteSourceURL
 }
 
 // remoteSyncResult is what one refresh changed.
@@ -67,10 +77,10 @@ func sameImported(row *model.NodeInbound, node kernel.ImportedNode, extra string
 	return row.Name == truncateRunes(node.Name, 100) && row.Listen == node.Host && row.Port == node.Port && row.Extra == extra
 }
 
-// syncRemoteSource fetches the source and brings its imported nodes in line:
-// nodes are matched by name first (providers keep names when they move a
-// server), then by address.
-func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource) (remoteSyncResult, error) {
+// syncRemoteSource fetches the source (a file source takes the uploaded
+// content) and brings its imported nodes in line: nodes are matched by name
+// first (providers keep names when they move a server), then by address.
+func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource, upload string) (remoteSyncResult, error) {
 	remoteSourceMu.Lock()
 	defer remoteSourceMu.Unlock()
 	res := remoteSyncResult{Errors: []string{}}
@@ -80,9 +90,16 @@ func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource)
 		return res, err
 	}
 
-	body, userinfo, err := fetchSubscriptionInfo(ctx, src.URL)
-	if err != nil {
-		return fail(fmt.Errorf("获取订阅失败：%v", err))
+	body, userinfo := upload, ""
+	if sourceKind(src) == model.RemoteSourceFile {
+		if strings.TrimSpace(upload) == "" {
+			return fail(fmt.Errorf("文件订阅源不能自动更新，请重新上传文件"))
+		}
+	} else {
+		var err error
+		if body, userinfo, err = fetchSubscriptionInfo(ctx, src.URL); err != nil {
+			return fail(fmt.Errorf("获取订阅失败：%v", err))
+		}
 	}
 	nodes, parseErrs := kernel.ParseImport(body)
 	if len(nodes) == 0 {
@@ -201,7 +218,7 @@ func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource)
 }
 
 func remoteSourceDue(s *model.RemoteSource, now time.Time) bool {
-	if s.Enabled != 1 || s.IntervalHours <= 0 {
+	if s.Enabled != 1 || s.IntervalHours <= 0 || sourceKind(s) == model.RemoteSourceFile {
 		return false
 	}
 	return now.Sub(time.UnixMilli(s.LastFetch)) >= time.Duration(s.IntervalHours)*time.Hour
@@ -217,7 +234,7 @@ func (h *Handler) refreshDueRemoteSources(ctx context.Context, now time.Time) {
 		if !remoteSourceDue(s, now) {
 			continue
 		}
-		if _, err := h.syncRemoteSource(ctx, s); err != nil {
+		if _, err := h.syncRemoteSource(ctx, s, ""); err != nil {
 			log.Printf("remote source %d refresh failed: %v", s.ID, err)
 		}
 	}
@@ -255,23 +272,28 @@ func (h *Handler) remoteSourceList(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, response.OK(out))
 }
 
-// remoteSourceSave creates or edits a source; a new one (or a changed URL)
-// is fetched right away.
+// remoteSourceSave creates or edits a source; a new one, a changed URL or
+// an uploaded file is synced right away.
 func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.WriteJSON(w, response.ErrDefault("请求失败"))
 		return
 	}
 	var req struct {
-		ID            int64  `json:"id"`
-		Name          string `json:"name"`
-		URL           string `json:"url"`
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+		URL  string `json:"url"`
+		Kind string `json:"kind"`
+		Role string `json:"role"`
+		// Content is an uploaded file (file sources).
+		Content       string `json:"content"`
 		IntervalHours int    `json:"intervalHours"`
 		RelayOnly     bool   `json:"relayOnly"`
 		Enabled       *bool  `json:"enabled"`
 	}
-	if err := decodeJSON(r.Body, &req); err != nil {
-		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
+	// A JSON-escaped file can be larger than the file itself.
+	if err := decodeJSON(http.MaxBytesReader(w, r.Body, 2*maxSubscriptionBytes), &req); err != nil {
+		response.WriteJSON(w, response.ErrDefault("请求参数错误或文件超过 5MB"))
 		return
 	}
 	req.Name = strings.TrimSpace(req.Name)
@@ -280,7 +302,17 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("请填写名称（最多 100 个字）"))
 		return
 	}
-	if !isSubscriptionURL(req.URL) {
+	if req.Kind != model.RemoteSourceFile {
+		req.Kind = model.RemoteSourceURL
+	}
+	if req.Role != "relay" && req.Role != "landing" {
+		req.Role = ""
+	}
+	if len(req.Content) > maxSubscriptionBytes {
+		response.WriteJSON(w, response.ErrDefault("文件超过 5MB"))
+		return
+	}
+	if req.Kind == model.RemoteSourceURL && !isSubscriptionURL(req.URL) {
 		response.WriteJSON(w, response.ErrDefault("请填写 http(s) 订阅地址"))
 		return
 	}
@@ -297,8 +329,17 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	fetch := src.ID == 0 || src.URL != req.URL
-	src.Name, src.URL, src.IntervalHours = req.Name, req.URL, req.IntervalHours
+	if req.Kind == model.RemoteSourceFile {
+		req.URL, req.IntervalHours = "", 0
+		if strings.TrimSpace(req.Content) == "" && (src.ID == 0 || sourceKind(src) != model.RemoteSourceFile) {
+			response.WriteJSON(w, response.ErrDefault("请选择订阅文件"))
+			return
+		}
+	} else {
+		req.Content = ""
+	}
+	fetch := src.ID == 0 || src.URL != req.URL || sourceKind(src) != req.Kind || req.Content != ""
+	src.Name, src.URL, src.IntervalHours, src.Kind, src.Role = req.Name, req.URL, req.IntervalHours, req.Kind, req.Role
 	src.RelayOnly = boolToInt(req.RelayOnly)
 	if req.Enabled != nil {
 		src.Enabled = boolToInt(*req.Enabled)
@@ -313,11 +354,11 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.OK(remoteSourceViewOf(src)))
 		return
 	}
-	h.respondRemoteSync(w, r.Context(), src)
+	h.respondRemoteSync(w, r.Context(), src, req.Content)
 }
 
-func (h *Handler) respondRemoteSync(w http.ResponseWriter, ctx context.Context, src *model.RemoteSource) {
-	res, err := h.syncRemoteSource(ctx, src)
+func (h *Handler) respondRemoteSync(w http.ResponseWriter, ctx context.Context, src *model.RemoteSource, upload string) {
+	res, err := h.syncRemoteSource(ctx, src, upload)
 	saved, _ := h.repo.GetRemoteSource(src.ID)
 	if saved == nil {
 		saved = src
@@ -340,7 +381,11 @@ func (h *Handler) remoteSourceRefresh(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("订阅源不存在"))
 		return
 	}
-	h.respondRemoteSync(w, r.Context(), src)
+	if sourceKind(src) == model.RemoteSourceFile {
+		response.WriteJSON(w, response.ErrDefault("文件订阅源请在编辑里重新上传文件"))
+		return
+	}
+	h.respondRemoteSync(w, r.Context(), src, "")
 }
 
 // remoteSourceDelete removes a source and, unless keepNodes is set, its

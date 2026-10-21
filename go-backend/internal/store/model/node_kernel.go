@@ -71,7 +71,13 @@ type RemoteSource struct {
 	// IntervalHours between refreshes; 0 refreshes only by hand.
 	IntervalHours int `gorm:"column:interval_hours;not null;default:0"`
 	// RelayOnly marks its nodes relay-only when they are created.
-	RelayOnly int    `gorm:"column:relay_only;not null;default:0"`
+	RelayOnly int `gorm:"column:relay_only;not null;default:0"`
+	// Kind is RemoteSourceURL (fetched from URL) or RemoteSourceFile
+	// (uploaded; updated by uploading again).
+	Kind string `gorm:"type:varchar(10);not null;default:'url'"`
+	// Role is what its nodes are for in a chain: "" (plain nodes),
+	// "relay" (the hop in front of a landing node) or "landing".
+	Role      string `gorm:"type:varchar(10);not null;default:''"`
 	Enabled   int    `gorm:"not null;default:0"`
 	LastFetch int64  `gorm:"column:last_fetch;not null;default:0"`
 	LastError string `gorm:"column:last_error;type:text;not null;default:''"`
@@ -84,6 +90,11 @@ type RemoteSource struct {
 }
 
 func (RemoteSource) TableName() string { return "remote_source" }
+
+const (
+	RemoteSourceURL  = "url"
+	RemoteSourceFile = "file"
+)
 
 // NodeInboundCounter remembers the last cumulative nft counter value seen for
 // an inbound so traffic can be accumulated as deltas. Epoch changes whenever

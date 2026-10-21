@@ -1,8 +1,12 @@
-import type { RemoteSourceItem, RemoteSyncResult } from "@/api";
+import type {
+  RemoteSourceItem,
+  RemoteSourceRole,
+  RemoteSyncResult,
+} from "@/api";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { RefreshCw } from "lucide-react";
+import { FileUp, RefreshCw } from "lucide-react";
 
 import {
   deleteRemoteSource,
@@ -31,13 +35,62 @@ export const INTERVALS: Array<[string, string]> = [
   ["24", "每天"],
 ];
 
+export const SOURCE_ROLES: Array<[RemoteSourceRole, string]> = [
+  ["", "普通节点"],
+  ["relay", "中转（前置）"],
+  ["landing", "落地"],
+];
+
+export const ROLE_HINTS: Record<string, string> = {
+  "": "节点直接放进订阅，和自建节点一样用",
+  relay:
+    "机场节点做前置：新建订阅时整个源作为链式代理的中转，自建节点作为落地，节点改名、增删自动跟上",
+  landing: "新建订阅时整个源作为链式代理的落地（出口）",
+};
+
+/** The same limit as the panel's subscription download. */
+const MAX_FILE_BYTES = 5 << 20;
+
+/** Reads an uploaded subscription file as text; null (with a toast) when it can't be used. */
+export async function readSubscriptionFile(file: File): Promise<string | null> {
+  if (file.size > MAX_FILE_BYTES) {
+    toast.error("文件超过 5MB");
+
+    return null;
+  }
+  const text = await file.text();
+
+  if (!text.trim()) {
+    toast.error("文件是空的");
+
+    return null;
+  }
+
+  return text;
+}
+
 interface SourceDraft {
   id?: number;
   name: string;
   url: string;
+  kind: "url" | "file";
+  role: RemoteSourceRole;
   intervalHours: number;
   relayOnly: boolean;
+  /** A newly chosen file (file sources). */
+  content?: string;
+  fileName?: string;
 }
+
+const draftOf = (s: RemoteSourceItem): SourceDraft => ({
+  id: s.id,
+  name: s.name,
+  url: s.url,
+  kind: s.kind,
+  role: s.role,
+  intervalHours: s.intervalHours,
+  relayOnly: s.relayOnly,
+});
 
 function ago(ms: number): string {
   if (!ms) return "还没更新过";
@@ -91,6 +144,9 @@ export function RemoteSourcesSection({
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // A file source being updated from the list's upload button.
+  const reupload = useRef<RemoteSourceItem | null>(null);
+  const reuploadInput = useRef<HTMLInputElement>(null);
 
   const report = (res: {
     code: number;
@@ -114,11 +170,39 @@ export function RemoteSourcesSection({
     }
   };
 
+  const uploadAgain = async (s: RemoteSourceItem, file: File) => {
+    const content = await readSubscriptionFile(file);
+
+    if (content === null) return;
+    setRefreshing(s.id);
+    try {
+      report(await saveRemoteSource({ ...draftOf(s), content }));
+      await onChanged();
+    } finally {
+      setRefreshing(null);
+    }
+  };
+
   const save = async () => {
     if (!draft) return;
+    if (draft.kind === "file" && !draft.id && !draft.content) {
+      toast.error("请选择订阅文件");
+
+      return;
+    }
     setSaving(true);
     try {
-      const res = await saveRemoteSource(draft);
+      const data = {
+        id: draft.id,
+        name: draft.name,
+        url: draft.url,
+        kind: draft.kind,
+        role: draft.role,
+        intervalHours: draft.intervalHours,
+        relayOnly: draft.relayOnly,
+        content: draft.kind === "file" ? draft.content : undefined,
+      };
+      const res = await saveRemoteSource(data);
 
       report(res);
       // A source whose first fetch failed is still saved; keep the editor
@@ -163,7 +247,14 @@ export function RemoteSourcesSection({
           size="sm"
           variant="light"
           onPress={() =>
-            setDraft({ name: "", url: "", intervalHours: 12, relayOnly: false })
+            setDraft({
+              name: "",
+              url: "",
+              kind: "url",
+              role: "",
+              intervalHours: 12,
+              relayOnly: false,
+            })
           }
         >
           添加
@@ -171,7 +262,7 @@ export function RemoteSourcesSection({
       </div>
       {sources.length === 0 ? (
         <p className="rounded-xl border border-dashed border-divider px-3 py-4 text-center text-xs text-default-500">
-          填机场或别人的订阅链接：节点会定时更新，出现在“入站”里，可以接中转，也能和自己的落地合并成一个订阅。在“导入”里粘贴订阅地址并打开“定时同步”也会存到这里
+          填机场或别人的订阅链接，或上传订阅文件：节点出现在“入站”里，可以给自建落地做前置中转，也能和自己的落地合并成一个订阅。在“导入”里粘贴订阅地址并打开“定时同步”也会存到这里
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-2 2xl:grid-cols-2">
@@ -184,15 +275,7 @@ export function RemoteSourcesSection({
                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-divider bg-content1 px-3 py-2.5 shadow-sm transition-colors hover:bg-default-100"
                 role="button"
                 tabIndex={0}
-                onClick={() =>
-                  setDraft({
-                    id: s.id,
-                    name: s.name,
-                    url: s.url,
-                    intervalHours: s.intervalHours,
-                    relayOnly: s.relayOnly,
-                  })
-                }
+                onClick={() => setDraft(draftOf(s))}
                 onKeyDown={(e) => {
                   if (e.target !== e.currentTarget) return;
                   if (e.key === "Enter" || e.key === " ") {
@@ -211,12 +294,28 @@ export function RemoteSourcesSection({
                   }`}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{s.name}</div>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-medium">{s.name}</span>
+                    {s.role && (
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] ${s.role === "relay" ? "bg-secondary-100 text-secondary-700 dark:bg-secondary-500/20" : "bg-warning-100 text-warning-700 dark:bg-warning-500/20"}`}
+                      >
+                        {s.role === "relay" ? "中转" : "落地"}
+                      </span>
+                    )}
+                  </div>
                   <div className="truncate text-xs text-default-500">
-                    {s.nodeCount} 个节点 · {ago(s.lastFetch)}
-                    {s.intervalHours
-                      ? ` · 每 ${s.intervalHours} 小时`
-                      : " · 手动更新"}
+                    {s.nodeCount} 个节点 ·{" "}
+                    {s.kind === "file"
+                      ? s.lastFetch
+                        ? ago(s.lastFetch).replace("更新", "上传")
+                        : "还没上传过"
+                      : ago(s.lastFetch)}
+                    {s.kind === "file"
+                      ? " · 文件"
+                      : s.intervalHours
+                        ? ` · 每 ${s.intervalHours} 小时`
+                        : " · 手动更新"}
                   </div>
                   {s.lastError ? (
                     <div className="truncate text-xs text-danger">
@@ -237,13 +336,29 @@ export function RemoteSourcesSection({
                 >
                   <Button
                     isIconOnly
-                    aria-label={`更新 ${s.name}`}
+                    aria-label={
+                      s.kind === "file"
+                        ? `重新上传 ${s.name}`
+                        : `更新 ${s.name}`
+                    }
                     isLoading={refreshing === s.id}
                     size="sm"
                     variant="flat"
-                    onPress={() => refresh(s)}
+                    onPress={() => {
+                      if (s.kind !== "file") {
+                        void refresh(s);
+
+                        return;
+                      }
+                      reupload.current = s;
+                      reuploadInput.current?.click();
+                    }}
                   >
-                    <RefreshCw className="h-4 w-4" />
+                    {s.kind === "file" ? (
+                      <FileUp className="h-4 w-4" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -251,6 +366,18 @@ export function RemoteSourcesSection({
           })}
         </div>
       )}
+      <input
+        ref={reuploadInput}
+        className="hidden"
+        type="file"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          const s = reupload.current;
+
+          e.target.value = "";
+          if (file && s) void uploadAgain(s, file);
+        }}
+      />
 
       <Modal
         backdrop="blur"
@@ -279,32 +406,85 @@ export function RemoteSourcesSection({
                       setDraft({ ...draft, name: e.target.value })
                     }
                   />
-                  <Input
-                    label="订阅地址"
-                    placeholder="https://..."
-                    value={draft.url}
-                    variant="bordered"
-                    onChange={(e) =>
-                      setDraft({ ...draft, url: e.target.value })
+                  <Segmented
+                    options={[
+                      ["url", "订阅地址"],
+                      ["file", "上传文件"],
+                    ]}
+                    value={draft.kind}
+                    onChange={(kind) =>
+                      setDraft({ ...draft, kind: kind as SourceDraft["kind"] })
                     }
                   />
+                  {draft.kind === "url" ? (
+                    <Input
+                      label="订阅地址"
+                      placeholder="https://..."
+                      value={draft.url}
+                      variant="bordered"
+                      onChange={(e) =>
+                        setDraft({ ...draft, url: e.target.value })
+                      }
+                    />
+                  ) : (
+                    <FilePick
+                      fileName={draft.fileName}
+                      hint={
+                        draft.id && editing?.kind === "file"
+                          ? "不选文件就保留现在的节点；选了文件就按新文件更新"
+                          : "订阅文件：Base64 订阅、分享链接、Clash / Mihomo、sing-box、Surge / Loon 节点，最大 5MB"
+                      }
+                      onFile={async (file) => {
+                        const content = await readSubscriptionFile(file);
+
+                        if (content !== null) {
+                          setDraft({
+                            ...draft,
+                            content,
+                            fileName: file.name,
+                            name:
+                              draft.name || file.name.replace(/\.[^.]+$/, ""),
+                          });
+                        }
+                      }}
+                    />
+                  )}
+                  {draft.kind === "url" && (
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-medium">自动更新</p>
+                      <Segmented
+                        options={INTERVALS}
+                        value={String(draft.intervalHours)}
+                        onChange={(v) =>
+                          setDraft({ ...draft, intervalHours: Number(v) })
+                        }
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-default-500">
+                    {draft.kind === "url" ? "更新" : "重新上传"}
+                    时按名称对上已有节点：改了地址就跟着改（中转也跟着改），没了就移除；挂着中转的会保留
+                  </p>
                   <div className="space-y-1.5">
-                    <p className="text-sm font-medium">自动更新</p>
+                    <p className="text-sm font-medium">用途</p>
                     <Segmented
-                      options={INTERVALS}
-                      value={String(draft.intervalHours)}
-                      onChange={(v) =>
-                        setDraft({ ...draft, intervalHours: Number(v) })
+                      options={SOURCE_ROLES}
+                      value={draft.role}
+                      onChange={(role) =>
+                        setDraft({
+                          ...draft,
+                          role: role as RemoteSourceRole,
+                        })
                       }
                     />
                     <p className="text-xs text-default-500">
-                      更新时按名称对上已有节点：改了地址就跟着改（中转也跟着改），没了就移除；挂着中转的会保留
+                      {ROLE_HINTS[draft.role]}
                     </p>
                   </div>
                   <ToggleRow
-                    hint="新加进来的节点不直接放进订阅，只用来接中转"
+                    hint="新加进来的节点不直接放进订阅，只通过你自己机器上的转发（中转线路）连接"
                     id="source-relay-only"
-                    label="新节点设为仅中转"
+                    label="只通过我的转发访问"
                     value={draft.relayOnly}
                     onChange={(relayOnly) => setDraft({ ...draft, relayOnly })}
                   />
@@ -343,7 +523,11 @@ export function RemoteSourcesSection({
                     取消
                   </Button>
                   <Button color="primary" isLoading={saving} onPress={save}>
-                    {draft.id ? "保存" : "添加并更新"}
+                    {draft.id
+                      ? "保存"
+                      : draft.kind === "file"
+                        ? "添加"
+                        : "添加并更新"}
                   </Button>
                 </ModalFooter>
               </>
@@ -352,5 +536,50 @@ export function RemoteSourcesSection({
         </ModalContent>
       </Modal>
     </section>
+  );
+}
+
+/** A file picker row: the chosen file's name, or a prompt. */
+export function FilePick({
+  fileName,
+  hint,
+  onFile,
+}: {
+  fileName?: string;
+  hint?: string;
+  onFile: (file: File) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="space-y-1">
+      <button
+        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-divider px-3 py-3 text-left text-sm hover:bg-default-100"
+        type="button"
+        onClick={() => input.current?.click()}
+      >
+        <FileUp className="h-4 w-4 shrink-0 text-default-500" />
+        <span
+          className={`min-w-0 flex-1 truncate ${fileName ? "" : "text-default-500"}`}
+        >
+          {fileName || "选择订阅文件"}
+        </span>
+        {fileName && (
+          <span className="shrink-0 text-xs text-primary">更换</span>
+        )}
+      </button>
+      {hint && <p className="text-xs text-default-500">{hint}</p>}
+      <input
+        ref={input}
+        className="hidden"
+        type="file"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+
+          e.target.value = "";
+          if (file) onFile(file);
+        }}
+      />
+    </div>
   );
 }
