@@ -148,7 +148,7 @@ function SplitForm({
           onChange={setOutboundIpStrategy}
         />
         <section className="space-y-2">
-          <p className="text-sm font-medium">默认出口</p>
+          <p className="text-sm font-medium">默认去向</p>
           <TargetButton
             missing={outboundMissing}
             targets={targets}
@@ -184,7 +184,7 @@ function SplitForm({
         <TargetPicker
           isOpen={picking !== null}
           targets={targets}
-          title={picking === "default" ? "默认出口" : "去向"}
+          title={picking === "default" ? "默认去向" : "去向"}
           value={
             picking === "default"
               ? outboundId || "direct"

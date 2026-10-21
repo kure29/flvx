@@ -94,7 +94,7 @@ export function SplitRulesEditor({
     <div className="space-y-2">
       {rules.length === 0 && (
         <div className="rounded-xl border border-dashed border-divider px-4 py-6 text-center text-sm text-default-500">
-          还没有分流规则，所有流量走默认出口
+          还没有分流规则，所有流量走默认去向
         </div>
       )}
       {rules.map((r, i) => {

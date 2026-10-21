@@ -437,7 +437,7 @@ const TrafficChartCard = React.memo(function TrafficChartCard({
                 <Line
                   dataKey="bytesIn"
                   dot={false}
-                  name="入站流量"
+                  name="上传流量"
                   stroke="#10b981"
                   strokeWidth={2}
                   type="monotone"
@@ -445,7 +445,7 @@ const TrafficChartCard = React.memo(function TrafficChartCard({
                 <Line
                   dataKey="bytesOut"
                   dot={false}
-                  name="出站流量"
+                  name="下载流量"
                   stroke="#ef4444"
                   strokeWidth={2}
                   type="monotone"

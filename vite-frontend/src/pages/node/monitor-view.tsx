@@ -360,8 +360,8 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
       case "network":
         return {
           lines: [
-            { dataKey: "netIn", color: "#10b981", name: "入站速度" },
-            { dataKey: "netOut", color: "#ef4444", name: "出站速度" },
+            { dataKey: "netIn", color: "#10b981", name: "接收速度" },
+            { dataKey: "netOut", color: "#ef4444", name: "发送速度" },
           ],
           yAxisLabel: "速度 (bytes/s)",
         };
