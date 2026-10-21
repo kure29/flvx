@@ -1,5 +1,7 @@
 import type { NodeSystemInfo } from "@/pages/node/system-info";
 
+import { ArrowDown, ArrowUp } from "lucide-react";
+
 function bytes(v: number): string {
   const units = ["B", "K", "M", "G", "T", "P"];
   let i = 0;
@@ -61,43 +63,65 @@ export function NodeLiveStats({
       <Meter label="磁盘" value={info?.diskUsage} />
     </>
   );
-  const speed =
-    up === undefined || down === undefined
-      ? "—"
-      : `↑${bytes(up)}/s ↓${bytes(down)}/s`;
-  const monthText = month ? `本月 ${bytes(month[0] + month[1])}` : "";
+  const rate = (v?: number) => (v === undefined ? "—" : `${bytes(v)}/s`);
+  const upIcon = <ArrowUp className="h-3 w-3 shrink-0 text-emerald-500" />;
+  const downIcon = <ArrowDown className="h-3 w-3 shrink-0 text-sky-500" />;
+  const total = month ? bytes(month[0] + month[1]) : "—";
+  const split = month ? `↑${bytes(month[1])} ↓${bytes(month[0])}` : "";
 
   if (variant !== "row") {
     return (
       <div
-        className={`space-y-1.5 ${variant === "footer" ? "mt-2 lg:hidden" : ""}`}
+        className={`space-y-2 ${variant === "footer" ? "mt-2 lg:hidden" : ""}`}
       >
         <div className="grid grid-cols-3 gap-3">{meters}</div>
-        <div className="flex gap-3 font-mono text-[11px] text-default-500">
-          <span>{speed}</span>
-          {monthText && <span>{monthText}</span>}
+        <div className="grid grid-cols-2 divide-x divide-divider rounded-lg bg-default-100/60 py-1.5 text-[11px] tabular-nums">
+          <div className="min-w-0 px-2.5">
+            <div className="text-[10px] text-default-400">网速</div>
+            <div className="flex flex-wrap items-center gap-x-2 font-medium">
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                {upIcon}
+                {rate(up)}
+              </span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                {downIcon}
+                {rate(down)}
+              </span>
+            </div>
+          </div>
+          <div className="min-w-0 px-2.5" title={split}>
+            <div className="text-[10px] text-default-400">本月流量</div>
+            <div className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="font-semibold">{total}</span>
+              <span className="whitespace-nowrap text-[10px] text-default-400">
+                {split}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="hidden items-center gap-4 lg:flex">
+    <div className="hidden items-center gap-5 lg:flex">
       <div className="grid w-60 grid-cols-3 gap-3">{meters}</div>
-      <div className="w-36 space-y-0.5 font-mono text-[11px] leading-tight">
-        <div className="text-warning-700 dark:text-warning-400">
-          ↑ {up === undefined ? "—" : `${bytes(up)}/s`}
+      <div className="w-24 space-y-0.5 text-[11px] font-medium leading-tight tabular-nums">
+        <div className="flex items-center gap-1">
+          {upIcon}
+          {rate(up)}
         </div>
-        <div className="text-primary">
-          ↓ {down === undefined ? "—" : `${bytes(down)}/s`}
+        <div className="flex items-center gap-1">
+          {downIcon}
+          {rate(down)}
         </div>
       </div>
-      <div className="flex w-24 items-center gap-1.5">
-        <span className="text-[10px] text-default-400">本月</span>
-        <div className="space-y-0.5 font-mono text-[11px] leading-tight text-default-600">
-          <div>↑ {month ? bytes(month[1]) : "—"}</div>
-          <div>↓ {month ? bytes(month[0]) : "—"}</div>
+      <div className="w-28 space-y-0.5 leading-tight tabular-nums">
+        <div className="flex items-baseline gap-1.5 text-[11px]">
+          <span className="text-[10px] text-default-400">本月</span>
+          <span className="font-semibold">{total}</span>
         </div>
+        <div className="text-[10px] text-default-400">{split || "—"}</div>
       </div>
     </div>
   );
