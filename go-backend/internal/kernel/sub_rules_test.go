@@ -113,9 +113,22 @@ func TestSubscriptionRulesOffAndStash(t *testing.T) {
 		!strings.Contains(plain, "MATCH,节点选择") {
 		t.Fatalf("rules off must keep the minimal profile:\n%s", plain)
 	}
-	stash, _, _ := Subscription(FormatStash, eps, SubOptions{Rules: true, RuleGroups: allRuleGroupKeys()})
-	if stash != plain {
-		t.Fatalf("stash must ignore the rules:\n%s", stash)
+	if stash, _, _ := Subscription(FormatStash, eps, SubOptions{}); stash != plain {
+		t.Fatalf("stash without rules must match clash:\n%s", stash)
+	}
+
+	// With rules Stash gets Mihomo's rules, read from YAML rule sets, and
+	// none of the Mihomo-only DNS / sniffer settings.
+	opts := SubOptions{Rules: true, RuleGroups: allRuleGroupKeys()}
+	mihomo, _, _ := Subscription(FormatClash, eps, opts)
+	stash, _, _ := Subscription(FormatStash, eps, opts)
+	if strings.Contains(stash, "mrs") || strings.Contains(stash, "dns:") || strings.Contains(stash, "sniffer:") ||
+		!strings.Contains(stash, `format: "yaml"`) || !strings.Contains(stash, "/geo/geosite/cn.yaml") {
+		t.Fatalf("stash rule sets / settings:\n%s", stash)
+	}
+	rulesOf := func(body string) string { return body[strings.Index(body, "\nrules:"):] }
+	if rulesOf(stash) != rulesOf(mihomo) || !strings.Contains(stash, "MATCH,漏网之鱼") {
+		t.Fatalf("stash rules differ from mihomo:\n%s\n---\n%s", stash, mihomo)
 	}
 }
 

@@ -34,7 +34,7 @@
 | Loon | Loon 节点 | `loon://` | ✗ | ✓（下发完整配置，复制链接导入） |
 | Quantumult X | QX 节点 | `quantumult-x://` | ✗ | ✓（下发完整配置，复制链接导入） |
 | Surge | Surge 配置 | `surge://` | ✓ | ✓ |
-| Stash | Clash 配置 | `stash://` | ✓ | ✗ |
+| Stash | Clash 配置 | `stash://` | ✓ | ✓（规则集用 YAML 格式） |
 | 通用 | Base64 分享链接（v2rayN、NekoBox 等） | 仅复制 | ✗ | ✗ |
 
 - 客户端不支持的协议会自动略过（完整列表见下表），例如 Loon 没有 TUIC，Quantumult X 没有 Hysteria2 / TUIC，Surge 没有 VLESS；VLESS Encryption 只在 Clash / Mihomo 和通用订阅里，WireGuard 只在 Clash / Mihomo、sing-box 和通用订阅里

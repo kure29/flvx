@@ -266,6 +266,36 @@ func parseClashTemplate(content string) (*yaml.Node, error) {
 	return &doc, nil
 }
 
+// clashTemplateUsesMRS reports whether a Mihomo template has .mrs rule
+// sets, which only Mihomo reads; an unreadable template counts as yes.
+func clashTemplateUsesMRS(content string) bool {
+	doc, err := parseClashTemplate(content)
+	if err != nil {
+		return true
+	}
+	p, _ := tplMapGet(doc.Content[0], "rule-providers")
+	if p == nil || p.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 1; i < len(p.Content); i += 2 {
+		if tplScalar(p.Content[i], "format") == "mrs" || strings.HasSuffix(strings.ToLower(tplScalar(p.Content[i], "url")), ".mrs") {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeTemplates is templates with slot set to content, leaving the
+// caller's map unchanged.
+func mergeTemplates(templates map[string]string, slot, content string) map[string]string {
+	out := make(map[string]string, len(templates)+1)
+	for k, v := range templates {
+		out[k] = v
+	}
+	out[slot] = content
+	return out
+}
+
 func checkClashTemplate(content string, names []string) (TemplateSummary, error) {
 	doc, err := parseClashTemplate(content)
 	if err != nil {

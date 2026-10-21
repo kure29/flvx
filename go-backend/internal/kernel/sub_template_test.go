@@ -113,10 +113,21 @@ func TestSubscriptionClashTemplate(t *testing.T) {
 	if err != nil || !strings.Contains(flow, "香港 01") || !strings.Contains(flow, "选择") {
 		t.Fatalf("flow template: %v\n%s", err, flow)
 	}
-	// Formats without a template still render the built-in profile.
+	// Stash without a template of its own takes the Mihomo one...
 	stash, _, _ := Subscription(FormatStash, eps, opts)
-	if strings.Contains(stash, "🚀 节点选择") {
-		t.Fatal("Stash has no template support")
+	if !strings.Contains(stash, "🚀 节点选择") {
+		t.Fatalf("Stash must take the Mihomo template:\n%s", stash)
+	}
+	// ...unless that uses .mrs rule sets, which Stash cannot read.
+	mrs := opts
+	mrs.Templates = map[string]string{TemplateClash: strings.Replace(clashTpl,
+		`url: "https://example.com/netflix.yaml"`, `format: mrs, url: "https://example.com/netflix.mrs"`, 1)}
+	if stash, _, _ := Subscription(FormatStash, eps, mrs); strings.Contains(stash, "🚀 节点选择") {
+		t.Fatalf("Stash must not take an .mrs template:\n%s", stash)
+	}
+	// The Sing-box format has no Mihomo fallback.
+	if sb, _, _ := Subscription(FormatSingbox, eps, opts); strings.Contains(sb, "🚀 节点选择") {
+		t.Fatal("sing-box must not take the Mihomo template")
 	}
 }
 

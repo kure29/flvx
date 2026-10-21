@@ -30,7 +30,7 @@
   - Shadowrocket：Clash 格式的配置，点客户端直接导入（`shadowrocket://config/add/`）
   - Loon / Quantumult X：复制链接，在 App 的配置管理里“从 URL 下载”
   - 链式代理：Shadowrocket 照旧生成“落地（经 中转）”节点；Loon 和 Quantumult X 没有前置代理参数，落地节点仍是直连
-- `.mrs` 只有 mihomo 内核能读，Stash 订阅不带分流规则；已停更的 Clash Premium / Clash for Windows 原版内核不支持
+- `.mrs` 只有 mihomo 内核能读：Stash 订阅的规则集改用 YAML 格式（同一套规则），也不带 mihomo 专用的 DNS / 嗅探设置；已停更的 Clash Premium / Clash for Windows 原版内核不支持
 
 ## 链式代理
 

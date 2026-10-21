@@ -46,8 +46,8 @@ const (
 	FormatClash   = "clash"
 	FormatSingbox = "singbox"
 	FormatSurge   = "surge"
-	// FormatStash is a Clash profile without routing rules: Stash cannot
-	// read the .mrs rule sets they use.
+	// FormatStash is a Clash profile for Stash: its rule sets are YAML,
+	// since only Mihomo reads .mrs, and it leaves out Mihomo-only settings.
 	FormatStash = "stash"
 )
 
@@ -641,6 +641,13 @@ func FormatForUserAgent(ua string) string {
 // Subscription renders every supported endpoint in the requested format and
 // returns the body with its content type.
 func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string, string, error) {
+	// Stash reads Mihomo templates: without one of its own it takes the
+	// Mihomo template, unless that uses .mrs rule sets Stash cannot read.
+	if format == FormatStash && strings.TrimSpace(opts.Templates[TemplateStash]) == "" {
+		if tpl := opts.Templates[TemplateClash]; strings.TrimSpace(tpl) != "" && !clashTemplateUsesMRS(tpl) {
+			opts.Templates = mergeTemplates(opts.Templates, TemplateStash, tpl)
+		}
+	}
 	if slot := templateFor(format); slot != "" && strings.TrimSpace(opts.Templates[slot]) != "" {
 		tpl, kind := opts.Templates[slot], TemplateKindOf(slot)
 		endpoints = uniqueNamesExcept(ApplySubOptions(endpoints, opts), templateGroupNames(kind, tpl))
@@ -664,11 +671,9 @@ func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string,
 		}
 		return base64.StdEncoding.EncodeToString([]byte(strings.Join(lines, "\n"))), "text/plain; charset=utf-8", nil
 	case FormatClash:
-		return clashProfile(endpoints, groups, opts), "text/yaml; charset=utf-8", nil
+		return clashProfile(endpoints, groups, opts, false), "text/yaml; charset=utf-8", nil
 	case FormatStash:
-		stash := opts
-		stash.Rules = false
-		return clashProfile(endpoints, opts.RegionGroups, stash), "text/yaml; charset=utf-8", nil
+		return clashProfile(endpoints, groups, opts, true), "text/yaml; charset=utf-8", nil
 	case FormatShadowrocket:
 		if opts.Rules {
 			return shadowrocketConfig(endpoints, opts), "text/yaml; charset=utf-8", nil
@@ -747,7 +752,9 @@ func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string,
 	return "", "", fmt.Errorf("不支持的订阅格式 %s", format)
 }
 
-func clashProfile(endpoints []Endpoint, withRegions bool, opts SubOptions) string {
+// stash writes rule sets as YAML and leaves out the Mihomo-only DNS and
+// sniffer settings.
+func clashProfile(endpoints []Endpoint, withRegions bool, opts SubOptions, stash bool) string {
 	var rendered []Endpoint
 	var nodes []yamlNode
 	for _, e := range endpoints {
@@ -814,7 +821,7 @@ func clashProfile(endpoints []Endpoint, withRegions bool, opts SubOptions) strin
 		for _, g := range rulePolicyGroups(opts, regionList) {
 			groups = append(groups, yamlNode{{"name", g.name}, {"type", "select"}, {"proxies", g.members}})
 		}
-		providers, rules = clashRules(opts)
+		providers, rules = clashRules(opts, stash)
 	}
 	profile := yamlNode{
 		{"mixed-port", 7890},
@@ -822,7 +829,7 @@ func clashProfile(endpoints []Endpoint, withRegions bool, opts SubOptions) strin
 		{"mode", "rule"},
 		{"log-level", "warning"},
 	}
-	if opts.Rules {
+	if opts.Rules && !stash {
 		profile = append(profile, clashRuleSettings()...)
 	}
 	profile = append(profile,

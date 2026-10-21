@@ -68,6 +68,7 @@ rules:
 
 - 选了模板的客户端拿到按模板生成的配置，下面的 **内置分组与规则** 对它不生效
 - 没选模板的客户端照旧用内置规则；Loon、Quantumult X 暂不支持模板
+- Stash 没单独选模板时，沿用 Mihomo 的模板；Mihomo 模板里有 `mrs` 规则集（Stash 读不了）时不沿用，改用内置规则
 - **Stash、Shadowrocket** 用 Mihomo 格式的模板，可以和 Mihomo 共用同一个：
   - 这两个客户端不一定认 `include-all` / `filter`，面板会把这类组展开成具体的节点列表（模板里原本写的成员排在前面），一个节点都匹配不到时放一个 `DIRECT`，避免客户端报空组
   - 规则集要用 `yaml` 或 `text` 格式：`mrs` 只有 Mihomo 能读，模板检查时会提醒

@@ -229,8 +229,13 @@ var (
 	foreignDoH  = []string{"https://dns.google/dns-query", "https://cloudflare-dns.com/dns-query"}
 )
 
-// clashRules returns the rule providers and rules for a Mihomo profile.
-func clashRules(opts SubOptions) (yamlNode, []interface{}) {
+// clashRules returns the rule providers and rules for a Mihomo profile;
+// yamlSets writes the rule sets as YAML for Stash, which cannot read .mrs.
+func clashRules(opts SubOptions, yamlSets bool) (yamlNode, []interface{}) {
+	format, ext := "mrs", ".mrs"
+	if yamlSets {
+		format, ext = "yaml", ".yaml"
+	}
 	providers := yamlNode{}
 	seen := map[string]bool{}
 	provider := func(kind, name string) string {
@@ -242,9 +247,9 @@ func clashRules(opts SubOptions) (yamlNode, []interface{}) {
 				behavior, dir = "ipcidr", "geoip"
 			}
 			providers = append(providers, yamlField{tag, yamlNode{
-				{"type", "http"}, {"behavior", behavior}, {"format", "mrs"},
-				{"url", metaRuleURL("meta", dir, name, ".mrs")},
-				{"path", "./ruleset/" + tag + ".mrs"}, {"interval", 86400}, {"proxy", "节点选择"},
+				{"type", "http"}, {"behavior", behavior}, {"format", format},
+				{"url", metaRuleURL("meta", dir, name, ext)},
+				{"path", "./ruleset/" + tag + ext}, {"interval", 86400}, {"proxy", "节点选择"},
 			}})
 		}
 		return tag
