@@ -1,6 +1,9 @@
 import type { StatusNode } from "@/api";
 
 import { useState } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
+
+import { RouteTag } from "@/components/route-tag";
 
 const ALL = "全部";
 
@@ -34,8 +37,8 @@ function Meter({ label, value }: { label: string; value?: number }) {
   return (
     <div className="min-w-0 space-y-1.5">
       <div className="flex items-baseline justify-between gap-1 text-xs">
-        <span className="text-default-500 md:hidden">{label}</span>
-        <span className="font-mono font-semibold">
+        <span className="text-default-500 lg:hidden">{label}</span>
+        <span className="font-semibold tabular-nums">
           {value === undefined ? "—" : `${value.toFixed(0)}%`}
         </span>
       </div>
@@ -51,36 +54,98 @@ function Meter({ label, value }: { label: string; value?: number }) {
   );
 }
 
-/** The node's first reachable reference point, toned by latency and loss. */
+type Point = StatusNode["latency"][number];
+
+/** Points the board lists; the rest are counted. */
+const MAX_POINTS = 4;
+
+function msTone(p: Point): string {
+  if (!p.ok || (p.ms ?? 0) >= 300 || (p.lossPct ?? 0) >= 50) {
+    return "text-rose-600 dark:text-rose-400";
+  }
+  if ((p.ms ?? 0) >= 100 || (p.lossPct ?? 0) > 0) {
+    return "text-amber-600 dark:text-amber-400";
+  }
+
+  return "text-emerald-600 dark:text-emerald-400";
+}
+
+function msText(p: Point): string {
+  if (!p.ok) return "超时";
+
+  return p.lossPct ? `${p.ms} ms · 丢${p.lossPct.toFixed(0)}%` : `${p.ms} ms`;
+}
+
+/** Latency and return route to each reference point, one line per point. */
 function Latency({ n }: { n: StatusNode }) {
   if (!n.online) {
-    return (
-      <span className="rounded-full bg-default-100 px-2.5 py-1 text-xs text-default-500">
-        离线
-      </span>
-    );
+    return <span className="text-xs text-default-400">离线</span>;
   }
-  const p = n.latency.find((x) => x.ok);
-
-  if (!p) {
-    return n.latency.length ? (
-      <span className="rounded-full bg-default-100 px-2.5 py-1 text-xs text-default-500">
-        无响应
-      </span>
-    ) : null;
+  if (n.latency.length === 0) {
+    return <span className="text-xs text-default-400">—</span>;
   }
-  const bad = (p.lossPct ?? 0) > 0 || (p.ms ?? 0) > 150;
+  const more = n.latency.length - MAX_POINTS;
 
   return (
-    <span
-      className={`truncate rounded-full px-2.5 py-1 text-xs ${bad ? "bg-warning-100 text-warning-800 dark:bg-warning-500/20 dark:text-warning-300" : "bg-success-100 text-success-800 dark:bg-success-500/20 dark:text-success-300"}`}
-      title={n.latency
-        .map((x) => `${x.name} ${x.ok ? `${x.ms} ms` : "超时"}`)
-        .join("\n")}
-    >
-      {p.name} {p.ms} ms
-      {p.lossPct ? ` · 丢 ${p.lossPct.toFixed(0)}%` : ""}
-    </span>
+    <div className="space-y-1">
+      {n.latency.slice(0, MAX_POINTS).map((p) => (
+        <div key={p.name} className="flex min-w-0 items-center gap-2 text-xs">
+          <span className="w-14 shrink-0 truncate text-default-500">
+            {p.name}
+          </span>
+          <span className={`shrink-0 font-medium tabular-nums ${msTone(p)}`}>
+            {msText(p)}
+          </span>
+          <RouteTag short route={p.route} />
+          {p.routeV6 && p.routeV6 !== p.route && (
+            <span className="inline-flex items-center gap-0.5">
+              <span className="text-[10px] text-default-400">v6</span>
+              <RouteTag short route={p.routeV6} />
+            </span>
+          )}
+        </div>
+      ))}
+      {more > 0 && (
+        <div className="text-[11px] text-default-400">还有 {more} 个测试点</div>
+      )}
+    </div>
+  );
+}
+
+/** Upload over download, each with its arrow. */
+function Speed({ n }: { n: StatusNode }) {
+  const row = (up: boolean, v: number) => (
+    <div className="flex items-center gap-1.5">
+      {up ? (
+        <ArrowUp className="h-3 w-3 shrink-0 text-emerald-500" />
+      ) : (
+        <ArrowDown className="h-3 w-3 shrink-0 text-sky-500" />
+      )}
+      <span className="font-medium tabular-nums">
+        {n.online ? `${bytes(v)}/s` : "—"}
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="space-y-1 text-xs">
+      {row(true, n.netOut)}
+      {row(false, n.netIn)}
+    </div>
+  );
+}
+
+/** This month's total, upload and download under it. */
+function Month({ n }: { n: StatusNode }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-sm font-semibold tabular-nums">
+        {bytes(n.monthIn + n.monthOut)}
+      </div>
+      <div className="whitespace-nowrap text-[11px] tabular-nums text-default-400">
+        ↑{bytes(n.monthOut)} ↓{bytes(n.monthIn)}
+      </div>
+    </div>
   );
 }
 
@@ -133,7 +198,7 @@ function Summary({ nodes }: { nodes: StatusNode[] }) {
 }
 
 const GRID =
-  "md:grid md:grid-cols-[minmax(12rem,1.6fr)_repeat(3,minmax(0,1fr))_8rem_8rem_minmax(8rem,10rem)] md:items-center md:gap-5";
+  "lg:grid lg:grid-cols-[minmax(10rem,1.3fr)_repeat(3,minmax(4rem,0.7fr))_6.5rem_7.5rem_minmax(13rem,1.3fr)] lg:items-center lg:gap-5";
 
 /**
  * Nodes' live state, read only: the public status page and the view for
@@ -176,7 +241,7 @@ export function StatusBoard({
           ))}
         </div>
       )}
-      <div className="space-y-3 md:space-y-0 md:overflow-hidden md:rounded-2xl md:bg-content1 md:shadow-sm">
+      <div className="space-y-3 lg:space-y-0 lg:overflow-hidden lg:rounded-2xl lg:bg-content1 lg:shadow-sm">
         <div
           className={`hidden bg-default-100/60 px-6 py-3 text-xs text-default-500 ${GRID}`}
         >
@@ -186,12 +251,12 @@ export function StatusBoard({
           <span>磁盘</span>
           <span>网速</span>
           <span>本月流量</span>
-          <span>延迟</span>
+          <span>延迟 · 回程</span>
         </div>
         {shown.map((n, i) => (
           <div
             key={`${n.name}-${i}`}
-            className={`space-y-3 rounded-2xl bg-content1 p-4 shadow-sm md:space-y-0 md:rounded-none md:border-t md:border-divider md:px-6 md:py-4 md:shadow-none ${GRID} ${n.online ? "" : "opacity-60"}`}
+            className={`space-y-3 rounded-2xl bg-content1 p-4 shadow-sm lg:space-y-0 lg:rounded-none lg:border-t lg:border-divider lg:px-6 lg:py-4 lg:shadow-none ${GRID} ${n.online ? "" : "opacity-60"}`}
           >
             <div className="flex min-w-0 items-center gap-2.5">
               <span
@@ -205,32 +270,32 @@ export function StatusBoard({
                     .join(" · ")}
                 </div>
               </div>
-              <span className="md:hidden">
-                <Latency n={n} />
-              </span>
             </div>
-            <div className="grid grid-cols-3 gap-3 md:contents">
+            <div className="grid grid-cols-3 gap-3 lg:contents">
               <Meter label="CPU" value={n.online ? n.cpu : undefined} />
               <Meter label="内存" value={n.online ? n.mem : undefined} />
               <Meter label="磁盘" value={n.online ? n.disk : undefined} />
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs md:contents">
-              <div className="flex gap-3 md:flex-col md:gap-0.5">
-                <span className="text-warning-700 dark:text-warning-400">
-                  ↑ {n.online ? `${bytes(n.netOut)}/s` : "—"}
-                </span>
-                <span className="text-primary">
-                  ↓ {n.online ? `${bytes(n.netIn)}/s` : "—"}
-                </span>
+            <div className="grid grid-cols-2 gap-2 lg:contents">
+              <div className="rounded-xl bg-default-50 px-3 py-2 lg:rounded-none lg:bg-transparent lg:p-0">
+                <div className="mb-1 text-[11px] text-default-400 lg:hidden">
+                  网速
+                </div>
+                <Speed n={n} />
               </div>
-              <div className="flex gap-3 text-default-600 md:flex-col md:gap-0.5">
-                <span>
-                  <span className="md:hidden">本月 </span>↑ {bytes(n.monthOut)}
-                </span>
-                <span>↓ {bytes(n.monthIn)}</span>
+              <div className="rounded-xl bg-default-50 px-3 py-2 lg:rounded-none lg:bg-transparent lg:p-0">
+                <div className="mb-1 text-[11px] text-default-400 lg:hidden">
+                  本月流量
+                </div>
+                <Month n={n} />
               </div>
             </div>
-            <div className="hidden min-w-0 md:block">
+            <div
+              className={`min-w-0 border-t border-divider pt-3 lg:border-0 lg:p-0 ${n.online && n.latency.length > 0 ? "" : "hidden lg:block"}`}
+            >
+              <div className="mb-1.5 text-[11px] text-default-400 lg:hidden">
+                延迟 · 回程
+              </div>
               <Latency n={n} />
             </div>
           </div>

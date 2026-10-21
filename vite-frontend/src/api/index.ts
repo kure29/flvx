@@ -687,7 +687,14 @@ export interface StatusNode {
   monthOut: number;
   tcp: number;
   udp: number;
-  latency: Array<{ name: string; ok: boolean; ms?: number; lossPct?: number }>;
+  latency: Array<{
+    name: string;
+    ok: boolean;
+    ms?: number;
+    lossPct?: number;
+    route?: string;
+    routeV6?: string;
+  }>;
 }
 
 /** The status page: public (no login) or for users allowed to see monitoring. */

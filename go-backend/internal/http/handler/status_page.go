@@ -36,6 +36,9 @@ type statusLatency struct {
 	OK      bool    `json:"ok"`
 	Ms      int64   `json:"ms,omitempty"`
 	LossPct float64 `json:"lossPct,omitempty"`
+	// Route is the return route's name (e.g. CN2 GIA), never its hops.
+	Route   string `json:"route,omitempty"`
+	RouteV6 string `json:"routeV6,omitempty"`
 }
 
 // statusNode is everything the status page shows about a node.
@@ -103,8 +106,9 @@ func (h *Handler) buildStatusView(publicOnly bool, tzOffset int, title string) (
 			item.NetIn, item.NetOut, item.TCP, item.UDP = m.NetInSpeed, m.NetOutSpeed, m.TCPConns, m.UDPConns
 		}
 		if p, ok := h.nodeLatency.get(n.ID); ok && item.Online {
-			for _, pt := range p.Points {
-				item.Latency = append(item.Latency, statusLatency{Name: pt.Name, OK: pt.OK, Ms: pt.LatencyMs, LossPct: pt.LossPct})
+			for _, pt := range h.withRoutes(n.ID, p).Points {
+				item.Latency = append(item.Latency, statusLatency{Name: pt.Name, OK: pt.OK, Ms: pt.LatencyMs, LossPct: pt.LossPct,
+					Route: pt.Route, RouteV6: pt.RouteV6})
 			}
 		}
 		view.Nodes = append(view.Nodes, item)

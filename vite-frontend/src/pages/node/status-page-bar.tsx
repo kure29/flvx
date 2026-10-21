@@ -116,7 +116,7 @@ export function StatusPageBar() {
           <ModalHeader className="flex flex-col gap-1">
             <h2 className="text-lg font-bold">公开状态页</h2>
             <p className="text-small font-normal text-default-500">
-              任何拿到链接的人都能看，只显示下面勾选的节点的名称、资源、网速、流量和延迟，不显示
+              任何拿到链接的人都能看，只显示下面勾选的节点的名称、资源、网速、流量、延迟和回程线路，不显示
               IP、端口和版本
             </p>
           </ModalHeader>
