@@ -1,10 +1,10 @@
 import type { InboundApiItem, InboundRelayApiItem } from "@/api/types";
 
-import { useVisiblePolling } from "@/hooks/use-visible-polling";
-import { latestProbe } from "@/utils/latest-probe";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+
+import { useVisiblePolling } from "@/hooks/use-visible-polling";
+import { latestProbe } from "@/utils/latest-probe";
 
 import { getInboundList, getInboundRelays, probeInboundRelays } from "@/api";
 import { AnimatedPage } from "@/components/animated-page";
