@@ -19,12 +19,13 @@ func (h *Handler) StartBackgroundJobs() {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	queue := newNodeReconnectProbeQueue()
+	h.reconnectProbes = queue
+	h.jobsWG.Add(1)
 	h.jobsCancel = cancel
 	h.jobsCtx = ctx
 	h.jobsStarted = true
-	queue := newNodeReconnectProbeQueue()
-	h.reconnectProbes = queue
-	h.jobsWG.Add(14)
+	h.jobsWG.Add(13)
 	h.jobsMu.Unlock()
 
 	go h.runHourlyStatsLoop(ctx)

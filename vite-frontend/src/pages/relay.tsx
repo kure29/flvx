@@ -1,5 +1,8 @@
 import type { InboundApiItem, InboundRelayApiItem } from "@/api/types";
 
+import { useVisiblePolling } from "@/hooks/use-visible-polling";
+import { latestProbe } from "@/utils/latest-probe";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -22,8 +25,6 @@ import TunnelPage from "@/pages/tunnel";
 import { TunnelMonitorView } from "@/pages/node/tunnel-monitor-view";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
-import { useVisiblePolling } from "@/hooks/use-visible-polling";
-import { latestProbe } from "@/utils/latest-probe";
 
 type RelayTab = "lines" | "tunnels" | "rules" | "quality";
 
