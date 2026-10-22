@@ -129,9 +129,15 @@ function LinesView() {
   const card = viewMode === "card";
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
   const loadingRef = useRef(false);
+  // A reload asked for during a silent poll (after an edit) runs after it.
+  const reloadRef = useRef(false);
 
-  const load = useCallback(async (silent = false) => {
-    if (loadingRef.current) return;
+  const load = useCallback(async (silent = false): Promise<void> => {
+    if (loadingRef.current) {
+      if (!silent) reloadRef.current = true;
+
+      return;
+    }
     loadingRef.current = true;
     try {
       const [inRes, relRes] = await Promise.all([
@@ -157,6 +163,10 @@ function LinesView() {
     } finally {
       loadingRef.current = false;
       setLoading(false);
+      if (reloadRef.current) {
+        reloadRef.current = false;
+        void load(true);
+      }
     }
   }, []);
 

@@ -62,19 +62,31 @@ func (h *Handler) scheduleNodeReconnectProbe(nodeID int64) {
 	}
 }
 
-func (h *Handler) runNodeReconnectProbes(ctx context.Context, queue *nodeReconnectProbeQueue, delay time.Duration) {
+// runNodeReconnectProbes probes reconnected nodes once reconnects have been
+// quiet for quiet (at most 6×quiet after the first): when the panel restarts
+// and every node reconnects, that is one batch rather than one per node.
+func (h *Handler) runNodeReconnectProbes(ctx context.Context, queue *nodeReconnectProbeQueue, quiet time.Duration) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-queue.wake:
 		}
-		timer := time.NewTimer(delay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
+		deadline := time.Now().Add(6 * quiet)
+		for waiting := true; waiting; {
+			timer := time.NewTimer(min(quiet, time.Until(deadline)))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+				waiting = false
+			case <-queue.wake:
+				// Another reconnect: its node is already queued; wait for
+				// quiet again.
+				timer.Stop()
+				waiting = time.Until(deadline) > 0
+			}
 		}
 		nodes := queue.take()
 		if len(nodes) == 0 {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -164,39 +165,36 @@ func TestReconnectNodeWithoutRelayOnlyRefreshesItsOwnLatency(t *testing.T) {
 	}
 }
 
-func TestRelayProbeWaitsForOlderRoundAndHonorsCancelledWaiter(t *testing.T) {
+func TestRelayProbeOlderRoundCannotOverwriteNewer(t *testing.T) {
 	h, r := setupLatencyHandler(t, "")
 	entry := mustCreateRelayNode(t, r, "entry", "198.51.100.1")
 	id := mustCreateRelayLine(t, r, "line", 1, "203.0.113.1:443", entry, nil, 0)
-	started := make(chan struct{}, 2)
+	started := make(chan struct{}, 1)
 	release := make(chan struct{})
+	var calls atomic.Int32
 	stubLatencyPing(t, func(int64, string) (map[string]interface{}, error) {
-		started <- struct{}{}
-		<-release
+		if calls.Add(1) == 1 {
+			started <- struct{}{}
+			<-release
+			return nil, errors.New("节点离线")
+		}
 		return okPing(10), nil
 	})
-	first := make(chan struct{})
+	older := make(chan struct{})
 	go func() {
-		defer close(first)
+		defer close(older)
 		_, _ = h.probeRelayLatency(context.Background(), []int64{id})
 	}()
 	<-started
-	ctx, cancel := context.WithCancel(context.Background())
-	second := make(chan error, 1)
-	go func() {
-		_, err := h.probeRelayLatency(ctx, []int64{id})
-		second <- err
-	}()
-	select {
-	case <-started:
-		close(release)
-		t.Fatal("relay rounds overlapped")
-	case <-time.After(20 * time.Millisecond):
+	if _, err := h.probeRelayLatency(context.Background(), []int64{id}); err != nil {
+		t.Fatal(err)
 	}
-	cancel()
+	if got, _ := h.relayLatency.get(id); !got.OK {
+		t.Fatalf("newer result not stored: %+v", got)
+	}
 	close(release)
-	<-first
-	if err := <-second; err != context.Canceled {
-		t.Fatalf("cancelled waiter: %v", err)
+	<-older
+	if got, _ := h.relayLatency.get(id); !got.OK {
+		t.Fatalf("older round overwrote the newer result: %+v", got)
 	}
 }

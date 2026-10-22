@@ -1,9 +1,13 @@
 import { useEffect, useRef } from "react";
 
-/** Pull cached results while visible; resume immediately after returning online. */
+/**
+ * Pull cached results while visible; resume immediately after returning
+ * online. Probe results change every few minutes (or after a reconnect), so
+ * 15 seconds keeps them current without loading the panel.
+ */
 export function useVisiblePolling(
   refresh: () => Promise<void>,
-  interval = 5000,
+  interval = 15_000,
 ) {
   const refreshRef = useRef(refresh);
 

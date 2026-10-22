@@ -43,7 +43,7 @@ func (h *Handler) StartBackgroundJobs() {
 	go h.runRemoteSourceLoop(ctx)
 	go func() {
 		defer h.jobsWG.Done()
-		h.runNodeReconnectProbes(ctx, queue, 2*time.Second)
+		h.runNodeReconnectProbes(ctx, queue, 5*time.Second)
 	}()
 }
 

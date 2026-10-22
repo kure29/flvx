@@ -327,10 +327,17 @@ export default function NodePage({
 
   // 加载节点列表
   const nodesLoadingRef = useRef(false);
+  // A reload asked for during a silent poll (after an edit) runs after it.
+  const nodesReloadRef = useRef(false);
   const loadNodes = useCallback(async (options?: { silent?: boolean }) => {
-    if (nodesLoadingRef.current) return;
-    nodesLoadingRef.current = true;
     const silent = options?.silent ?? false;
+
+    if (nodesLoadingRef.current) {
+      if (!silent) nodesReloadRef.current = true;
+
+      return;
+    }
+    nodesLoadingRef.current = true;
 
     if (!silent) {
       setLoading(true);
@@ -393,6 +400,10 @@ export default function NodePage({
       nodesLoadingRef.current = false;
       if (!silent) {
         setLoading(false);
+      }
+      if (nodesReloadRef.current) {
+        nodesReloadRef.current = false;
+        void loadNodes({ silent: true });
       }
     }
   }, []);

@@ -277,8 +277,8 @@ export default function InboundPage() {
       loadingRef.current = true;
       if (initial) setLoading(true);
       try {
-        // Status is cheap to pull every five seconds; form capabilities and
-        // subscription sources keep their existing thirty-second cadence.
+        // Status comes with every poll; form capabilities and subscription
+        // sources at most every thirty seconds.
         const metadata =
           !silent || Date.now() - metadataLoadedAtRef.current >= 30_000;
         const [capsRes, nodeRes, kernelRes, inboundRes, sourceRes] =

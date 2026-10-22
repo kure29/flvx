@@ -43,10 +43,11 @@ type relayLatency struct {
 type relayLatencyStore struct {
 	mu      sync.RWMutex
 	results map[int64]relayLatency
+	rounds  probeRounds
 }
 
 func newRelayLatencyStore() *relayLatencyStore {
-	return &relayLatencyStore{results: make(map[int64]relayLatency)}
+	return &relayLatencyStore{results: make(map[int64]relayLatency), rounds: make(probeRounds)}
 }
 
 func (s *relayLatencyStore) get(relayID int64) (relayLatency, bool) {
@@ -58,13 +59,26 @@ func (s *relayLatencyStore) get(relayID int64) (relayLatency, bool) {
 
 // replace stores fresh results; a full round also drops deleted relays.
 func (s *relayLatencyStore) replace(results map[int64]relayLatency, all bool) {
+	s.replaceRound(results, all, time.Now().UnixNano())
+}
+
+// replaceRound is replace for a round that started at started (unix ns):
+// results of a newer round that already finished are kept.
+func (s *relayLatencyStore) replaceRound(results map[int64]relayLatency, all bool, started int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if all {
-		s.results = make(map[int64]relayLatency, len(results))
+		for id := range s.results {
+			if _, ok := results[id]; !ok && s.rounds.take(id, started) {
+				delete(s.results, id)
+				delete(s.rounds, id)
+			}
+		}
 	}
 	for id, r := range results {
-		s.results[id] = r
+		if s.rounds.take(id, started) {
+			s.results[id] = r
+		}
 	}
 }
 
@@ -216,13 +230,7 @@ func relayLatencyFrom(plan relayPlan, hops []relayHop, entry *reachProbe, now in
 // probeRelayLatency measures the given relay lines (all when ids is empty).
 // Entry nodes' reference point latency comes from the last node round.
 func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64]relayLatency, error) {
-	// An older scheduled round must finish before a reconnect/manual round
-	// reads node status, otherwise its offline snapshot can overwrite recovery.
-	h.relayLatencyProbeMu.Lock()
-	defer h.relayLatencyProbeMu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+	started := time.Now().UnixNano()
 	rows, err := h.repo.ListInboundRelays(0)
 	if err != nil {
 		return nil, err
@@ -316,7 +324,7 @@ func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64
 		results[id] = relayLatencyFrom(plan, hops[id], entry, now)
 	}
 	if ctx.Err() == nil {
-		h.relayLatency.replace(results, len(ids) == 0)
+		h.relayLatency.replaceRound(results, len(ids) == 0, started)
 	}
 	return results, nil
 }

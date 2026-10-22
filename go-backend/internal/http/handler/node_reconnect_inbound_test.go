@@ -2,12 +2,12 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net"
 	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"go-backend/internal/store/model"
 )
@@ -91,7 +91,7 @@ func TestReconnectRefreshesBuiltInboundsAndClearsCachedPortFailure(t *testing.T)
 	}
 }
 
-func TestInboundReachRoundsSerializeAndCancelWithoutChangingCache(t *testing.T) {
+func TestInboundReachOlderRoundCannotOverwriteNewerAndCancelKeepsCache(t *testing.T) {
 	h, r := setupLatencyHandler(t, "")
 	row := model.NodeInbound{Name: "external", Protocol: "ss", Listen: "203.0.113.1", Port: 443, Enabled: 1}
 	if err := r.CreateNodeInbound(&row); err != nil {
@@ -100,72 +100,63 @@ func TestInboundReachRoundsSerializeAndCancelWithoutChangingCache(t *testing.T) 
 	h.reachProbes.replace(map[int64]reachProbe{row.ID: {OK: true, CheckedAt: 123}}, false)
 	oldDial := reachDial
 	t.Cleanup(func() { reachDial = oldDial })
-	started := make(chan int32, 2)
-	firstRelease, secondRelease := make(chan struct{}), make(chan struct{})
-	var firstOnce, secondOnce sync.Once
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
 	var calls atomic.Int32
 	reachDial = func(ctx context.Context, _ string) (net.Conn, error) {
-		n := calls.Add(1)
-		started <- n
-		if n == 1 {
-			<-firstRelease
-			return nil, ctx.Err()
+		if calls.Add(1) == 1 {
+			// The older round still sees the port closed, and finishes last.
+			started <- struct{}{}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			return nil, errors.New("connection refused")
 		}
-		<-secondRelease
 		a, b := net.Pipe()
 		_ = b.Close()
 		return a, nil
 	}
+
+	// A cancelled round leaves the cache alone.
 	ctx, cancel := context.WithCancel(context.Background())
-	first, second := make(chan error, 1), make(chan error, 1)
-	var wg sync.WaitGroup
-	defer func() {
-		cancel()
-		firstOnce.Do(func() { close(firstRelease) })
-		secondOnce.Do(func() { close(secondRelease) })
-		wg.Wait()
-	}()
-	wg.Add(1)
+	cancelled := make(chan error, 1)
 	go func() {
-		defer wg.Done()
 		_, err := h.probeInboundReach(ctx, []int64{row.ID})
-		first <- err
+		cancelled <- err
 	}()
-	select {
-	case <-started:
-	case <-time.After(2 * time.Second):
-		t.Fatal("first probe did not start")
-	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err := h.probeInboundReach(context.Background(), []int64{row.ID})
-		second <- err
-	}()
-	select {
-	case <-started:
-		t.Fatal("port checks overlapped")
-	case <-time.After(20 * time.Millisecond):
-	}
+	<-started
 	cancel()
-	firstOnce.Do(func() { close(firstRelease) })
-	if err := <-first; err != context.Canceled {
+	if err := <-cancelled; err != context.Canceled {
 		t.Fatalf("cancelled probe: %v", err)
-	}
-	select {
-	case <-started:
-	case <-time.After(2 * time.Second):
-		t.Fatal("queued recovery check did not start")
 	}
 	if p, _ := h.reachProbes.get(row.ID); !p.OK || p.CheckedAt != 123 {
 		t.Fatalf("cancelled check changed cache: %+v", p)
 	}
-	secondOnce.Do(func() { close(secondRelease) })
-	if err := <-second; err != nil {
+
+	// Rounds overlap: the newer one is not held up by the older one, and
+	// the older one's stale failure does not replace its result.
+	calls.Store(0)
+	older := make(chan error, 1)
+	go func() {
+		_, err := h.probeInboundReach(context.Background(), []int64{row.ID})
+		older <- err
+	}()
+	<-started
+	if _, err := h.probeInboundReach(context.Background(), []int64{row.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := h.reachProbes.get(row.ID); !p.OK || p.CheckedAt <= 123 {
-		t.Fatalf("fresh result not stored: %+v", p)
+	newer, _ := h.reachProbes.get(row.ID)
+	if !newer.OK || newer.CheckedAt <= 123 {
+		t.Fatalf("fresh result not stored: %+v", newer)
+	}
+	close(release)
+	if err := <-older; err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := h.reachProbes.get(row.ID); !p.OK || p.CheckedAt != newer.CheckedAt {
+		t.Fatalf("older round overwrote the newer result: %+v", p)
 	}
 }
 
@@ -190,5 +181,29 @@ func TestInboundRecoveryViewDoesNotGoBackToOlderNodeSampleTime(t *testing.T) {
 	}
 	if cached, _ := h.nodeLatency.get(1); cached.CheckedAt != 400 {
 		t.Fatal("combining a view changed the stored node sample")
+	}
+}
+
+func TestPartialInboundChecksDoNotCountTowardOutage(t *testing.T) {
+	h, r := setupLatencyHandler(t, "")
+	row := model.NodeInbound{Name: "external", Protocol: "ss", Listen: "203.0.113.1", Port: 443, Enabled: 1}
+	if err := r.CreateNodeInbound(&row); err != nil {
+		t.Fatal(err)
+	}
+	oldDial := reachDial
+	t.Cleanup(func() { reachDial = oldDial })
+	reachDial = func(context.Context, string) (net.Conn, error) {
+		return nil, errors.New("connection refused")
+	}
+	for i := 0; i < notifyInboundDownStreak+1; i++ {
+		if _, err := h.probeInboundReach(context.Background(), []int64{row.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.reachProbes.mu.RLock()
+	streak, down := h.reachProbes.failStreak[row.ID], h.reachProbes.down[row.ID]
+	h.reachProbes.mu.RUnlock()
+	if streak != 0 || down {
+		t.Fatalf("clicked / reconnect checks counted toward an outage: streak=%d down=%v", streak, down)
 	}
 }

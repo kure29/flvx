@@ -43,9 +43,26 @@ type reachProbe struct {
 	Points []latencyPoint `json:"points,omitempty"`
 }
 
+// probeRounds remembers when the round that stored each result started
+// (unix ns). Rounds overlap (scheduled, clicked, after a reconnect), and a
+// slow round that started earlier must not overwrite a newer result with
+// what it saw before, such as a node that was still offline.
+type probeRounds map[int64]int64
+
+// take reports whether a round that started at started may store id's
+// result, and records it as the latest when so.
+func (r probeRounds) take(id, started int64) bool {
+	if r[id] > started {
+		return false
+	}
+	r[id] = started
+	return true
+}
+
 type reachProbeStore struct {
 	mu      sync.RWMutex
 	results map[int64]reachProbe
+	rounds  probeRounds
 	// failStreak counts consecutive failed probes; down marks nodes already
 	// reported as unreachable, so alerts fire once per outage.
 	failStreak map[int64]int
@@ -55,6 +72,7 @@ type reachProbeStore struct {
 func newReachProbeStore() *reachProbeStore {
 	return &reachProbeStore{
 		results:    make(map[int64]reachProbe),
+		rounds:     make(probeRounds),
 		failStreak: make(map[int64]int),
 		down:       make(map[int64]bool),
 	}
@@ -106,10 +124,21 @@ func (s *reachProbeStore) get(id int64) (reachProbe, bool) {
 // replace stores fresh results and drops entries of inbounds that no longer
 // exist when the whole set was probed.
 func (s *reachProbeStore) replace(results map[int64]reachProbe, all bool) {
+	s.replaceRound(results, all, time.Now().UnixNano())
+}
+
+// replaceRound is replace for a round that started at started (unix ns):
+// results of a newer round that already finished are kept.
+func (s *reachProbeStore) replaceRound(results map[int64]reachProbe, all bool, started int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if all {
-		s.results = make(map[int64]reachProbe, len(results))
+		for id := range s.results {
+			if _, ok := results[id]; !ok && s.rounds.take(id, started) {
+				delete(s.results, id)
+				delete(s.rounds, id)
+			}
+		}
 		for id := range s.failStreak {
 			if _, ok := results[id]; !ok {
 				delete(s.failStreak, id)
@@ -122,7 +151,9 @@ func (s *reachProbeStore) replace(results map[int64]reachProbe, all bool) {
 		}
 	}
 	for id, p := range results {
-		s.results[id] = p
+		if s.rounds.take(id, started) {
+			s.results[id] = p
+		}
 	}
 }
 
@@ -222,13 +253,7 @@ func probeErrorText(err error) string {
 // probeInboundReach checks the given inbounds (all of them when ids is
 // empty) in parallel and records the results.
 func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64]reachProbe, error) {
-	// Reconnect checks must read node/kernel status after any older round,
-	// rather than letting an old port failure overwrite a recovered result.
-	h.inboundReachProbeMu.Lock()
-	defer h.inboundReachProbeMu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+	started := time.Now().UnixNano()
 	rows, err := h.repo.ListNodeInbounds()
 	if err != nil {
 		return nil, err
@@ -294,7 +319,12 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	h.reachProbes.replace(results, len(ids) == 0)
+	h.reachProbes.replaceRound(results, len(ids) == 0, started)
+	// Outage streaks count scheduled rounds only: a click or a reconnect
+	// check (which can run before the kernel is back) is not one.
+	if len(ids) > 0 {
+		return results, nil
+	}
 
 	byID := make(map[int64]model.NodeInbound, len(targets))
 	for _, row := range targets {
