@@ -286,6 +286,19 @@ func lastResetAt(d int, now time.Time) time.Time {
 	return t
 }
 
+// subTrafficSince is when the subscription's current traffic started
+// counting. Older subscriptions did not keep it: their last reset (or a
+// reset day being set) stands in, else their creation.
+func subTrafficSince(s *model.Subscription) int64 {
+	switch {
+	case s.TrafficSince > 0:
+		return s.TrafficSince
+	case s.TrafficResetTime > 0:
+		return s.TrafficResetTime
+	}
+	return s.CreatedTime
+}
+
 // subDueReset reports whether the monthly reset is due.
 func subDueReset(s *model.Subscription, now time.Time) bool {
 	if s.ResetDay <= 0 || !isShare(s) {
@@ -504,6 +517,8 @@ type subscriptionView struct {
 	TrafficLimit  int64 `json:"trafficLimit"`
 	ResetDay      int   `json:"resetDay"`
 	OverQuota     bool  `json:"overQuota"`
+	// TrafficSince is when the traffic above started counting (unix ms).
+	TrafficSince int64 `json:"trafficSince"`
 	// UserID / UserName: the panel user it is assigned to (0 = none).
 	UserID   int64  `json:"userId"`
 	UserName string `json:"userName,omitempty"`
@@ -551,7 +566,7 @@ func (h *Handler) subscriptionView(s *model.Subscription, rows []model.NodeInbou
 		ExpireTime: s.ExpireTime, Enabled: s.Enabled == 1, Active: subActive(s, now), Remark: s.Remark,
 		NodeCount:   len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
 		UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes, TrafficLimit: s.TrafficLimit,
-		ResetDay: s.ResetDay, OverQuota: subOverQuota(s), UserID: s.UserID,
+		ResetDay: s.ResetDay, OverQuota: subOverQuota(s), UserID: s.UserID, TrafficSince: subTrafficSince(s),
 	}
 }
 
@@ -687,7 +702,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 			before = subInboundIDs(s, rows)
 		}
 	} else {
-		s = &model.Subscription{Token: randomHex(16), Enabled: 1, CreatedTime: now.UnixMilli()}
+		s = &model.Subscription{Token: randomHex(16), Enabled: 1, CreatedTime: now.UnixMilli(), TrafficSince: now.UnixMilli()}
 	}
 	s.Name = req.Name
 	s.Kind = req.Kind

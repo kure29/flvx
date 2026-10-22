@@ -5,6 +5,7 @@ import {
   Area,
   ComposedChart,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -114,6 +115,12 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
   const empty = shown !== null && shown.up + shown.down === 0;
   const rows = [...points].reverse();
   const maxTotal = Math.max(1, ...points.map((p) => p.up + p.down));
+  // The bucket the used traffic above started counting in, if in range.
+  const sinceAt =
+    shown && points.length && shown.since >= points[0].time
+      ? points.filter((p) => p.time <= shown.since).pop()
+      : undefined;
+  const sinceDate = shown ? new Date(shown.since).toLocaleDateString() : "";
 
   return (
     <div className="space-y-3">
@@ -125,6 +132,7 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
           setAll(false);
         }}
       />
+      <p className="text-xs text-default-500">{RANGE_HINT[range]}的流量</p>
       <div className="grid grid-cols-3 gap-2">
         {(
           [
@@ -201,6 +209,14 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
                   }}
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
                 />
+                {sinceAt && (
+                  <ReferenceLine
+                    stroke="currentColor"
+                    strokeDasharray="2 3"
+                    strokeOpacity={0.35}
+                    x={sinceAt.label}
+                  />
+                )}
                 <Area
                   dataKey="down"
                   fill={DOWN}
@@ -241,7 +257,12 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
               />
               上传
             </span>
-            <span className="ml-auto">{RANGE_HINT[range]}</span>
+            {sinceAt && (
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 border-l border-dashed border-default-400" />
+                本周期起（{sinceDate}）
+              </span>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-divider">
@@ -287,7 +308,12 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
           </div>
           <p className="text-xs text-default-400">
             统计自建节点上按用户区分的协议（VLESS、Trojan、Hysteria2
-            等）；导入的节点、Shadowsocks、Snell 不计入。从本功能更新后开始记录
+            等）；导入的节点、Shadowsocks、Snell 不计入。3.3.29
+            起开始记录，之前的流量不在图里
+          </p>
+          <p className="text-xs text-default-400">
+            订阅上方的已用流量从本周期开始（{sinceDate}
+            ，创建或上次重置）累计，和这里的时间范围不同，两边的数不一定相等
           </p>
         </>
       )}

@@ -897,6 +897,8 @@ export interface SubscriptionItem {
   /** Day of month (1-28) the traffic resets; 0 = never. */
   resetDay: number;
   overQuota: boolean;
+  /** When the used traffic started counting: creation or the last reset (ms). */
+  trafficSince: number;
   /** Panel user it is assigned to; 0 = none. */
   userId: number;
   userName?: string;
@@ -955,6 +957,8 @@ export interface UserSubscription {
   resetDay: number;
   /** Next monthly reset (ms); 0 = none. */
   nextResetTime: number;
+  /** When the used traffic started counting: creation or the last reset (ms). */
+  trafficSince: number;
   /** Routing rules on: some clients import a full config. */
   rules: boolean;
   /** Clients rendered from a template (Shadowrocket then imports a full config). */
@@ -974,6 +978,8 @@ export interface SubTraffic {
   points: Array<{ time: number; up: number; down: number }>;
   up: number;
   down: number;
+  /** When the subscription's used traffic started counting (ms). */
+  since: number;
 }
 const trafficQuery = (id: number, range: SubTrafficRange) => ({
   id,

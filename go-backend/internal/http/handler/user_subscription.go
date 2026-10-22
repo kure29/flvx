@@ -24,6 +24,8 @@ type userSubscriptionView struct {
 	DownloadBytes int64  `json:"downloadBytes"`
 	TrafficLimit  int64  `json:"trafficLimit"`
 	ResetDay      int    `json:"resetDay"`
+	// TrafficSince is when the traffic above started counting (unix ms).
+	TrafficSince int64 `json:"trafficSince"`
 	// NextResetTime is the next monthly traffic reset (unix ms; 0 none).
 	NextResetTime int64 `json:"nextResetTime"`
 	// Rules: routing rules are on, so some clients import a full config.
@@ -55,7 +57,7 @@ func (h *Handler) userSubscriptionView(s *model.Subscription, rows []model.NodeI
 	v := userSubscriptionView{
 		ID: s.ID, Name: s.Name, Path: "/api/v1/open_api/sub/" + s.Token, Status: subStatus(s, now),
 		ExpireTime: s.ExpireTime, UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes,
-		TrafficLimit: s.TrafficLimit, ResetDay: s.ResetDay, Rules: pipe.Rules, Templates: templateSlots(pipe),
+		TrafficLimit: s.TrafficLimit, ResetDay: s.ResetDay, TrafficSince: subTrafficSince(s), Rules: pipe.Rules, Templates: templateSlots(pipe),
 		NodeCount: len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
 	}
 	if s.ResetDay > 0 {

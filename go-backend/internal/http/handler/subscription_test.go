@@ -89,6 +89,9 @@ func TestKernelPayloadCarriesActiveShareSubscriptions(t *testing.T) {
 	if c := config(); !strings.Contains(c, "user-pw") {
 		t.Fatalf("reset traffic restores the user: %s", c)
 	}
+	if got, _ = r.GetSubscription(s.ID); subTrafficSince(got) != now {
+		t.Fatalf("reset restarts the count: since=%d", subTrafficSince(got))
+	}
 
 	s.ExpireTime = now - 1000
 	_ = r.SaveSubscription(s)
@@ -130,4 +133,19 @@ func containsInt64(list []int64, v int64) bool {
 		}
 	}
 	return false
+}
+
+func TestSubTrafficSince(t *testing.T) {
+	for _, c := range []struct {
+		s    model.Subscription
+		want int64
+	}{
+		{model.Subscription{CreatedTime: 1, TrafficResetTime: 5, TrafficSince: 3}, 3},
+		{model.Subscription{CreatedTime: 1, TrafficResetTime: 5}, 5},
+		{model.Subscription{CreatedTime: 1}, 1},
+	} {
+		if got := subTrafficSince(&c.s); got != c.want {
+			t.Fatalf("%+v: got %d, want %d", c.s, got, c.want)
+		}
+	}
 }

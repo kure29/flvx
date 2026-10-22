@@ -82,7 +82,7 @@ function Traffic({ s }: { s: UserSubscription }) {
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-2 text-xs text-default-500">
         <span className="font-mono">
-          已用 {formatTraffic(used)}
+          {ymd(s.trafficSince)} 起已用 {formatTraffic(used)}
           {s.trafficLimit
             ? ` / ${formatTraffic(s.trafficLimit)}`
             : " · 不限流量"}

@@ -39,12 +39,15 @@ type Subscription struct {
 	// Traffic of a share subscription, counted on the nodes per user.
 	// TrafficLimit (bytes, 0 = unlimited) cuts it off once reached;
 	// ResetDay (1-28, 0 = never) zeroes the traffic monthly.
-	UploadBytes      int64  `gorm:"column:upload_bytes;not null;default:0"`
-	DownloadBytes    int64  `gorm:"column:download_bytes;not null;default:0"`
-	TrafficLimit     int64  `gorm:"column:traffic_limit;not null;default:0"`
-	ResetDay         int    `gorm:"column:reset_day;not null;default:0"`
-	TrafficResetTime int64  `gorm:"column:traffic_reset_time;not null;default:0"`
-	Remark           string `gorm:"type:text;not null;default:''"`
+	UploadBytes      int64 `gorm:"column:upload_bytes;not null;default:0"`
+	DownloadBytes    int64 `gorm:"column:download_bytes;not null;default:0"`
+	TrafficLimit     int64 `gorm:"column:traffic_limit;not null;default:0"`
+	ResetDay         int   `gorm:"column:reset_day;not null;default:0"`
+	TrafficResetTime int64 `gorm:"column:traffic_reset_time;not null;default:0"`
+	// TrafficSince is when the traffic last started from zero (creation or
+	// the last reset; unix ms). 0 on subscriptions from before it was kept.
+	TrafficSince int64  `gorm:"column:traffic_since;not null;default:0"`
+	Remark       string `gorm:"type:text;not null;default:''"`
 	// UserID is the panel user the subscription is assigned to (0 = none):
 	// they see it under 订阅 in their panel and may reset its link.
 	UserID      int64 `gorm:"column:user_id;not null;default:0;index"`

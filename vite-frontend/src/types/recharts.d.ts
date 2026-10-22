@@ -8,6 +8,7 @@ declare module "recharts" {
   export const XAxis: React.ComponentType<Record<string, unknown>>;
   export const YAxis: React.ComponentType<Record<string, unknown>>;
   export const CartesianGrid: React.ComponentType<Record<string, unknown>>;
+  export const ReferenceLine: React.ComponentType<Record<string, unknown>>;
   export const Tooltip: React.ComponentType<Record<string, unknown>>;
   export const ResponsiveContainer: React.ComponentType<
     Record<string, unknown>
