@@ -1875,7 +1875,7 @@ func (w *WebSocketReporter) handleTcpPing(ctx context.Context, data interface{})
 
 	// 执行TCP ping操作
 	avgTime, packetLoss, err := tcpPingHost(ctx, req.IP, req.Port, req.Count, req.Timeout)
-	if ctx.Err() != nil {
+	if err != nil && ctx.Err() != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return TcpPingResponse{}, fmt.Errorf("TCP探测执行超时（含排队等待）")
 		}
@@ -2201,9 +2201,12 @@ func tcpPingHost(ctx context.Context, ip string, port int, count int, timeoutMs 
 		fmt.Printf("🎯 使用IP地址进行测试: %s\n", target)
 	}
 
+	// attempts counts the dials that finished; one cut short by ctx is not
+	// a loss. When the budget runs out the attempts so far are the result.
+	attempts := 0
 	for i := 0; i < count; i++ {
-		if err := ctx.Err(); err != nil {
-			return 0, 0, err
+		if ctx.Err() != nil {
+			break
 		}
 		start := time.Now()
 
@@ -2212,6 +2215,10 @@ func tcpPingHost(ctx context.Context, ip string, port int, count int, timeoutMs 
 		conn, err := dialer.DialContext(ctx, "tcp", target)
 
 		elapsed := time.Since(start)
+		if err != nil && ctx.Err() != nil {
+			break
+		}
+		attempts++
 
 		if err != nil {
 			fmt.Printf("  第%d次连接失败: %v (%.2fms)\n", i+1, err, elapsed.Seconds()*1000)
@@ -2229,17 +2236,19 @@ func tcpPingHost(ctx context.Context, ip string, port int, count int, timeoutMs 
 			case <-timer.C:
 			case <-ctx.Done():
 				timer.Stop()
-				return 0, 0, ctx.Err()
 			}
 		}
 	}
 
 	if successCount == 0 {
+		if err := ctx.Err(); err != nil {
+			return 0, 0, err
+		}
 		return 0, 100.0, fmt.Errorf("所有TCP连接尝试都失败")
 	}
 
 	avgTime := totalTime / float64(successCount)
-	packetLoss := float64(count-successCount) / float64(count) * 100
+	packetLoss := float64(attempts-successCount) / float64(attempts) * 100
 
 	fmt.Printf("✅ TCP ping完成: 平均连接时间 %.2fms，失败率 %.1f%%\n", avgTime, packetLoss)
 

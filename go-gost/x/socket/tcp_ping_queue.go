@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+const (
+	// tcpPingReplyMargin is kept back from the panel's budget for the
+	// command's trip here and the reply's trip back.
+	tcpPingReplyMargin = 500 * time.Millisecond
+	minTCPPingBudget   = 500 * time.Millisecond
+)
+
 type queuedTCPPing struct {
 	command CommandMessage
 	ctx     context.Context
@@ -29,7 +36,13 @@ func (w *WebSocketReporter) enqueueTCPPing(cmd CommandMessage) {
 	// Older panels do not send a budget. Keep their tasks bounded as well.
 	timeout := reporterReadWait
 	if cmd.TimeoutMS > 0 {
-		timeout = time.Duration(cmd.TimeoutMS) * time.Millisecond
+		// The panel's clock started before the command got here: stop a
+		// little earlier so the reason (or a partial result) reaches it
+		// before it gives up waiting.
+		timeout = time.Duration(cmd.TimeoutMS)*time.Millisecond - tcpPingReplyMargin
+		if timeout < minTCPPingBudget {
+			timeout = minTCPPingBudget
+		}
 	}
 	ctx, cancel := context.WithTimeout(w.ctx, timeout)
 	task := queuedTCPPing{command: cmd, ctx: ctx, cancel: cancel}

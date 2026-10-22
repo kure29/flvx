@@ -146,10 +146,14 @@ func TestTCPPingExecutionHonorsCancellation(t *testing.T) {
 	port, accepted := newTCPPingTestTarget(t)
 	ctx, cancel := context.WithCancel(reporter.ctx)
 	defer cancel()
-	done := make(chan error, 1)
+	type result struct {
+		res TcpPingResponse
+		err error
+	}
+	done := make(chan result, 1)
 	go func() {
-		_, err := reporter.handleTcpPing(ctx, TcpPingRequest{IP: "127.0.0.1", Port: port, Count: 1000, Timeout: 5000})
-		done <- err
+		res, err := reporter.handleTcpPing(ctx, TcpPingRequest{IP: "127.0.0.1", Port: port, Count: 1000, Timeout: 5000})
+		done <- result{res, err}
 	}()
 	deadline := time.After(time.Second)
 	for accepted.Load() == 0 {
@@ -161,9 +165,10 @@ func TestTCPPingExecutionHonorsCancellation(t *testing.T) {
 	}
 	cancel()
 	select {
-	case err := <-done:
-		if err == nil || err.Error() != "TCP探测已取消" {
-			t.Fatalf("unexpected canceled probe result: %v", err)
+	case r := <-done:
+		// The attempts made before the cancellation are the result.
+		if r.err != nil || !r.res.Success || r.res.PacketLoss != 0 {
+			t.Fatalf("unexpected canceled probe result: %+v, %v", r.res, r.err)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("probe did not stop after cancellation")
@@ -197,5 +202,14 @@ func TestTCPPingQueueStopsWithPendingAndRunningProbes(t *testing.T) {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("shutdown waited for pending or running probes")
+	}
+}
+
+func TestTCPPingCanceledBeforeAnyAttempt(t *testing.T) {
+	reporter, _ := newTCPPingTestReporter(t)
+	ctx, cancel := context.WithCancel(reporter.ctx)
+	cancel()
+	if _, err := reporter.handleTcpPing(ctx, TcpPingRequest{IP: "127.0.0.1", Port: 1, Count: 4, Timeout: 5000}); err == nil || err.Error() != "TCP探测已取消" {
+		t.Fatalf("unexpected result: %v", err)
 	}
 }
