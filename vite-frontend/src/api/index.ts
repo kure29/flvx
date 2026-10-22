@@ -1163,5 +1163,11 @@ export const createInboundRelay = (data: {
   name?: string;
   shareHost?: string;
 }) => Network.post<{ id: number }>("/inbound/relay/create", data);
+/** Renames a relay and changes its share host; the forward is untouched. */
+export const updateInboundRelay = (data: {
+  id: number;
+  name: string;
+  shareHost: string;
+}) => Network.post("/inbound/relay/update", data);
 export const deleteInboundRelay = (id: number, force = false) =>
   Network.post("/inbound/relay/delete", { id, force });

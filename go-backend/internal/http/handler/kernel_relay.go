@@ -355,6 +355,48 @@ func (h *Handler) removeForwardWithServices(forward *forwardRecord) error {
 	return nil
 }
 
+// inboundRelayUpdate renames a relay and changes its share host. Both only
+// feed share links and subscriptions, so nothing is pushed to the nodes.
+func (h *Handler) inboundRelayUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.WriteJSON(w, response.ErrDefault("请求失败"))
+		return
+	}
+	var req struct {
+		ID        int64  `json:"id"`
+		Name      string `json:"name"`
+		ShareHost string `json:"shareHost"`
+	}
+	if err := decodeJSON(r.Body, &req); err != nil || req.ID <= 0 {
+		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
+		return
+	}
+	rel, err := h.repo.GetInboundRelay(req.ID)
+	if err != nil || rel == nil {
+		response.WriteJSON(w, response.ErrDefault("中转不存在"))
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		response.WriteJSON(w, response.ErrDefault("名称不能为空"))
+		return
+	}
+	if len([]rune(name)) > 100 {
+		response.WriteJSON(w, response.ErrDefault("名称不超过 100 字"))
+		return
+	}
+	shareHost := strings.TrimSpace(req.ShareHost)
+	if len(shareHost) > 255 {
+		response.WriteJSON(w, response.ErrDefault("分享地址过长"))
+		return
+	}
+	if err := h.repo.UpdateInboundRelay(rel.ID, name, shareHost); err != nil {
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
+	response.WriteJSON(w, response.OKEmpty())
+}
+
 func (h *Handler) inboundRelayDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.WriteJSON(w, response.ErrDefault("请求失败"))

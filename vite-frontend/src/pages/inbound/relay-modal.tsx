@@ -13,6 +13,7 @@ import {
   getInboundRelays,
   probeInboundRelays,
   getTunnelList,
+  updateInboundRelay,
 } from "@/api";
 import { RelayLatencyCell } from "@/components/relay-latency";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -86,6 +87,12 @@ export function RelayModal({
     shareHost: "",
   });
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<{
+    id: number;
+    name: string;
+    shareHost: string;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<InboundRelayApiItem | null>(null);
   const [removeFailed, setRemoveFailed] = useState(false);
   const [removeLoading, setRemoveLoading] = useState(false);
@@ -129,6 +136,7 @@ export function RelayModal({
   useEffect(() => {
     if (!item) return;
     setForm({ tunnelId: "", inPort: "", name: "", shareHost: "" });
+    setEditing(null);
     load();
   }, [item, load]);
 
@@ -187,6 +195,35 @@ export function RelayModal({
     }
   };
 
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editing.name.trim()) {
+      toast.error("名称不能为空");
+
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await updateInboundRelay({
+        id: editing.id,
+        name: editing.name.trim(),
+        shareHost: editing.shareHost.trim(),
+      });
+
+      if (res.code !== 0) {
+        toast.error(res.msg || "保存失败");
+
+        return;
+      }
+      toast.success("已保存");
+      setEditing(null);
+      await load();
+      onChanged();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const remove = async (force: boolean) => {
     if (!removing) return;
     setRemoveLoading(true);
@@ -239,73 +276,137 @@ export function RelayModal({
                         还没有对接中转。
                       </p>
                     )}
-                    {relays.map((rel) => (
-                      <div
-                        key={rel.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-divider px-3 py-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="min-w-0 font-medium truncate">
-                              {rel.name}
-                            </span>
-                            <Chip
-                              className="shrink-0 whitespace-nowrap"
+                    {relays.map((rel) =>
+                      editing?.id === rel.id ? (
+                        <div
+                          key={rel.id}
+                          className="space-y-3 rounded-xl border border-primary/40 px-3 py-3"
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <Input
+                              label="名称"
+                              value={editing.name}
+                              variant="bordered"
+                              onChange={(e) =>
+                                setEditing((p) =>
+                                  p ? { ...p, name: e.target.value } : p,
+                                )
+                              }
+                            />
+                            <Input
+                              label="分享地址"
+                              placeholder="默认入口 IP"
+                              value={editing.shareHost}
+                              variant="bordered"
+                              onChange={(e) =>
+                                setEditing((p) =>
+                                  p ? { ...p, shareHost: e.target.value } : p,
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="light"
+                              onPress={() => setEditing(null)}
+                            >
+                              取消
+                            </Button>
+                            <Button
+                              color="primary"
+                              isLoading={saving}
                               size="sm"
                               variant="flat"
+                              onPress={saveEdit}
                             >
-                              {rel.mode === "tunnel" ? "隧道转发" : "端口转发"}
-                            </Chip>
-                            {!rel.forwardExists ? (
-                              <Chip
-                                className="shrink-0 whitespace-nowrap"
-                                color="danger"
-                                size="sm"
-                                variant="flat"
-                              >
-                                转发已删除
-                              </Chip>
-                            ) : rel.forwardStatus !== 1 ? (
-                              <Chip
-                                className="shrink-0 whitespace-nowrap"
-                                color="warning"
-                                size="sm"
-                                variant="flat"
-                              >
-                                转发已暂停
-                              </Chip>
-                            ) : null}
+                              保存
+                            </Button>
                           </div>
-                          <p className="text-xs text-default-500 font-mono mt-0.5 break-all">
-                            {rel.tunnelName} ·{" "}
-                            {rel.entries.length > 0
-                              ? rel.entries
-                                  .map((e) => `${e.Host}:${e.Port}`)
-                                  .join(", ")
-                              : "无入口"}{" "}
-                            → {rel.remoteAddr}
-                          </p>
                         </div>
-                        {rel.forwardExists && (
-                          <RelayLatencyCell
-                            latency={rel.latency}
-                            probing={probingId === rel.id}
-                            onProbe={() => probeRelay(rel.id)}
-                          />
-                        )}
-                        <Button
-                          color="danger"
-                          size="sm"
-                          variant="flat"
-                          onPress={() => {
-                            setRemoveFailed(false);
-                            setRemoving(rel);
-                          }}
+                      ) : (
+                        <div
+                          key={rel.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-divider px-3 py-2"
                         >
-                          删除
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="min-w-0 font-medium truncate">
+                                {rel.name}
+                              </span>
+                              <Chip
+                                className="shrink-0 whitespace-nowrap"
+                                size="sm"
+                                variant="flat"
+                              >
+                                {rel.mode === "tunnel"
+                                  ? "隧道转发"
+                                  : "端口转发"}
+                              </Chip>
+                              {!rel.forwardExists ? (
+                                <Chip
+                                  className="shrink-0 whitespace-nowrap"
+                                  color="danger"
+                                  size="sm"
+                                  variant="flat"
+                                >
+                                  转发已删除
+                                </Chip>
+                              ) : rel.forwardStatus !== 1 ? (
+                                <Chip
+                                  className="shrink-0 whitespace-nowrap"
+                                  color="warning"
+                                  size="sm"
+                                  variant="flat"
+                                >
+                                  转发已暂停
+                                </Chip>
+                              ) : null}
+                            </div>
+                            <p className="text-xs text-default-500 font-mono mt-0.5 break-all">
+                              {rel.tunnelName} ·{" "}
+                              {rel.entries.length > 0
+                                ? rel.entries
+                                    .map((e) => `${e.Host}:${e.Port}`)
+                                    .join(", ")
+                                : "无入口"}{" "}
+                              → {rel.remoteAddr}
+                            </p>
+                          </div>
+                          {rel.forwardExists && (
+                            <RelayLatencyCell
+                              latency={rel.latency}
+                              probing={probingId === rel.id}
+                              onProbe={() => probeRelay(rel.id)}
+                            />
+                          )}
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() =>
+                              setEditing({
+                                id: rel.id,
+                                name: rel.name,
+                                shareHost: rel.shareHost,
+                              })
+                            }
+                          >
+                            编辑
+                          </Button>
+                          <Button
+                            color="danger"
+                            size="sm"
+                            variant="flat"
+                            onPress={() => {
+                              setRemoveFailed(false);
+                              setRemoving(rel);
+                            }}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                      ),
+                    )}
                   </div>
 
                   <div className="space-y-3 rounded-xl border border-divider p-3">

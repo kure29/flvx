@@ -438,6 +438,16 @@ func (r *Repository) CreateInboundRelay(rel *model.NodeInboundRelay) error {
 	return r.db.Create(rel).Error
 }
 
+// UpdateInboundRelay changes what a relay is called and the host it
+// shares; the forward behind it is untouched.
+func (r *Repository) UpdateInboundRelay(id int64, name, shareHost string) error {
+	if r == nil || r.db == nil {
+		return errors.New("repository not initialized")
+	}
+	return r.db.Model(&model.NodeInboundRelay{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"name": name, "share_host": shareHost}).Error
+}
+
 func (r *Repository) DeleteInboundRelay(id int64) error {
 	if r == nil || r.db == nil {
 		return errors.New("repository not initialized")

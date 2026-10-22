@@ -272,6 +272,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/inbound/sub/info", h.inboundSubInfo)
 	mux.HandleFunc("/api/v1/inbound/relay/list", h.inboundRelayList)
 	mux.HandleFunc("/api/v1/inbound/relay/create", h.inboundRelayCreate)
+	mux.HandleFunc("/api/v1/inbound/relay/update", h.inboundRelayUpdate)
 	mux.HandleFunc("/api/v1/inbound/relay/delete", h.inboundRelayDelete)
 	mux.HandleFunc("/api/v1/inbound/relay/probe", h.inboundRelayProbe)
 	mux.HandleFunc("/api/v1/open_api/sub/", h.openSubscription)

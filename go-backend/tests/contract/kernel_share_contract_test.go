@@ -211,6 +211,30 @@ func TestInboundShareAndSubscriptionContract(t *testing.T) {
 		}
 	})
 
+	t.Run("relay rename changes the shared name and host", func(t *testing.T) {
+		relayID := int64(mustQueryInt(t, r, `SELECT id FROM node_inbound_relay WHERE forward_id = ?`, forwardID))
+		if out := kernelContractPost(t, router, admin, "/api/v1/inbound/relay/update", `{"id":`+jsonInt64(relayID)+`,"name":"  "}`); out.Code == 0 {
+			t.Fatal("blank name must be rejected")
+		}
+		out := kernelContractPost(t, router, admin, "/api/v1/inbound/relay/update",
+			`{"id":`+jsonInt64(relayID)+`,"name":" 香港 IPLC ","shareHost":"hk.example.com"}`)
+		if out.Code != 0 {
+			t.Fatalf("update: %+v", out)
+		}
+		share := kernelContractPost(t, router, admin, "/api/v1/inbound/share", `{"id":`+jsonInt64(inboundID)+`}`)
+		var relay map[string]interface{}
+		for _, it := range share.Data.([]interface{}) {
+			if m := it.(map[string]interface{}); m["kind"] == "relay" {
+				relay = m
+			}
+		}
+		if relay == nil || relay["name"] != "香港 IPLC" || !strings.Contains(relay["uri"].(string), "@hk.example.com:30005?") {
+			t.Fatalf("renamed relay entry: %v", relay)
+		}
+		kernelContractPost(t, router, admin, "/api/v1/inbound/relay/update",
+			`{"id":`+jsonInt64(relayID)+`,"name":"香港中转 → 东京","shareHost":""}`)
+	})
+
 	t.Run("relay list and forward deletion cascade", func(t *testing.T) {
 		list := kernelContractPost(t, router, admin, "/api/v1/inbound/relay/list", `{"inboundId":`+jsonInt64(inboundID)+`}`)
 		rels, _ := list.Data.([]interface{})
