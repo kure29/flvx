@@ -95,6 +95,7 @@ type CommandMessage struct {
 	Type      string      `json:"type"`
 	Data      interface{} `json:"data"`
 	RequestId string      `json:"requestId,omitempty"`
+	TimeoutMS int64       `json:"timeoutMs,omitempty"` // 整条命令的预算，包含排队时间
 }
 
 // CommandResponse 命令响应结构体
@@ -153,6 +154,7 @@ const (
 	maxBackoff                  = 2 * time.Minute  // 重连最大退避
 	defaultMetricReportInterval = 5 * time.Second
 	maxConcurrentTCPPings       = 8
+	maxQueuedTCPPings           = 256
 	maxConcurrentReadCommands   = 16
 	maxQueuedMutationCommands   = 256
 )
@@ -173,11 +175,11 @@ type WebSocketReporter struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
 	connected         bool
-	connecting        bool              // 正在连接状态
-	connMutex         sync.Mutex        // 连接状态锁
-	aesCrypto         *crypto.AESCrypto // AES加密器
-	tcpPingSem        chan struct{}     // 限制诊断探测并发，避免离线目标耗尽连接
-	readCommandSem    chan struct{}     // 限制只读命令并发，避免诊断请求耗尽资源
+	connecting        bool               // 正在连接状态
+	connMutex         sync.Mutex         // 连接状态锁
+	aesCrypto         *crypto.AESCrypto  // AES加密器
+	tcpPingQueue      chan queuedTCPPing // TCP 探测由固定数量的 worker 执行
+	readCommandSem    chan struct{}      // 限制只读命令并发，避免诊断请求耗尽资源
 	mutationQueue     chan CommandMessage
 	workers           sync.WaitGroup
 }
@@ -209,36 +211,15 @@ func NewWebSocketReporter(serverURL string, secret string) *WebSocketReporter {
 		connected:      false,
 		connecting:     false,
 		aesCrypto:      aesCrypto,
-		tcpPingSem:     make(chan struct{}, maxConcurrentTCPPings),
+		tcpPingQueue:   make(chan queuedTCPPing, maxQueuedTCPPings),
 		readCommandSem: make(chan struct{}, maxConcurrentReadCommands),
 		mutationQueue:  make(chan CommandMessage, maxQueuedMutationCommands),
 	}
 }
 
-func (w *WebSocketReporter) tryAcquireTCPPingSlot() bool {
-	if w == nil || w.tcpPingSem == nil {
-		return false
-	}
-	select {
-	case w.tcpPingSem <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-
-func (w *WebSocketReporter) releaseTCPPingSlot() {
-	if w == nil || w.tcpPingSem == nil {
-		return
-	}
-	select {
-	case <-w.tcpPingSem:
-	default:
-	}
-}
-
 // Start 启动WebSocket报告器
 func (w *WebSocketReporter) Start() {
+	w.startTCPPingWorkers()
 	w.workers.Add(2)
 	go func() {
 		defer w.workers.Done()
@@ -762,6 +743,7 @@ func (w *WebSocketReporter) handleReceivedMessage(messageType int, message []byt
 			Compressed bool            `json:"compressed"`
 			Data       json.RawMessage `json:"data"`
 			RequestId  string          `json:"requestId,omitempty"`
+			TimeoutMS  int64           `json:"timeoutMs,omitempty"`
 		}
 
 		if err := json.Unmarshal(message, &compressedMsg); err == nil && compressedMsg.Compressed {
@@ -791,6 +773,7 @@ func (w *WebSocketReporter) handleReceivedMessage(messageType int, message []byt
 			var cmdMsg CommandMessage
 			cmdMsg.Type = compressedMsg.Type
 			cmdMsg.RequestId = compressedMsg.RequestId
+			cmdMsg.TimeoutMS = compressedMsg.TimeoutMS
 			if err := json.Unmarshal(message, &cmdMsg.Data); err != nil {
 				fmt.Printf("❌ 解析解压后的命令数据失败: %v\n", err)
 				w.sendErrorResponse("ParseError", fmt.Sprintf("解析命令失败: %v", err))
@@ -823,6 +806,10 @@ func (w *WebSocketReporter) handleReceivedMessage(messageType int, message []byt
 // registries and configuration, so running them concurrently can corrupt the
 // persisted config or interleave service lifecycle operations.
 func (w *WebSocketReporter) dispatchCommand(cmd CommandMessage) {
+	if cmd.Type == "TcpPing" {
+		w.enqueueTCPPing(cmd)
+		return
+	}
 	if isMutationCommand(cmd.Type) {
 		select {
 		case w.mutationQueue <- cmd:
@@ -838,7 +825,7 @@ func (w *WebSocketReporter) dispatchCommand(cmd CommandMessage) {
 	case w.readCommandSem <- struct{}{}:
 		go func() {
 			defer func() { <-w.readCommandSem }()
-			w.routeCommandSafely(cmd)
+			w.routeCommandSafely(w.ctx, cmd)
 		}()
 	case <-w.ctx.Done():
 		w.sendCommandFailure(cmd, "Agent is shutting down")
@@ -853,19 +840,19 @@ func (w *WebSocketReporter) runMutationCommands() {
 		case <-w.ctx.Done():
 			return
 		case cmd := <-w.mutationQueue:
-			w.routeCommandSafely(cmd)
+			w.routeCommandSafely(w.ctx, cmd)
 		}
 	}
 }
 
-func (w *WebSocketReporter) routeCommandSafely(cmd CommandMessage) {
+func (w *WebSocketReporter) routeCommandSafely(ctx context.Context, cmd CommandMessage) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			fmt.Printf("❌ 命令处理 panic: type=%s panic=%v\n%s", cmd.Type, recovered, debug.Stack())
 			w.sendCommandFailure(cmd, fmt.Sprintf("命令处理异常: %v", recovered))
 		}
 	}()
-	w.routeCommand(cmd)
+	w.routeCommand(ctx, cmd)
 }
 
 func (w *WebSocketReporter) sendCommandFailure(cmd CommandMessage, message string) {
@@ -899,7 +886,7 @@ func isMutationCommand(commandType string) bool {
 }
 
 // routeCommand 路由命令到对应的处理函数
-func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
+func (w *WebSocketReporter) routeCommand(ctx context.Context, cmd CommandMessage) {
 	if isMutationCommand(cmd.Type) {
 		unlock := config.LockMutation()
 		defer unlock()
@@ -973,13 +960,8 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	// TCP Ping 诊断命令（只读，不需要保存配置）
 	case "TcpPing":
 		response.Type = "TcpPingResponse"
-		if !w.tryAcquireTCPPingSlot() {
-			err = fmt.Errorf("TCP探测任务过多，请稍后重试")
-			break
-		}
-		defer w.releaseTCPPingSlot()
 		var tcpPingResult TcpPingResponse
-		tcpPingResult, err = w.handleTcpPing(cmd.Data)
+		tcpPingResult, err = w.handleTcpPing(ctx, cmd.Data)
 		response.Data = tcpPingResult
 		// needSaveConfig = false (默认值)
 
@@ -1850,7 +1832,7 @@ func EnableConfigPersist() {
 }
 
 // handleTcpPing 处理TCP ping诊断命令
-func (w *WebSocketReporter) handleTcpPing(data interface{}) (TcpPingResponse, error) {
+func (w *WebSocketReporter) handleTcpPing(ctx context.Context, data interface{}) (TcpPingResponse, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return TcpPingResponse{}, fmt.Errorf("序列化TCP ping数据失败: %v", err)
@@ -1892,7 +1874,13 @@ func (w *WebSocketReporter) handleTcpPing(data interface{}) (TcpPingResponse, er
 	}
 
 	// 执行TCP ping操作
-	avgTime, packetLoss, err := tcpPingHost(req.IP, req.Port, req.Count, req.Timeout)
+	avgTime, packetLoss, err := tcpPingHost(ctx, req.IP, req.Port, req.Count, req.Timeout)
+	if ctx.Err() != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return TcpPingResponse{}, fmt.Errorf("TCP探测执行超时（含排队等待）")
+		}
+		return TcpPingResponse{}, fmt.Errorf("TCP探测已取消")
+	}
 
 	response := TcpPingResponse{
 		IP:        req.IP,
@@ -2175,7 +2163,7 @@ func icmpPing(target string, timeout time.Duration) (time.Duration, error) {
 }
 
 // tcpPingHost 执行TCP连接测试，返回平均连接时间和失败率
-func tcpPingHost(ip string, port int, count int, timeoutMs int) (float64, float64, error) {
+func tcpPingHost(ctx context.Context, ip string, port int, count int, timeoutMs int) (float64, float64, error) {
 	var totalTime float64
 	var successCount int
 
@@ -2193,7 +2181,7 @@ func tcpPingHost(ip string, port int, count int, timeoutMs int) (float64, float6
 		fmt.Printf("🔍 检测到域名，正在解析DNS...\n")
 		dnsStart := time.Now()
 
-		addrs, err := net.LookupHost(ip)
+		addrs, err := net.DefaultResolver.LookupHost(ctx, ip)
 		dnsDuration := time.Since(dnsStart)
 
 		if err != nil {
@@ -2214,10 +2202,14 @@ func tcpPingHost(ip string, port int, count int, timeoutMs int) (float64, float6
 	}
 
 	for i := 0; i < count; i++ {
+		if err := ctx.Err(); err != nil {
+			return 0, 0, err
+		}
 		start := time.Now()
 
 		// 创建带超时的TCP连接
-		conn, err := net.DialTimeout("tcp", target, timeout)
+		dialer := net.Dialer{Timeout: timeout}
+		conn, err := dialer.DialContext(ctx, "tcp", target)
 
 		elapsed := time.Since(start)
 
@@ -2232,7 +2224,13 @@ func tcpPingHost(ip string, port int, count int, timeoutMs int) (float64, float6
 
 		// 如果不是最后一次，等待一下再进行下次测试
 		if i < count-1 {
-			time.Sleep(100 * time.Millisecond)
+			timer := time.NewTimer(100 * time.Millisecond)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				return 0, 0, ctx.Err()
+			}
 		}
 	}
 

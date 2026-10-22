@@ -112,8 +112,8 @@ func TestProbeNodeLatencyMeasuresOnlineLocalNodes(t *testing.T) {
 	}
 	want := []latencyPoint{
 		{Name: "电信", Pinned: true, OK: true, LatencyMs: 38, LossPct: 25},
-		{Name: "联通", Error: "超时"},
-		{Name: "移动", Error: "节点无响应"},
+		{Name: "联通", Error: "测试点连接失败"},
+		{Name: "移动", Error: "节点响应超时"},
 	}
 	for i, w := range want {
 		if p.Points[i] != w {
@@ -122,6 +122,38 @@ func TestProbeNodeLatencyMeasuresOnlineLocalNodes(t *testing.T) {
 	}
 	if stored, ok := h.nodeLatency.get(online); !ok || len(stored.Points) != 3 {
 		t.Fatalf("result not stored: %+v", stored)
+	}
+}
+
+func TestLatencyPointPreservesFailureReason(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		data map[string]interface{}
+		err  error
+		want string
+	}{
+		{name: "legacy busy", err: errors.New("TCP探测任务过多，请稍后重试"), want: "节点繁忙，请稍后重试"},
+		{name: "read commands busy", err: errors.New("只读命令并发过多，请稍后重试"), want: "节点繁忙，请稍后重试"},
+		{name: "queue full", err: errors.New("TCP探测队列已满，请稍后重试"), want: "TCP探测队列已满，请稍后重试"},
+		{name: "queue expired", err: errors.New("TCP探测排队超时"), want: "TCP探测排队超时"},
+		{name: "panel queue expired", err: errTCPPingQueueTimeout, want: "节点上的 TCP 探测排队超时"},
+		{name: "execution expired", err: errors.New("TCP探测执行超时（含排队等待）"), want: "TCP探测执行超时（含排队等待）"},
+		{name: "offline", err: errors.New("节点不在线"), want: "节点离线"},
+		{name: "command timeout", err: errors.New("等待节点响应超时"), want: "节点响应超时"},
+		{name: "deadline", err: context.DeadlineExceeded, want: "节点响应超时"},
+		{name: "cancel", err: context.Canceled, want: "探测已取消"},
+		{name: "shutdown", err: errors.New("Agent is shutting down"), want: "探测已取消"},
+		{name: "unexpected failure", err: errors.New("节点未返回诊断数据"), want: "探测失败：节点未返回诊断数据"},
+		{name: "dns", data: map[string]interface{}{"success": false, "errorMessage": "DNS解析失败: no such host"}, want: "域名解析失败"},
+		{name: "target unreachable", data: map[string]interface{}{"success": false, "errorMessage": "所有TCP连接尝试都失败"}, want: "测试点连接失败"},
+		{name: "invalid target", data: map[string]interface{}{"success": false, "errorMessage": "无效的IP地址或主机名"}, want: "无效的IP地址或主机名"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := latencyPointFrom(latencyTarget{Name: "test"}, tt.data, tt.err)
+			if got.OK || got.Error != tt.want {
+				t.Fatalf("point = %+v, want error %q", got, tt.want)
+			}
+		})
 	}
 }
 

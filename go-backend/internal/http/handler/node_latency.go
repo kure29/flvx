@@ -27,6 +27,10 @@ const (
 	latencyPingCount        = 4
 	latencyPingTimeoutMS    = 2000
 	latencyParallel         = 16
+	// The agent runs eight TCP probes at once; allow both waves to finish.
+	latencyAgentParallel  = agentTCPPingLimit
+	latencyPingWaves      = (latencyParallel + latencyAgentParallel - 1) / latencyAgentParallel
+	latencyCommandTimeout = time.Duration(latencyPingWaves*latencyPingCount*(latencyPingTimeoutMS+200))*time.Millisecond + 5*time.Second
 )
 
 // latencyTarget is one reference point, e.g. a province's carrier CDN node.
@@ -227,7 +231,7 @@ func (s *nodeLatencyStore) drop(ids []int64) {
 // nodeLatencyPing runs one TcpPing from a node; tests replace it.
 var nodeLatencyPing = func(h *Handler, nodeID int64, host string, port int) (map[string]interface{}, error) {
 	return h.tcpPingViaNode(nodeID, host, port, diagnosisExecOptions{
-		commandTimeout: time.Duration(latencyPingCount*(latencyPingTimeoutMS+200))*time.Millisecond + 5*time.Second,
+		commandTimeout: latencyCommandTimeout,
 		pingTimeoutMS:  latencyPingTimeoutMS,
 		pingCount:      latencyPingCount,
 	})
@@ -236,7 +240,7 @@ var nodeLatencyPing = func(h *Handler, nodeID int64, host string, port int) (map
 func latencyPointFrom(t latencyTarget, data map[string]interface{}, err error) latencyPoint {
 	p := latencyPoint{Name: t.Name, Pinned: t.Pinned}
 	if err != nil {
-		p.Error = "节点无响应"
+		p.Error = latencyCommandError(err)
 		return p
 	}
 	if !asBool(data["success"], false) {
@@ -244,8 +248,10 @@ func latencyPointFrom(t latencyTarget, data map[string]interface{}, err error) l
 		switch {
 		case strings.Contains(msg, "DNS"):
 			p.Error = "域名解析失败"
+		case msg == "" || msg == "所有TCP连接尝试都失败":
+			p.Error = "测试点连接失败"
 		default:
-			p.Error = "超时"
+			p.Error = msg
 		}
 		return p
 	}
@@ -256,6 +262,28 @@ func latencyPointFrom(t latencyTarget, data map[string]interface{}, err error) l
 	}
 	p.LossPct = float64(int(asFloat(data["packetLoss"], 0) + 0.5))
 	return p
+}
+
+func latencyCommandError(err error) string {
+	msg := strings.TrimSpace(err.Error())
+	switch {
+	case errors.Is(err, errTCPPingQueueTimeout):
+		return msg
+	case strings.Contains(msg, "任务过多"), strings.Contains(msg, "并发过多"):
+		return "节点繁忙，请稍后重试"
+	case strings.Contains(msg, "队列已满"), strings.Contains(msg, "TCP探测"):
+		return msg
+	case strings.Contains(msg, "节点不在线"):
+		return "节点离线"
+	case errors.Is(err, context.DeadlineExceeded), strings.Contains(strings.ToLower(msg), "timeout"), strings.Contains(msg, "等待节点响应超时"):
+		return "节点响应超时"
+	case errors.Is(err, context.Canceled), strings.Contains(msg, "Agent is shutting down"):
+		return "探测已取消"
+	case msg == "":
+		return "探测失败"
+	default:
+		return "探测失败：" + msg
+	}
 }
 
 // probeNodeLatency measures the given local nodes' latency (all online ones

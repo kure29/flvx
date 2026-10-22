@@ -10,10 +10,9 @@ import (
 	"go-backend/internal/ws"
 )
 
-// An agent runs at most agentTCPPingLimit TcpPing commands at once and turns
-// the rest away with agentBusyMessage (go-gost/x/socket, maxConcurrentTCPPings).
-// The panel keeps to that limit per node, so latency rounds, relay checks,
-// tunnel quality and diagnosis queue for a slot instead of failing.
+// An agent runs at most agentTCPPingLimit TcpPing commands at once. The
+// panel queues for a slot before sending; newer agents also queue
+// excess commands, while older agents refuse them with agentBusyMessage.
 const (
 	agentTCPPingLimit   = 8
 	agentBusyMessage    = "TCP探测任务过多"
@@ -45,6 +44,9 @@ func (s *nodePingSlots) node(nodeID int64) chan struct{} {
 
 // acquire waits up to wait for one of the node's slots.
 func (s *nodePingSlots) acquire(nodeID int64, wait time.Duration) bool {
+	if wait <= 0 {
+		return false
+	}
 	if s == nil {
 		return true
 	}
@@ -77,14 +79,28 @@ var tcpPingSend = func(h *Handler, nodeID int64, data interface{}, timeout time.
 // still be busy with pings the panel gave up waiting for, or with another
 // panel's (federation): one such refusal is retried after a short pause.
 func (h *Handler) sendTCPPing(nodeID int64, data interface{}, timeout time.Duration) (ws.CommandResult, error) {
-	if !h.pingSlots.acquire(nodeID, timeout) {
+	if timeout <= 0 {
+		timeout = defaultNodeCommandTimeout
+	}
+	deadline := time.Now().Add(timeout)
+	if !h.pingSlots.acquire(nodeID, time.Until(deadline)) {
 		return ws.CommandResult{}, errTCPPingQueueTimeout
 	}
 	defer h.pingSlots.release(nodeID)
-	res, err := tcpPingSend(h, nodeID, data, timeout)
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return ws.CommandResult{}, errTCPPingQueueTimeout
+	}
+	// Panel queueing, an optional retry and agent execution share one budget.
+	res, err := tcpPingSend(h, nodeID, data, remaining)
 	if err != nil && strings.Contains(err.Error(), agentBusyMessage) {
+		if time.Until(deadline) <= agentBusyRetryDelay {
+			return res, err
+		}
 		time.Sleep(agentBusyRetryDelay)
-		res, err = tcpPingSend(h, nodeID, data, timeout)
+		if remaining = time.Until(deadline); remaining > 0 {
+			res, err = tcpPingSend(h, nodeID, data, remaining)
+		}
 	}
 	return res, err
 }

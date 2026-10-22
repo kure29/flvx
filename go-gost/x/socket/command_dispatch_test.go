@@ -133,7 +133,7 @@ func TestMutationCommandWaitsForRuntimeTransaction(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		reporter.routeCommand(CommandMessage{Type: "DeleteService", Data: map[string]any{"services": []string{name}}})
+		reporter.routeCommand(reporter.ctx, CommandMessage{Type: "DeleteService", Data: map[string]any{"services": []string{name}}})
 	}()
 	select {
 	case <-svc.started:

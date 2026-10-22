@@ -503,6 +503,10 @@ func (s *Server) SendCommand(nodeID int64, cmdType string, data interface{}, tim
 		"data":      data,
 		"requestId": requestID,
 	}
+	if cmdType == "TcpPing" {
+		// The agent counts queueing and execution against the same budget.
+		cmdPayload["timeoutMs"] = timeout.Milliseconds()
+	}
 	rawCmd, err := json.Marshal(cmdPayload)
 	if err != nil {
 		cleanup()

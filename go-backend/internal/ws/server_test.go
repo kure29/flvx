@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -213,6 +214,39 @@ func websocketTestPipe(t *testing.T) (*websocket.Conn, *websocket.Conn) {
 	}
 
 	return nil, nil
+}
+
+func TestTCPPingCommandCarriesQueueAndExecutionBudget(t *testing.T) {
+	serverConn, agentConn := websocketTestPipe(t)
+	defer serverConn.Close()
+	defer agentConn.Close()
+	server := NewServer(nil, "test-secret")
+	server.nodes[7] = &nodeSession{nodeID: 7, conn: &connWrap{conn: serverConn}}
+	done := make(chan error, 1)
+	go func() {
+		_, err := server.SendCommand(7, "TcpPing", map[string]interface{}{"ip": "127.0.0.1"}, 2*time.Second)
+		done <- err
+	}()
+	agentConn.SetReadDeadline(time.Now().Add(time.Second))
+	var command struct {
+		Type      string `json:"type"`
+		RequestID string `json:"requestId"`
+		TimeoutMS int64  `json:"timeoutMs"`
+	}
+	if err := agentConn.ReadJSON(&command); err != nil {
+		t.Fatal(err)
+	}
+	if command.Type != "TcpPing" || command.TimeoutMS != 2000 || command.RequestID == "" {
+		t.Fatalf("unexpected command budget: %+v", command)
+	}
+	response, err := json.Marshal(commandResponse{Type: "TcpPingResponse", Success: true, RequestID: command.RequestID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.tryResolvePending(7, string(response))
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRealtimeSessionGetsLatestNodeMetricOnConnect(t *testing.T) {
