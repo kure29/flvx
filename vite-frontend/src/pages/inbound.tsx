@@ -6,7 +6,7 @@ import type {
   NodeApiItem,
 } from "@/api/types";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +35,7 @@ import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
 import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
+import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { LatencyCell } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
@@ -72,6 +73,7 @@ import {
 } from "@/shadcn-bridge/heroui/modal";
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 import { formatTraffic } from "@/utils/traffic";
+import { latestProbe } from "@/utils/latest-probe";
 
 const modalBase =
   "!w-[calc(100%-32px)] !mx-auto sm:!w-full rounded-2xl overflow-hidden";
@@ -259,52 +261,80 @@ export default function InboundPage() {
     name: string;
   } | null>(null);
   const [sources, setSources] = useState<RemoteSourceItem[]>([]);
+  const loadingRef = useRef(false);
+  const reloadPendingRef = useRef(false);
+  const metadataLoadedAtRef = useRef(0);
 
   const loadData = useCallback(
-    async (initial = false) => {
+    async (initial = false, options?: { silent?: boolean }): Promise<void> => {
+      const silent = options?.silent ?? false;
+
+      if (loadingRef.current) {
+        if (!silent && !initial) reloadPendingRef.current = true;
+
+        return;
+      }
+      loadingRef.current = true;
       if (initial) setLoading(true);
       try {
+        // Status is cheap to pull every five seconds; form capabilities and
+        // subscription sources keep their existing thirty-second cadence.
+        const metadata =
+          !silent || Date.now() - metadataLoadedAtRef.current >= 30_000;
         const [capsRes, nodeRes, kernelRes, inboundRes, sourceRes] =
           await Promise.all([
-            getKernelCapabilities(),
-            getNodeList(),
-            getKernelList(),
+            metadata ? getKernelCapabilities() : null,
+            metadata ? getNodeList() : null,
+            metadata ? getKernelList() : null,
             getInboundList(),
-            getRemoteSources(),
+            metadata ? getRemoteSources() : null,
           ]);
 
-        if (capsRes.code === 0) setCaps(capsRes.data);
-        if (sourceRes.code === 0) setSources(sourceRes.data ?? []);
-        if (nodeRes.code === 0) setNodes(nodeRes.data || []);
-        if (kernelRes.code === 0) setKernels(kernelRes.data || []);
+        if (metadata) metadataLoadedAtRef.current = Date.now();
+        if (capsRes?.code === 0) setCaps(capsRes.data);
+        if (sourceRes?.code === 0) setSources(sourceRes.data ?? []);
+        if (nodeRes?.code === 0) setNodes(nodeRes.data || []);
+        if (kernelRes?.code === 0) setKernels(kernelRes.data || []);
         if (inboundRes.code === 0) {
           const rows = inboundRes.data || [];
 
-          setInbounds(rows);
+          setInbounds((prev) => {
+            const previous = new Map(prev.map((i) => [i.id, i]));
+
+            return rows.map((i) => ({
+              ...i,
+              probe: latestProbe(i.probe, previous.get(i.id)?.probe),
+            }));
+          });
           setSelectedIds((prev) => {
             if (prev.size === 0) return prev;
             const alive = new Set(rows.map((i) => i.id));
 
             return new Set([...prev].filter((id) => alive.has(id)));
           });
-        } else {
+        } else if (!silent) {
           toast.error(inboundRes.msg || "获取入站列表失败");
         }
       } catch {
-        toast.error("加载数据失败");
+        if (!silent) toast.error("加载数据失败");
       } finally {
+        loadingRef.current = false;
         if (initial) setLoading(false);
+        if (reloadPendingRef.current) {
+          reloadPendingRef.current = false;
+          void loadData(false);
+        }
       }
     },
-    [setTab],
+    [],
   );
 
   useEffect(() => {
     loadData(true);
-    const timer = window.setInterval(() => loadData(false), 30000);
-
-    return () => window.clearInterval(timer);
   }, [loadData]);
+  useVisiblePolling(
+    useCallback(() => loadData(false, { silent: true }), [loadData]),
+  );
 
   const nodeOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -543,7 +573,9 @@ export default function InboundPage() {
         return;
       }
       setInbounds((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, probe } : i)),
+        prev.map((i) =>
+          i.id === id ? { ...i, probe: latestProbe(probe, i.probe) } : i,
+        ),
       );
     } catch {
       toast.error("检测失败");

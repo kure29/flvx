@@ -6,10 +6,9 @@ import {
   type NodeRenewalCycle,
 } from "@/pages/node/renewal";
 import { Node, NodeExpiryState } from "@/pages/node/types";
+import { latestProbe } from "@/utils/latest-probe";
 
 /** Expiry, realtime-merge and sortable-row helpers for the node page (no React state). */
-export const NODE_FALLBACK_REFRESH_INTERVAL_MS = 15000;
-
 export const EXPIRING_SOON_DAYS = 7;
 
 export const getNodeReminderEnabled = (node: Node): boolean => {
@@ -83,6 +82,7 @@ export const mergeNodeRealtimeState = (
 ): Node => {
   return {
     ...incomingNode,
+    latency: latestProbe(incomingNode.latency, existingNode?.latency),
     systemInfo: existingNode?.systemInfo ?? incomingNode.systemInfo ?? null,
     copyLoading: existingNode?.copyLoading ?? incomingNode.copyLoading ?? false,
     upgradeLoading:

@@ -261,6 +261,11 @@ func latencyPointFrom(t latencyTarget, data map[string]interface{}, err error) l
 // probeNodeLatency measures the given local nodes' latency (all online ones
 // when ids is empty) to every enabled reference point and records it.
 func (h *Handler) probeNodeLatency(ctx context.Context, ids []int64) (map[int64]reachProbe, error) {
+	h.nodeLatencyProbeMu.Lock()
+	defer h.nodeLatencyProbeMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	nodes, err := h.repo.ListMonitorNodes()
 	if err != nil {
 		return nil, err
@@ -315,8 +320,8 @@ func (h *Handler) probeNodeLatency(ctx context.Context, ids []int64) (map[int64]
 	for nodeID, list := range points {
 		results[nodeID] = latencyProbe(list, now)
 	}
-	h.nodeLatency.replace(results, len(ids) == 0)
 	if ctx.Err() == nil {
+		h.nodeLatency.replace(results, len(ids) == 0)
 		h.recordLatencySamples(results)
 		// Streaks count scheduled rounds; a click's extra probe is not one.
 		if len(ids) == 0 {
@@ -355,7 +360,14 @@ func (h *Handler) inboundProbeView(row *model.NodeInbound) *reachProbe {
 	reach, hasReach := h.reachProbes.get(row.ID)
 	if !isExternalInbound(row) {
 		if node, ok := h.nodeLatency.get(row.NodeID); ok && len(node.Points) > 0 {
+			// The view combines a port check with reference-point samples.
+			// Recovering the port must not move its timestamp backwards to an
+			// older node sample, or clients will keep the newer cached failure.
+			if hasReach {
+				node.CheckedAt = max(node.CheckedAt, reach.CheckedAt)
+			}
 			if hasReach && !reach.Skipped && !reach.OK {
+				reach.CheckedAt = node.CheckedAt
 				return &reach
 			}
 			view := h.withRoutes(row.NodeID, node)

@@ -216,6 +216,13 @@ func relayLatencyFrom(plan relayPlan, hops []relayHop, entry *reachProbe, now in
 // probeRelayLatency measures the given relay lines (all when ids is empty).
 // Entry nodes' reference point latency comes from the last node round.
 func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64]relayLatency, error) {
+	// An older scheduled round must finish before a reconnect/manual round
+	// reads node status, otherwise its offline snapshot can overwrite recovery.
+	h.relayLatencyProbeMu.Lock()
+	defer h.relayLatencyProbeMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	rows, err := h.repo.ListInboundRelays(0)
 	if err != nil {
 		return nil, err

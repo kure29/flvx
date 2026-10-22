@@ -222,6 +222,13 @@ func probeErrorText(err error) string {
 // probeInboundReach checks the given inbounds (all of them when ids is
 // empty) in parallel and records the results.
 func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64]reachProbe, error) {
+	// Reconnect checks must read node/kernel status after any older round,
+	// rather than letting an old port failure overwrite a recovered result.
+	h.inboundReachProbeMu.Lock()
+	defer h.inboundReachProbeMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	rows, err := h.repo.ListNodeInbounds()
 	if err != nil {
 		return nil, err
@@ -266,6 +273,9 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, reachProbeParallel)
 	for _, row := range targets {
+		if ctx.Err() != nil {
+			break
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(row model.NodeInbound) {
@@ -281,6 +291,9 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 		}(row)
 	}
 	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	h.reachProbes.replace(results, len(ids) == 0)
 
 	byID := make(map[int64]model.NodeInbound, len(targets))
