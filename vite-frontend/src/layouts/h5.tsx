@@ -221,7 +221,7 @@ export default function H5Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen bg-mesh-gradient">
       {/* 顶部导航栏 */}
-      <header className="bg-white/20 dark:bg-zinc-900/20 backdrop-blur-xl shadow-sm border-b border-white/80 dark:border-white/10 h-14 safe-top flex-shrink-0 flex items-center justify-between px-4 relative z-10">
+      <header className="bg-content1 border-b border-divider h-14 safe-top flex-shrink-0 flex items-center justify-between px-4 relative z-10">
         <div className="flex items-center gap-2">
           <BrandLogo size={20} />
           <h1 className="text-sm font-bold text-foreground">
@@ -239,7 +239,7 @@ export default function H5Layout({ children }: { children: React.ReactNode }) {
       <div aria-hidden className="h-[calc(4rem+var(--safe-area-bottom))]" />
 
       {/* 底部Tabbar */}
-      <nav className="bg-white/20 dark:bg-zinc-900/20 backdrop-blur-2xl border-t border-white/80 dark:border-white/10 h-[calc(4rem+var(--safe-area-bottom))] flex-shrink-0 flex items-center justify-around px-2 fixed bottom-0 left-0 right-0 z-30">
+      <nav className="bg-content1 border-t border-divider h-[calc(4rem+var(--safe-area-bottom))] flex-shrink-0 flex items-center justify-around px-2 fixed bottom-0 left-0 right-0 z-30">
         {filteredTabItems.map((item) => {
           const isActive =
             location.pathname === item.path ||

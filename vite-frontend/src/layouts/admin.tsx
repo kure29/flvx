@@ -407,12 +407,10 @@ export default function AdminLayout({
       {/* 左侧菜单栏 */}
       <aside
         className={`
-        ${isMobile ? "fixed h-screen top-0 left-0 rounded-r-3xl" : "relative h-full rounded-3xl"}
+        ${isMobile ? "fixed h-screen top-0 left-0 rounded-r-2xl" : "relative h-full rounded-2xl"}
         ${isMobile && !mobileMenuVisible ? "-translate-x-full" : "translate-x-0"}
         ${isMobile ? "w-64" : isCollapsed ? "w-20" : "w-[260px]"}
-        bg-white/70 dark:bg-zinc-900/70 backdrop-blur-3xl
-        shadow-[0_10px_30px_rgba(0,0,0,0.1)]
-        border border-white/80 dark:border-white/10
+        bg-content1 border border-divider
         z-50
         transition-all duration-300 ease-in-out
         flex flex-col flex-shrink-0      `}
@@ -457,15 +455,15 @@ export default function AdminLayout({
                   <motion.button
                     aria-disabled={isMonitorBlocked}
                     className={`
-                       w-full flex items-center px-3 py-2.5 rounded-2xl text-left
+                       w-full flex items-center px-3 py-2.5 rounded-lg text-left
                        relative min-h-[44px] overflow-hidden transition-colors
                        ${isMonitorBlocked ? "opacity-60" : ""}
                        ${
                          isActive
-                           ? "text-primary dark:text-primary-400 font-semibold"
+                           ? "text-foreground font-semibold"
                            : isMonitorBlocked
-                             ? "text-gray-500 dark:text-gray-400 font-medium"
-                             : "text-gray-600 dark:text-gray-300 font-medium"
+                             ? "text-default-400 font-medium"
+                             : "text-default-500 font-medium"
                        }
                      `}
                     title={
@@ -480,7 +478,7 @@ export default function AdminLayout({
                   >
                     {isActive && (
                       <motion.div
-                        className="absolute inset-0 rounded-2xl bg-white/60 dark:bg-white/10 backdrop-blur-xl shadow-[0_12px_36px_rgba(0,0,0,0.18)] border border-white dark:border-white/20"
+                        className="absolute inset-0 rounded-lg border border-input bg-default-100"
                         layoutId="sidebar-active"
                         transition={{
                           type: "spring",
@@ -491,7 +489,7 @@ export default function AdminLayout({
                     )}
                     {!isActive && (
                       <motion.div
-                        className="absolute inset-0 rounded-2xl bg-white/40 dark:bg-white/5 opacity-0"
+                        className="absolute inset-0 rounded-lg bg-default-100 opacity-0"
                         transition={{ duration: 0.15 }}
                         whileHover={{ opacity: 1 }}
                       />
@@ -606,7 +604,7 @@ export default function AdminLayout({
         {isMobile && (
           <Button
             isIconOnly
-            className="absolute top-4 left-4 z-40 bg-white/20 dark:bg-zinc-900/20 backdrop-blur-md shadow-sm border border-white/80 dark:border-white/10"
+            className="absolute top-4 left-4 z-40 border border-divider bg-content1 shadow-sm"
             variant="flat"
             onPress={toggleMobileMenu}
           >

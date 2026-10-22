@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent as BaseDialogContent,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
@@ -283,6 +284,12 @@ export function ModalBody({
       {...props}
     />
   );
+}
+
+export function ModalDescription(
+  props: React.ComponentProps<typeof DialogDescription>,
+) {
+  return <DialogDescription {...props} />;
 }
 
 export function ModalFooter({

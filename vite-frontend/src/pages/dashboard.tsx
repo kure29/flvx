@@ -101,7 +101,7 @@ function UserDashboard() {
       return {
         label: "未设置",
         badgeClassName:
-          "bg-default-100 text-default-700 dark:bg-default-50 dark:text-default-300",
+          "bg-default-100 text-default-700 dark:bg-default-50 dark:text-default-600",
         nextDueTime: undefined as number | undefined,
       };
     }
@@ -169,7 +169,7 @@ function UserDashboard() {
           </span>
         </div>
 
-        <div className="mt-3 text-sm text-default-700 dark:text-default-300">
+        <div className="mt-3 text-sm text-default-700 dark:text-default-600">
           {formatNodeRenewalTime(renewalSnapshot.nextDueTime)}
         </div>
 
@@ -650,7 +650,7 @@ function UserDashboard() {
             <DropdownTrigger>
               <Button
                 isIconOnly
-                className="rounded-full w-10 h-10 min-w-0 bg-primary text-white font-bold text-sm shadow-[0_4px_12px_rgba(0,122,255,0.3)]"
+                className="rounded-full w-10 h-10 min-w-0 bg-primary text-white font-bold text-sm shadow-none"
                 variant="solid"
               >
                 {username.slice(0, 2).toUpperCase()}
@@ -658,7 +658,7 @@ function UserDashboard() {
             </DropdownTrigger>
             <DropdownMenu
               aria-label="用户菜单"
-              className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-white/50 dark:border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.1)]"
+              className="bg-content1 border border-divider rounded-2xl"
             >
               <DropdownItem
                 key="profile"
@@ -850,7 +850,7 @@ function UserDashboard() {
       />
 
       {isAdmin && nodeExpiryReminders.length > 0 && (
-        <Card className="mb-6 lg:mb-8 border border-amber-200/80 bg-gradient-to-br from-amber-50/90 via-background to-orange-50/70 shadow-md dark:border-amber-500/20 dark:from-amber-950/10 dark:to-orange-950/10">
+        <Card className="mb-6 lg:mb-8 border border-warning/25 bg-content1">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
               <div className="flex items-center gap-2">
@@ -878,7 +878,7 @@ function UserDashboard() {
                   </p>
                 </div>
               </div>
-              <span className="inline-flex w-fit items-center rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200/80 dark:bg-white/5 dark:text-amber-300 dark:ring-amber-500/20">
+              <span className="inline-flex w-fit items-center rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200/80 dark:bg-warning/10 dark:text-amber-300 dark:ring-amber-500/20">
                 {nodeExpiryReminders.length} 个提醒
               </span>
             </div>
@@ -1083,7 +1083,7 @@ function UserDashboard() {
                     {group.forwards.map((forward) => (
                       <div
                         key={forward.id}
-                        className="bg-white/10 dark:bg-black/10 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-lg p-3 shadow-sm hover:shadow-md transition-all duration-300"
+                        className="bg-default-50 border border-divider rounded-lg p-3 hover:border-default-300 transition-all duration-300"
                       >
                         <div className="space-y-3">
                           <div>
@@ -1092,7 +1092,7 @@ function UserDashboard() {
                             </h4>
                             <div className="space-y-1">
                               <button
-                                className={`block px-2 py-1 bg-white/20 dark:bg-black/20 backdrop-blur-md rounded-lg border border-white/20 dark:border-white/10 font-mono text-xs truncate text-foreground transition-all duration-300 ${hasMultipleIps(forward.inIp) ? "cursor-pointer hover:bg-white/30 dark:hover:bg-white/10" : ""}`}
+                                className={`block px-2 py-1 bg-default-100 rounded-lg border border-divider font-mono text-xs truncate text-foreground transition-all duration-300 ${hasMultipleIps(forward.inIp) ? "cursor-pointer hover:bg-default-200" : ""}`}
                                 disabled={!hasMultipleIps(forward.inIp)}
                                 title={formatInAddress(
                                   forward.inIp,
@@ -1113,7 +1113,7 @@ function UserDashboard() {
                                 ↓
                               </div>
                               <button
-                                className={`block px-2 py-1 bg-white/20 dark:bg-black/20 backdrop-blur-md rounded-lg border border-white/20 dark:border-white/10 font-mono text-xs truncate text-foreground transition-all duration-300 ${hasMultipleRemoteAddresses(forward.remoteAddr) ? "cursor-pointer hover:bg-white/30 dark:hover:bg-white/10" : ""}`}
+                                className={`block px-2 py-1 bg-default-100 rounded-lg border border-divider font-mono text-xs truncate text-foreground transition-all duration-300 ${hasMultipleRemoteAddresses(forward.remoteAddr) ? "cursor-pointer hover:bg-default-200" : ""}`}
                                 disabled={
                                   !hasMultipleRemoteAddresses(
                                     forward.remoteAddr,

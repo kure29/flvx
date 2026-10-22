@@ -822,6 +822,49 @@ export interface LatencyTrend {
   points: LatencyTrendPoint[];
 }
 
+export interface NodeQualityStats {
+  avgMs: number | null;
+  jitterMs: number | null;
+  lossPct: number | null;
+  successPct: number | null;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  p99Ms: number | null;
+  sampleCount: number;
+}
+
+export interface NodeQualityData extends LatencyTrend {
+  intervalMs: number;
+  probeIntervalMs: number;
+  points: (LatencyTrendPoint & { summary: NodeQualityStats })[];
+  summary: NodeQualityStats;
+  events: {
+    kind: "latency" | "loss";
+    name: string;
+    t: number;
+    ms: number | null;
+    lossPct: number;
+  }[];
+}
+
+export type NodeTrafficGrain = "hour" | "day" | "month";
+
+export interface NodeTrafficData {
+  since: number;
+  until: number;
+  grain: NodeTrafficGrain;
+  tzOffset: number;
+  buckets: {
+    t: number;
+    end: number;
+    inBytes: number | null;
+    outBytes: number | null;
+    hours: number;
+    partial: boolean;
+    current: boolean;
+  }[];
+}
+
 export interface NodeRoute {
   checkedAt: number;
   points: NodeRoutePoint[];

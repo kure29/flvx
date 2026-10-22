@@ -54,6 +54,14 @@ func (h *Handler) monitorNodeMetricsHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	rest := strings.TrimPrefix(path, prefix)
+	if strings.HasSuffix(rest, "/quality") {
+		h.handleNodeQuality(w, r, strings.TrimSuffix(rest, "/quality"))
+		return
+	}
+	if strings.HasSuffix(rest, "/traffic") {
+		h.handleNodeTraffic(w, r, strings.TrimSuffix(rest, "/traffic"))
+		return
+	}
 	if strings.HasSuffix(rest, "/metrics/latest") {
 		h.handleNodeMetricsLatest(w, r, strings.TrimSuffix(rest, "/metrics/latest"))
 		return

@@ -1387,7 +1387,7 @@ export default function ConfigPage() {
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-default-700 dark:text-default-300">
+          <span className="text-sm font-medium text-default-700 dark:text-default-600">
             {label}
           </span>
           <div className="flex items-center gap-2">
@@ -1417,7 +1417,7 @@ export default function ConfigPage() {
                 className={`w-full px-3 py-2 rounded-lg border transition-all duration-200 cursor-pointer text-left ${
                   isSelected
                     ? "bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-500/50 shadow-sm"
-                    : "bg-white dark:bg-default-50 border-default-200 dark:border-default-100/30 hover:border-primary-200 dark:hover:border-primary-500/30 hover:shadow-sm"
+                    : "bg-content1 border-divider dark:border-default-100/30 hover:border-primary-200 dark:hover:border-primary-500/30 hover:shadow-sm"
                 }`}
                 type="button"
                 onClick={() => toggleTypeSelection(option.value, setTypes)}
@@ -1434,7 +1434,7 @@ export default function ConfigPage() {
                   <span
                     className={`font-medium ${
                       isSelected
-                        ? "text-default-900 dark:text-default-100"
+                        ? "text-default-900 dark:text-default-800"
                         : "text-default-700 dark:text-default-500"
                     }`}
                   >
@@ -1928,7 +1928,7 @@ export default function ConfigPage() {
             <>
               <ModalHeader>确认面板升级</ModalHeader>
               <ModalBody>
-                <div className="space-y-3 text-sm text-default-700 dark:text-default-300">
+                <div className="space-y-3 text-sm text-default-700 dark:text-default-600">
                   <p>
                     升级过程需要访问 Docker
                     Socket，并会在短时间内中断当前面板服务。

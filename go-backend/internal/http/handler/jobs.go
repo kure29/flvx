@@ -22,7 +22,7 @@ func (h *Handler) StartBackgroundJobs() {
 	h.jobsCancel = cancel
 	h.jobsCtx = ctx
 	h.jobsStarted = true
-	h.jobsWG.Add(13)
+	h.jobsWG.Add(14)
 	h.jobsMu.Unlock()
 
 	go h.runHourlyStatsLoop(ctx)
@@ -35,6 +35,7 @@ func (h *Handler) StartBackgroundJobs() {
 	go h.runFederationCleanupRetryLoop(ctx)
 	go h.runKernelStatusLoop(ctx)
 	go h.runReachProbeLoop(ctx)
+	go h.runNodeLatencyProbeLoop(ctx)
 	go h.runNotifyLoop(ctx)
 	go h.runSubscriptionLoop(ctx)
 	go h.runRemoteSourceLoop(ctx)

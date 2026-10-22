@@ -436,6 +436,17 @@ func (r *Repository) NodeTrafficSince(fromMs int64) (map[int64][2]int64, error) 
 	return out, err
 }
 
+// ListNodeTraffic returns recorded hours only; a missing hour is unknown, not zero.
+func (r *Repository) ListNodeTraffic(nodeID, startMs, endMs int64) ([]model.NodeTraffic, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("repository not initialized")
+	}
+	var rows []model.NodeTraffic
+	err := r.db.Where("node_id = ? AND hour >= ? AND hour < ?", nodeID, startMs, endMs).
+		Order("hour ASC").Find(&rows).Error
+	return rows, err
+}
+
 // PruneNodeTraffic drops the hours before beforeMs.
 func (r *Repository) PruneNodeTraffic(beforeMs int64) error {
 	if r == nil || r.db == nil {

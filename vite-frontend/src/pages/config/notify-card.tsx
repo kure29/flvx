@@ -22,7 +22,7 @@ const NOTIFY_EVENTS = [
   {
     key: "latency_bad",
     label: "延迟 / 丢包异常",
-    description: "某个测试点连续 3 次（约 9 分钟）超过阈值才提醒，恢复时也通知",
+    description: "某个测试点连续 3 次（约 3 分钟）超过阈值才提醒，恢复时也通知",
   },
   {
     key: "route_change",

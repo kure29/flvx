@@ -143,9 +143,8 @@ func (s *IngestionService) flushNodeMetrics() {
 	}
 	rows := make([]model.NodeTraffic, 0, len(traffic))
 	for k, v := range traffic {
-		if v[0] > 0 || v[1] > 0 {
-			rows = append(rows, model.NodeTraffic{NodeID: k.node, Hour: k.hour, InBytes: v[0], OutBytes: v[1]})
-		}
+		// Keep observed idle hours too, so charts distinguish zero from no report.
+		rows = append(rows, model.NodeTraffic{NodeID: k.node, Hour: k.hour, InBytes: v[0], OutBytes: v[1]})
 	}
 	if err := s.repo.AddNodeTraffic(rows); err != nil {
 		log.Printf("monitoring write failed op=node_traffic.flush count=%d err=%v", len(rows), err)

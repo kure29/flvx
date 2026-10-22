@@ -103,16 +103,7 @@ function RelayLines({
 
 /** Tunnel latency, throughput and errors over time (was 监控 → 隧道). */
 function QualityView() {
-  const [viewMode, setViewMode] = useViewMode("monitor");
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-      </div>
-      <TunnelMonitorView card={viewMode === "card"} />
-    </div>
-  );
+  return <TunnelMonitorView />;
 }
 
 /** Relay lines grouped by the landing they lead to. */

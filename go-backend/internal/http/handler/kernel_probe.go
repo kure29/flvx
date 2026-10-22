@@ -309,9 +309,6 @@ func (h *Handler) runReachProbeLoop(ctx context.Context) {
 		if _, err := h.probeInboundReach(ctx, nil); err != nil && ctx.Err() == nil {
 			log.Printf("inbound reachability probe failed: %v", err)
 		}
-		if _, err := h.probeNodeLatency(ctx, nil); err != nil && ctx.Err() == nil {
-			log.Printf("node latency probe failed: %v", err)
-		}
 		if _, err := h.probeRelayLatency(ctx, nil); err != nil && ctx.Err() == nil {
 			log.Printf("relay latency probe failed: %v", err)
 		}

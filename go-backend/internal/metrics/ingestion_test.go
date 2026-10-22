@@ -66,6 +66,24 @@ func TestRecordNodeMetric(t *testing.T) {
 	}
 }
 
+func TestObservedIdleTrafficIsPersisted(t *testing.T) {
+	r, err := repo.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	svc := NewIngestionService(r)
+	info := SystemInfo{BytesReceived: 1234, BytesTransmitted: 5678}
+	svc.RecordNodeMetric(1, info) // baseline
+	svc.RecordNodeMetric(1, info) // observed, zero delta
+	svc.flushNodeMetrics()
+	now := time.Now().UnixMilli()
+	rows, err := r.ListNodeTraffic(1, now-time.Hour.Milliseconds(), now+1)
+	if err != nil || len(rows) != 1 || rows[0].InBytes != 0 || rows[0].OutBytes != 0 {
+		t.Fatalf("idle hour must be distinct from absent history: %+v, %v", rows, err)
+	}
+}
+
 func TestRecordNodeMetricAutoFlush(t *testing.T) {
 	r, err := repo.Open(":memory:")
 	if err != nil {

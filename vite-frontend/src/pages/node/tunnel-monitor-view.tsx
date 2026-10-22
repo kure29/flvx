@@ -47,12 +47,7 @@ import { Button } from "@/shadcn-bridge/heroui/button";
 import { Card, CardBody, CardHeader } from "@/shadcn-bridge/heroui/card";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import { Select, SelectItem } from "@/shadcn-bridge/heroui/select";
-import {
-  EmptyHint,
-  ListGroup,
-  ListRow,
-  type RowStatus,
-} from "@/components/page-kit";
+import { EmptyHint } from "@/components/page-kit";
 import {
   DEFAULT_TUNNEL_QUALITY_INTERVAL_SEC,
   parseTunnelQualityIntervalSeconds,
@@ -157,13 +152,13 @@ function UptimeHistoryBar({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-[3px]">
+      <div className="grid w-full grid-cols-[repeat(30,minmax(0,1fr))] items-center gap-[3px]">
         {bars.map((q, idx) => {
           if (!q) {
             return (
               <div
                 key={idx}
-                className="w-1.5 h-4 rounded-full bg-default-200 dark:bg-default-100/50"
+                className="h-4 min-w-0 rounded-full bg-default-200 dark:bg-default-100/50"
                 title="暂无数据"
               />
             );
@@ -196,7 +191,7 @@ function UptimeHistoryBar({
           return (
             <div
               key={q.timestamp || idx}
-              className={`w-1.5 h-4 rounded-full transition-colors cursor-help hover:opacity-80 ${colorClass}`}
+              className={`h-4 min-w-0 rounded-full transition-colors cursor-help hover:opacity-80 ${colorClass}`}
               title={tooltip}
             />
           );
@@ -309,7 +304,7 @@ const QualityChartCard = React.memo(function QualityChartCard({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "rgba(0,0,0,0.85)",
-                    border: "none",
+                    border: "1px solid var(--divider)",
                     borderRadius: "8px",
                     fontSize: 12,
                   }}
@@ -326,7 +321,7 @@ const QualityChartCard = React.memo(function QualityChartCard({
 
                     return [`${n.toFixed(1)}ms`, label];
                   }}
-                  labelStyle={{ color: "#fff" }}
+                  labelStyle={{ color: "var(--foreground)" }}
                 />
                 <Line
                   connectNulls
@@ -427,12 +422,12 @@ const TrafficChartCard = React.memo(function TrafficChartCard({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "rgba(0,0,0,0.85)",
-                    border: "none",
+                    border: "1px solid var(--divider)",
                     borderRadius: "8px",
                     fontSize: 12,
                   }}
                   formatter={yFormatter}
-                  labelStyle={{ color: "#fff" }}
+                  labelStyle={{ color: "var(--foreground)" }}
                 />
                 <Line
                   dataKey="bytesIn"
@@ -733,7 +728,7 @@ const ForwardingChainTopology = React.memo(function ForwardingChainTopology({
   );
 });
 
-export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
+export function TunnelMonitorView() {
   const [tunnels, setTunnels] = useState<MonitorTunnelApiItem[]>([]);
   const [tunnelsLoading, setTunnelsLoading] = useState(false);
   const [tunnelsError, setTunnelsError] = useState<string | null>(null);
@@ -1317,10 +1312,7 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
     );
   }
 
-  const latencyText = (v?: number) =>
-    v === undefined || v < 0 ? "-" : `${v.toFixed(0)}ms`;
-
-  // ===== LIST VIEW =====
+  // ===== TUNNEL CARDS =====
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -1366,8 +1358,8 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
 
       {tunnels.length === 0 ? (
         !tunnelsError && <EmptyHint text="暂无隧道" />
-      ) : card ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {tunnels.map((tunnel) => {
             const quality = qualityMap[tunnel.id];
             const isEnabled = tunnel.status === 1;
@@ -1376,8 +1368,17 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
             return (
               <Card
                 key={tunnel.id}
-                className="group relative overflow-hidden shadow-sm border border-divider dark:border-default-100 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 h-full flex flex-col cursor-pointer bg-background"
+                aria-label={`查看 ${tunnel.name} 质量详情`}
+                className="group relative flex h-full cursor-pointer flex-col overflow-hidden border border-divider bg-background shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-default-100"
+                role="button"
+                tabIndex={0}
                 onClick={() => setDetailTunnelId(tunnel.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setDetailTunnelId(tunnel.id);
+                  }
+                }}
               >
                 <div
                   className={`absolute top-0 left-0 right-0 h-1 ${isEnabled ? "bg-success" : "bg-danger"}`}
@@ -1386,7 +1387,7 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
                   className={`absolute -right-8 -top-8 w-24 h-24 rounded-full blur-2xl opacity-10 transition-opacity group-hover:opacity-20 ${isEnabled ? "bg-success" : "bg-danger"}`}
                 />
 
-                <CardHeader className="pb-2 pt-5 px-5 flex flex-row justify-between items-start gap-4">
+                <CardHeader className="flex flex-row items-start justify-between gap-4 p-4 pb-4 md:p-5 md:pb-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="relative flex-shrink-0">
                       <div className="w-10 h-10 rounded-xl bg-default-100 dark:bg-default-50/10 flex items-center justify-center border border-divider">
@@ -1399,7 +1400,10 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
                       />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <h3 className="font-semibold text-foreground text-sm truncate">
+                      <h3
+                        className="truncate text-sm font-semibold text-foreground"
+                        title={tunnel.name}
+                      >
                         {tunnel.name}
                       </h3>
                       <div className="flex items-center gap-1.5 text-[11px] text-default-500 mt-0.5">
@@ -1411,11 +1415,11 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
                   </div>
                 </CardHeader>
 
-                <CardBody className="py-3 px-5 flex-1 flex flex-col justify-end gap-3 z-10 w-full overflow-hidden">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-default-500 flex items-center gap-1">
-                        <Zap className="w-3 h-3" />
+                <CardBody className="z-10 flex w-full flex-1 flex-col gap-4 overflow-hidden p-4 pt-0 md:p-5 md:pt-0">
+                  <div className="grid grid-cols-2 items-start gap-4">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex items-center gap-1 whitespace-nowrap text-[11px] leading-4 text-default-500">
+                        <Zap className="h-3 w-3 shrink-0" />
                         入口→出口
                       </div>
                       <UptimeHistoryBar
@@ -1424,16 +1428,10 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
                         type="entryToExit"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-[10px] text-default-500 flex items-center gap-1">
-                        <Globe className="w-3 h-3" />
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex items-center gap-1 whitespace-nowrap text-[11px] leading-4 text-default-500">
+                        <Globe className="h-3 w-3 shrink-0" />
                         出口→测试目标
-                      </div>
-                      <div
-                        aria-label={`测试目标 ${targetLabel}`}
-                        className="text-[10px] text-default-400 truncate"
-                      >
-                        {targetLabel}
                       </div>
                       <UptimeHistoryBar
                         history={qualityHistoryMap[tunnel.id]}
@@ -1443,105 +1441,46 @@ export function TunnelMonitorView({ card }: { card?: boolean } = {}) {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center pt-2 border-t border-divider/50">
-                    {quality?.errorMessage ? (
-                      <span className="text-[11px] text-danger truncate">
-                        {quality.errorMessage}
+                  <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-divider/50 pt-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-default-500">
+                      <span className="shrink-0">测试目标</span>
+                      <span
+                        aria-label={`测试目标 ${targetLabel}`}
+                        className="truncate text-default-400"
+                        title={targetLabel}
+                      >
+                        {targetLabel}
                       </span>
-                    ) : quality?.timestamp ? (
-                      <span className="text-[11px] text-default-500 flex items-center gap-1">
+                    </div>
+                    {quality?.timestamp && (
+                      <span className="flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums text-default-500">
                         {monitorTunnelQualityEnabled ? (
                           <LiveDot />
                         ) : (
-                          <WifiOff className="w-3 h-3 text-warning" />
+                          <WifiOff className="h-3 w-3 text-warning" />
                         )}
                         {new Date(quality.timestamp).toLocaleTimeString(
                           "zh-CN",
                         )}
                       </span>
-                    ) : (
-                      <span className="text-[11px] text-default-400">
+                    )}
+                    {quality?.errorMessage ? (
+                      <span className="w-full break-words text-[11px] text-danger">
+                        {quality.errorMessage}
+                      </span>
+                    ) : !quality?.timestamp ? (
+                      <span className="w-full text-[11px] text-default-400">
                         {monitorTunnelQualityEnabled
                           ? "等待探测..."
                           : "实时检测已关闭"}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </CardBody>
               </Card>
             );
           })}
         </div>
-      ) : (
-        <ListGroup>
-          {tunnels.map((tunnel) => {
-            const quality = qualityMap[tunnel.id];
-            const isEnabled = tunnel.status === 1;
-            const targetLabel = probeTargetLabel(quality);
-            const status: RowStatus = !isEnabled
-              ? "off"
-              : !quality
-                ? "off"
-                : quality.errorMessage ||
-                    quality.entryToExitLatency < 0 ||
-                    quality.exitToBingLatency < 0
-                  ? "bad"
-                  : quality.entryToExitLoss > 0 ||
-                      quality.exitToBingLoss > 0 ||
-                      quality.entryToExitLatency > 200 ||
-                      quality.exitToBingLatency > 200
-                    ? "warn"
-                    : "ok";
-            const meta = !quality
-              ? monitorTunnelQualityEnabled
-                ? "等待探测"
-                : "实时检测已关闭"
-              : quality.errorMessage
-                ? quality.errorMessage
-                : [
-                    `入口→出口 ${latencyText(quality.entryToExitLatency)}`,
-                    `出口→目标 ${latencyText(quality.exitToBingLatency)}`,
-                    quality.timestamp
-                      ? `更新 ${new Date(quality.timestamp).toLocaleTimeString("zh-CN")}`
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ");
-
-            return (
-              <ListRow
-                key={tunnel.id}
-                badges={
-                  !isEnabled && (
-                    <Chip className="shrink-0" size="sm" variant="flat">
-                      禁用
-                    </Chip>
-                  )
-                }
-                meta={meta}
-                right={
-                  <div
-                    aria-label={`出口到测试目标 ${targetLabel}`}
-                    className="hidden gap-4 lg:flex"
-                  >
-                    <UptimeHistoryBar
-                      history={qualityHistoryMap[tunnel.id]}
-                      type="entryToExit"
-                    />
-                    <UptimeHistoryBar
-                      history={qualityHistoryMap[tunnel.id]}
-                      type="exitToBing"
-                    />
-                  </div>
-                }
-                status={status}
-                statusTitle={isEnabled ? "启用" : "禁用"}
-                title={tunnel.name}
-                onPress={() => setDetailTunnelId(tunnel.id)}
-              />
-            );
-          })}
-        </ListGroup>
       )}
     </div>
   );

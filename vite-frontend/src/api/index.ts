@@ -51,6 +51,9 @@ import type {
   InboundApiItem,
   InboundProbe,
   LatencyTrend,
+  NodeQualityData,
+  NodeTrafficData,
+  NodeTrafficGrain,
   NodeRoute,
   InboundMutationPayload,
   SplitRule,
@@ -1099,6 +1102,27 @@ export const setNodeLatencyTargets = (data: {
 /** A node's latency to each reference point over the last hours. */
 export const getNodeLatencyHistory = (id: number, hours: number) =>
   Network.post<LatencyTrend>("/node/latency/history", { id, hours });
+
+export const getNodeQuality = (
+  id: number,
+  hours: number,
+  interval: number,
+  targets: string[],
+) => {
+  const query = new URLSearchParams({
+    hours: String(hours),
+    interval: String(interval),
+  });
+
+  targets.forEach((target) => query.append("target", target));
+
+  return Network.get<NodeQualityData>(`/monitor/nodes/${id}/quality?${query}`);
+};
+
+export const getNodeTrafficHistory = (id: number, grain: NodeTrafficGrain) =>
+  Network.get<NodeTrafficData>(
+    `/monitor/nodes/${id}/traffic?${new URLSearchParams({ grain, tzOffset: String(-new Date().getTimezoneOffset()) })}`,
+  );
 /** A node's last return-route traces to the reference points. */
 export const getNodeRoute = (id: number) =>
   Network.post<NodeRoute | null>("/node/route", { id });

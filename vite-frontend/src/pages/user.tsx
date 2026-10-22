@@ -1684,7 +1684,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
                                 ? "bg-default-100/50 dark:bg-default-50/50 border-default-200/50 dark:border-default-100/20 opacity-60 cursor-not-allowed"
                                 : isSelected
                                   ? "bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-500/50 shadow-sm"
-                                  : "bg-white dark:bg-default-50 border-default-200 dark:border-default-100/30 hover:border-primary-200 dark:hover:border-primary-500/30 hover:shadow-sm"
+                                  : "bg-content1 border-divider dark:border-default-100/30 hover:border-primary-200 dark:hover:border-primary-500/30 hover:shadow-sm"
                             }
                           `}
                           role="button"

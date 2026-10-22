@@ -298,7 +298,7 @@ export function Select<T>({
       <div
         ref={listboxRef}
         className={cn(
-          "absolute left-0 z-50 w-full space-y-1 overflow-y-auto rounded-md border border-divider bg-background p-2 shadow-md max-h-56 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+          "absolute left-0 z-50 w-full space-y-1 overflow-y-auto rounded-md border border-divider bg-content1 text-foreground p-2 shadow-md max-h-56 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
           placementClasses,
         )}
         id={`${generatedId}-listbox`}

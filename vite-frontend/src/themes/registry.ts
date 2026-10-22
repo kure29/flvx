@@ -84,12 +84,12 @@ export function resolveSystemMode(): "light" | "dark" {
 }
 
 export function getSavedMode(): ThemeMode {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") return "dark";
   const raw = localStorage.getItem(MODE_KEY);
 
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
 
-  return "system";
+  return "dark";
 }
 
 export function saveMode(mode: ThemeMode): void {

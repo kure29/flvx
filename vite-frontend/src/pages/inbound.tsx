@@ -33,12 +33,9 @@ import {
 import { PageLoadingState } from "@/components/page-state";
 import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
 import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { LatencyCell } from "@/components/latency-cell";
-import { RouteModal } from "@/components/route-modal";
-import { LatencyTrendModal } from "@/components/latency-trend-modal";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {
@@ -61,7 +58,6 @@ import {
 } from "@/pages/inbound/presets";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Card, CardBody } from "@/shadcn-bridge/heroui/card";
-import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import {
   Modal,
@@ -242,22 +238,13 @@ export default function InboundPage() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
   const [selectMode, setSelectMode] = useState(false);
-  const [viewMode, setViewMode] = useViewMode("inbound");
-  const card = viewMode === "card";
+
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [batchToggling, setBatchToggling] = useState(false);
   const [probing, setProbing] = useState(false);
   const [probingIds, setProbingIds] = useState<Set<number>>(new Set());
-  const [routeNode, setRouteNode] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [trendNode, setTrendNode] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
   const [sources, setSources] = useState<RemoteSourceItem[]>([]);
 
   const loadData = useCallback(
@@ -558,7 +545,7 @@ export default function InboundPage() {
     }
   };
 
-  const gridClass = card ? CARD_GRID : "grid grid-cols-1 gap-2 2xl:grid-cols-2";
+  const gridClass = CARD_GRID;
 
   const renderInbound = (item: InboundApiItem) => {
     const probe = item.probe?.skipped ? undefined : item.probe;
@@ -568,14 +555,6 @@ export default function InboundPage() {
     const unreachable =
       item.enabled && !kernelBad && probe !== undefined && !probe.ok;
     const running = item.enabled && !kernelBad && !unreachable;
-    // The group header already names the server.
-    const where = item.external
-      ? grouped
-        ? item.listen
-        : EXTERNAL_LABEL
-      : grouped
-        ? (KERNEL_LABELS[item.kernelType] ?? item.kernelType)
-        : item.nodeName;
 
     const selected = selectMode && selectedIds.has(item.id);
     // Built inbounds show their node's latency and routes on the 节点
@@ -585,32 +564,12 @@ export default function InboundPage() {
         <LatencyCell
           probe={probe}
           probing={probingIds.has(item.id)}
-          variant={card ? "card" : "list"}
+          variant="card"
           onProbe={() => probeOne(item.id)}
         />
       ) : null;
     // Cards give measured points their own block under the rows.
-    const latencyTiles = card && latency !== null && probe !== undefined;
-    const activate = () =>
-      selectMode ? toggleSelect(item.id) : setSheetFor(item.id);
-    const dotClass = unreachable
-      ? "bg-danger"
-      : running
-        ? "bg-success"
-        : item.enabled
-          ? "bg-warning"
-          : "bg-default-300";
-    const stateText = unreachable
-      ? `连不上：${probe?.error ?? ""}`
-      : running
-        ? probe
-          ? item.external
-            ? `可连接 · ${probe.latencyMs} ms`
-            : "可连接"
-          : "运行中"
-        : item.enabled
-          ? `内核${KERNEL_STATUS[item.kernelStatus]?.label ?? "异常"}`
-          : "已停用";
+    const latencyTiles = latency !== null && probe !== undefined;
 
     const badges = (
       <>
@@ -679,185 +638,93 @@ export default function InboundPage() {
       </>
     );
 
-    if (card) {
-      const tone: CardTone = unreachable
-        ? "danger"
-        : running
-          ? "success"
-          : item.enabled
-            ? "warning"
-            : "default";
-
-      return (
-        <InfoCard
-          key={item.id}
-          actions={[
-            {
-              key: "share",
-              label: "分享",
-              color: "primary",
-              onPress: () => setSharing(item),
-            },
-            {
-              key: "relay",
-              label: "中转",
-              color: "secondary",
-              onPress: () => setRelaying(item),
-            },
-            {
-              key: "more",
-              label: "更多",
-              onPress: () => setSheetFor(item.id),
-            },
-          ]}
-          badges={badges}
-          headerRight={
-            <Switch
-              isDisabled={toggling === item.id}
-              isSelected={item.enabled}
-              size="sm"
-              onValueChange={() => handleToggle(item)}
-            />
-          }
-          rows={[
-            ["协议", describeInbound(item)],
-            [
-              "端口",
-              <span key="port" className="font-mono">
-                {item.port}
-              </span>,
-            ],
-            [
-              item.external ? "地址" : "节点",
-              <span key="where" className="font-mono">
-                {item.external ? item.listen : item.nodeName}
-              </span>,
-            ],
-            [
-              "流量",
-              <span key="traffic" className="font-mono">
-                ↑ {formatTraffic(item.uploadBytes)} · ↓{" "}
-                {formatTraffic(item.downloadBytes)}
-              </span>,
-            ],
-            ...(latency && !latencyTiles
-              ? ([["延迟", latency]] as Array<[string, React.ReactNode]>)
-              : []),
-          ]}
-          selectMode={selectMode}
-          selected={selected}
-          status={
-            unreachable
-              ? "连不上"
-              : running
-                ? "运行中"
-                : item.enabled
-                  ? "异常"
-                  : "已停用"
-          }
-          title={item.name}
-          tone={tone}
-          onPress={() => setSheetFor(item.id)}
-          onSelect={() => toggleSelect(item.id)}
-        >
-          {latencyTiles ? latency : null}
-        </InfoCard>
-      );
-    }
+    const tone: CardTone = unreachable
+      ? "danger"
+      : running
+        ? "success"
+        : item.enabled
+          ? "warning"
+          : "default";
 
     return (
-      <div
+      <InfoCard
         key={item.id}
-        aria-pressed={selectMode ? selected : undefined}
-        className={`flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-left shadow-sm transition-colors ${
-          selected
-            ? "border-primary bg-primary-50/70 dark:bg-primary-900/40"
-            : "border-divider bg-content1 hover:bg-default-100"
-        }`}
-        role="button"
-        tabIndex={0}
-        onClick={activate}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            activate();
-          }
-        }}
-      >
-        {selectMode && (
-          <div
-            className="flex shrink-0"
-            role="presentation"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Checkbox
-              aria-label={`选择 ${item.name}`}
-              isSelected={selected}
-              onValueChange={() => toggleSelect(item.id)}
-            />
-          </div>
-        )}
-        <span
-          className={`h-2 w-2 shrink-0 rounded-full ${dotClass}`}
-          title={stateText}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate font-medium">{item.name}</span>
-            {badges}
-          </div>
-          <div className="truncate text-xs text-default-500">
-            {describeInbound(item)} · {item.port}
-            {where ? ` · ${where}` : ""}
-            <span className="sm:hidden">
-              {" "}
-              · {formatTraffic(item.uploadBytes + item.downloadBytes)}
-            </span>
-          </div>
-        </div>
-        {latency && (
-          <div className="flex shrink-0 justify-end sm:w-32">{latency}</div>
-        )}
-        <div className="hidden shrink-0 text-right font-mono text-xs text-default-500 sm:block">
-          <div>↑ {formatTraffic(item.uploadBytes)}</div>
-          <div>↓ {formatTraffic(item.downloadBytes)}</div>
-        </div>
-        <div
-          className={`hidden shrink-0 gap-1 ${selectMode ? "" : "md:flex"}`}
-          role="presentation"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Button
-            color="primary"
-            size="sm"
-            variant="flat"
-            onPress={() => setSharing(item)}
-          >
-            分享
-          </Button>
-          <Button
-            color="secondary"
-            size="sm"
-            variant="flat"
-            onPress={() => setRelaying(item)}
-          >
-            中转
-          </Button>
-        </div>
-        <div
-          className={`shrink-0 ${selectMode ? "hidden" : ""}`}
-          role="presentation"
-          onClick={(e) => e.stopPropagation()}
-        >
+        actions={[
+          {
+            key: "share",
+            label: "分享",
+            color: "primary",
+            onPress: () => setSharing(item),
+          },
+          {
+            key: "relay",
+            label: "中转",
+            color: "secondary",
+            onPress: () => setRelaying(item),
+          },
+          {
+            key: "more",
+            label: "更多",
+            onPress: () => setSheetFor(item.id),
+          },
+        ]}
+        badges={badges}
+        headerRight={
           <Switch
             isDisabled={toggling === item.id}
             isSelected={item.enabled}
             size="sm"
             onValueChange={() => handleToggle(item)}
           />
-        </div>
-      </div>
+        }
+        rows={[
+          ["协议", describeInbound(item)],
+          [
+            "端口",
+            <span key="port" className="font-mono">
+              {item.port}
+            </span>,
+          ],
+          [
+            item.external ? "地址" : "节点",
+            <span key="where" className="font-mono">
+              {item.external ? item.listen : item.nodeName}
+            </span>,
+          ],
+          [
+            "流量",
+            <span key="traffic" className="font-mono">
+              ↑ {formatTraffic(item.uploadBytes)} · ↓{" "}
+              {formatTraffic(item.downloadBytes)}
+            </span>,
+          ],
+          ...(latency && !latencyTiles
+            ? ([["延迟", latency]] as Array<[string, React.ReactNode]>)
+            : []),
+          ...(!item.external && unreachable && probe?.error
+            ? ([["检测", probe.error]] as Array<[string, React.ReactNode]>)
+            : []),
+        ]}
+        selectMode={selectMode}
+        selected={selected}
+        status={
+          unreachable
+            ? "连不上"
+            : running
+              ? !item.external && probe
+                ? "可连接"
+                : "运行中"
+              : item.enabled
+                ? "异常"
+                : "已停用"
+        }
+        title={item.name}
+        tone={tone}
+        onPress={() => setSheetFor(item.id)}
+        onSelect={() => toggleSelect(item.id)}
+      >
+        {latencyTiles ? latency : null}
+      </InfoCard>
     );
   };
 
@@ -943,7 +810,6 @@ export default function InboundPage() {
                   ))}
                 </select>
               )}
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </PageToolbar>
           )}
 
@@ -1411,16 +1277,6 @@ export default function InboundPage() {
           }}
         </ModalContent>
       </Modal>
-      <RouteModal
-        nodeId={routeNode?.id ?? null}
-        nodeName={routeNode?.name}
-        onClose={() => setRouteNode(null)}
-      />
-      <LatencyTrendModal
-        nodeId={trendNode?.id ?? null}
-        nodeName={trendNode?.name}
-        onClose={() => setTrendNode(null)}
-      />
     </AnimatedPage>
   );
 }

@@ -14,6 +14,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -25,13 +26,12 @@ import {
   Activity,
   Clock,
   Play,
-  Server,
   ArrowLeft,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useSearchParams } from "react-router-dom";
 
-import { formatTraffic } from "@/utils/traffic";
-import { EmptyHint, ListGroup, ListRow } from "@/components/page-kit";
+import { EmptyHint } from "@/components/page-kit";
 import {
   getNodeMetrics,
   getServiceMonitorList,
@@ -68,6 +68,10 @@ import {
   getDistroColor,
   parseDistroFromVersion,
 } from "@/components/distro-icon";
+import { NodeDetailOverview } from "@/pages/node/detail-overview";
+import { NodeNetworkQuality } from "@/pages/node/network-quality";
+import { NodeTrafficStatistics } from "@/pages/node/traffic-statistics";
+import { uptimeLabel } from "@/pages/node/status-card";
 import { useNodeRealtime } from "@/pages/node/use-node-realtime";
 
 interface MonitorViewProps {
@@ -77,8 +81,6 @@ interface MonitorViewProps {
   >;
   onRefresh?: () => void;
   refreshing?: boolean;
-  /** Show the nodes as cards. */
-  card?: boolean;
   /** Opens straight into this node's detail, without the overview. */
   focusNodeId?: number | null;
   /** With focusNodeId: the back button leaves the view. */
@@ -135,8 +137,6 @@ const formatDateTime = (ts: number): string => {
   });
 };
 
-const formatBytes = formatTraffic;
-
 const formatBytesPerSecond = (bytesPerSecond: number): string => {
   if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return "0 B/s";
 
@@ -166,104 +166,7 @@ const getColorByUsage = (usage?: number) => {
   return "success";
 };
 
-const BAR_TONE: Record<string, string> = {
-  success: "bg-success",
-  primary: "bg-primary",
-  warning: "bg-warning",
-  danger: "bg-danger",
-  default: "bg-default-300",
-};
-
-/** A labelled usage bar for a list row (CPU, 内存). */
-function UsageMini({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="min-w-0 space-y-1">
-      <div className="flex items-baseline justify-between gap-2 text-[11px]">
-        <span className="text-default-500">{label}</span>
-        <span className="font-mono font-medium">{value.toFixed(1)}%</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-default-100">
-        <div
-          className={`h-full rounded-full ${BAR_TONE[getColorByUsage(value)]}`}
-          style={{ width: `${Math.max(2, Math.min(100, value))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** Two stacked values (↑/↓ speed or traffic, connections/uptime). */
-function MetricPair({
-  label,
-  top,
-  bottom,
-}: {
-  label: string;
-  top: React.ReactNode;
-  bottom: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0 text-[11px] leading-4">
-      <div className="text-default-500">{label}</div>
-      <div className="truncate font-mono">{top}</div>
-      <div className="truncate font-mono">{bottom}</div>
-    </div>
-  );
-}
-
-/**
- * Live metrics under a node's list row. Phones show CPU, memory and speed
- * (the rest is in the row's meta line); wider screens spread every metric
- * across the row.
- */
-function NodeMetricsStrip({ metric }: { metric: RealtimeNodeMetric }) {
-  const up = <span className="font-bold text-primary-500">↑</span>;
-  const down = <span className="font-bold text-success-500">↓</span>;
-
-  return (
-    <div className="grid grid-cols-3 gap-3 md:grid-cols-5 md:gap-6">
-      <UsageMini label="CPU" value={metric.cpuUsage} />
-      <UsageMini label="内存" value={metric.memoryUsage} />
-      <MetricPair
-        bottom={
-          <>
-            {down} {formatBytesPerSecond(metric.netInSpeed)}
-          </>
-        }
-        label="网速"
-        top={
-          <>
-            {up} {formatBytesPerSecond(metric.netOutSpeed)}
-          </>
-        }
-      />
-      <div className="hidden md:block">
-        <MetricPair
-          bottom={
-            <>
-              {down} {formatBytes(metric.netInBytes)}
-            </>
-          }
-          label="累计流量"
-          top={
-            <>
-              {up} {formatBytes(metric.netOutBytes)}
-            </>
-          }
-        />
-      </div>
-      <div className="hidden md:block">
-        <MetricPair
-          bottom={`已运行 ${formatUptime(metric.uptime)}`}
-          label="连接 / 运行"
-          top={`TCP ${metric.tcpConns} · UDP ${metric.udpConns}`}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** A node in the card view (the original upstream design). */
+/** A node's live resource card. */
 function ServerCard({
   node,
   metric,
@@ -279,7 +182,7 @@ function ServerCard({
 
   return (
     <Card
-      className="group relative hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.15)] transition-all duration-300 h-full flex flex-col cursor-pointer"
+      className="group relative hover:border-default-300 transition-all duration-300 h-full flex flex-col cursor-pointer"
       onClick={onPress}
     >
       {/* Dynamic top gradient bar based on status */}
@@ -394,6 +297,7 @@ function ServerCard({
 }
 
 type MetricType =
+  | "resources"
   | "cpu"
   | "memory"
   | "disk"
@@ -406,6 +310,8 @@ const METRICS_MAX_ROWS = 5000;
 /* ─── Memoized Node Metrics Chart sub-component ─────────────────── */
 
 interface NodeMetricsChartCardProps {
+  title?: string;
+  showMetricSelector?: boolean;
   rangeMs: number;
   onRangeChange: (v: number) => void;
   activeMetricType: MetricType;
@@ -420,6 +326,7 @@ interface NodeMetricsChartCardProps {
 }
 
 const METRIC_TYPE_BUTTONS: { key: MetricType; label: string }[] = [
+  { key: "resources", label: "资源" },
   { key: "cpu", label: "CPU" },
   { key: "memory", label: "内存" },
   { key: "disk", label: "磁盘" },
@@ -429,6 +336,8 @@ const METRIC_TYPE_BUTTONS: { key: MetricType; label: string }[] = [
 ];
 
 const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
+  title = "负载详情",
+  showMetricSelector = true,
   rangeMs,
   onRangeChange,
   activeMetricType,
@@ -443,43 +352,68 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
 }: NodeMetricsChartCardProps) {
   const chartConfig = (() => {
     switch (activeMetricType) {
+      case "resources":
+        return {
+          lines: [
+            { dataKey: "cpu", color: "var(--chart-cpu)", name: "CPU %" },
+            { dataKey: "memory", color: "var(--chart-memory)", name: "内存 %" },
+            { dataKey: "disk", color: "var(--chart-disk)", name: "磁盘 %" },
+          ],
+          yAxisLabel: "使用率 (%)",
+        };
       case "cpu":
         return {
-          lines: [{ dataKey: "cpu", color: "#3b82f6", name: "CPU %" }],
+          lines: [{ dataKey: "cpu", color: "var(--chart-cpu)", name: "CPU %" }],
           yAxisLabel: "使用率 (%)",
         };
       case "memory":
         return {
-          lines: [{ dataKey: "memory", color: "#8b5cf6", name: "内存 %" }],
+          lines: [
+            { dataKey: "memory", color: "var(--chart-memory)", name: "内存 %" },
+          ],
           yAxisLabel: "使用率 (%)",
         };
       case "disk":
         return {
-          lines: [{ dataKey: "disk", color: "#f59e0b", name: "磁盘 %" }],
+          lines: [
+            { dataKey: "disk", color: "var(--chart-disk)", name: "磁盘 %" },
+          ],
           yAxisLabel: "使用率 (%)",
         };
       case "network":
         return {
           lines: [
-            { dataKey: "netIn", color: "#10b981", name: "接收速度" },
-            { dataKey: "netOut", color: "#ef4444", name: "发送速度" },
+            {
+              dataKey: "netIn",
+              color: "var(--chart-download)",
+              name: "接收速度",
+            },
+            {
+              dataKey: "netOut",
+              color: "var(--chart-upload)",
+              name: "发送速度",
+            },
           ],
           yAxisLabel: "速度 (bytes/s)",
         };
       case "load":
         return {
           lines: [
-            { dataKey: "load1", color: "#3b82f6", name: "负载 1m" },
-            { dataKey: "load5", color: "#8b5cf6", name: "负载 5m" },
-            { dataKey: "load15", color: "#f59e0b", name: "负载 15m" },
+            { dataKey: "load1", color: "var(--chart-cpu)", name: "负载 1m" },
+            { dataKey: "load5", color: "var(--chart-memory)", name: "负载 5m" },
+            { dataKey: "load15", color: "var(--chart-disk)", name: "负载 15m" },
           ],
           yAxisLabel: "负载值",
         };
       case "connections":
         return {
           lines: [
-            { dataKey: "tcp", color: "#3b82f6", name: "TCP 连接" },
-            { dataKey: "udp", color: "#10b981", name: "UDP 连接" },
+            { dataKey: "tcp", color: "var(--chart-cpu)", name: "TCP 连接" },
+            {
+              dataKey: "udp",
+              color: "var(--chart-download)",
+              name: "UDP 连接",
+            },
           ],
           yAxisLabel: "连接数",
         };
@@ -492,7 +426,8 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
     if (!Number.isFinite(n)) return "";
     switch (activeMetricType) {
       case "network":
-        return formatBytesPerSecond(n);
+        return (n / (1024 * 1024)).toFixed(1);
+      case "resources":
       case "cpu":
       case "memory":
       case "disk":
@@ -511,6 +446,7 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
     switch (activeMetricType) {
       case "network":
         return formatBytesPerSecond(n);
+      case "resources":
       case "cpu":
       case "memory":
       case "disk":
@@ -523,9 +459,9 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">节点指标图表</h3>
+    <Card className="h-full">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 border-b border-divider !p-4">
+        <h3 className="text-sm font-semibold">{title}</h3>
         <div className="flex items-center gap-2">
           <Select
             className="w-28"
@@ -552,20 +488,22 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
           </Button>
         </div>
       </CardHeader>
-      <CardBody className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {METRIC_TYPE_BUTTONS.map((item) => (
-            <Button
-              key={item.key}
-              color={activeMetricType === item.key ? "primary" : "default"}
-              size="sm"
-              variant={activeMetricType === item.key ? "solid" : "flat"}
-              onPress={() => onMetricTypeChange(item.key)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
+      <CardBody className="flex flex-1 flex-col gap-4">
+        {showMetricSelector && (
+          <div className="flex flex-wrap gap-1.5">
+            {METRIC_TYPE_BUTTONS.map((item) => (
+              <Button
+                key={item.key}
+                color={activeMetricType === item.key ? "primary" : "default"}
+                size="sm"
+                variant={activeMetricType === item.key ? "solid" : "flat"}
+                onPress={() => onMetricTypeChange(item.key)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-8">
@@ -575,20 +513,59 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
           <div className="text-center py-8 text-danger text-sm">{error}</div>
         ) : data.length > 0 ? (
           <>
-            <div className="h-64">
-              <ResponsiveContainer height="100%" width="100%">
+            <div className="mt-auto h-64">
+              <ResponsiveContainer
+                height="100%"
+                initialDimension={{ width: 400, height: 256 }}
+                minWidth={0}
+                width="100%"
+              >
                 <LineChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" fontSize={12} />
-                  <YAxis fontSize={12} tickFormatter={yAxisTickFormatter} />
+                  <Legend
+                    height={28}
+                    iconSize={8}
+                    iconType="circle"
+                    verticalAlign="top"
+                    wrapperStyle={{ fontSize: 11 }}
+                  />
+                  <CartesianGrid stroke="var(--divider)" vertical={false} />
+                  <XAxis
+                    axisLine={false}
+                    dataKey="time"
+                    fontSize={10}
+                    minTickGap={30}
+                    stroke="var(--default-500)"
+                    tickLine={false}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    fontSize={10}
+                    label={
+                      activeMetricType === "network"
+                        ? {
+                            value: "MB/s",
+                            position: "insideTopLeft",
+                            offset: 0,
+                            dy: -15,
+                            fill: "var(--default-500)",
+                            fontSize: 10,
+                          }
+                        : undefined
+                    }
+                    stroke="var(--default-500)"
+                    tickFormatter={yAxisTickFormatter}
+                    tickLine={false}
+                    width={52}
+                  />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "rgba(0,0,0,0.8)",
-                      border: "none",
+                      backgroundColor: "var(--content1)",
+                      border: "1px solid var(--divider)",
+                      color: "var(--foreground)",
                       borderRadius: "8px",
                     }}
                     formatter={tooltipFormatter}
-                    labelStyle={{ color: "#fff" }}
+                    labelStyle={{ color: "var(--foreground)" }}
                   />
                   {chartConfig.lines.map((line) => (
                     <Line
@@ -631,11 +608,25 @@ export function MonitorView({
   nodeMap,
   onRefresh,
   refreshing,
-  card,
   focusNodeId = null,
   onBack,
 }: MonitorViewProps) {
   const [detailNodeId, setDetailNodeId] = useState<number | null>(focusNodeId);
+  const [detailParams, setDetailParams] = useSearchParams();
+  const detailTab =
+    detailParams.get("view") === "quality" ? "quality" : "overview";
+  const setDetailTab = (value: "overview" | "quality") =>
+    setDetailParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+
+        if (value === "quality") next.set("view", "quality");
+        else next.delete("view");
+
+        return next;
+      },
+      { replace: true },
+    );
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(
     focusNodeId,
   );
@@ -643,7 +634,8 @@ export function MonitorView({
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsTruncated, setMetricsTruncated] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [activeMetricType, setActiveMetricType] = useState<MetricType>("cpu");
+  const [activeMetricType, setActiveMetricType] =
+    useState<MetricType>("resources");
 
   const [metricsRangeMs, setMetricsRangeMs] = useState(60 * 60 * 1000);
 
@@ -1382,7 +1374,7 @@ export function MonitorView({
         </Card>
       )}
 
-      {/* ====== GRID/LIST VIEW ====== */}
+      {/* ====== NODE CARDS ====== */}
       {!accessDenied && !detailNodeId && (
         <>
           <div className="flex items-center gap-2">
@@ -1427,7 +1419,7 @@ export function MonitorView({
 
           {nodes.length === 0 ? (
             <EmptyHint text="暂无节点" />
-          ) : card ? (
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {nodes.map((node) => (
                 <ServerCard
@@ -1441,44 +1433,6 @@ export function MonitorView({
                 />
               ))}
             </div>
-          ) : (
-            <ListGroup>
-              {nodes.map((node) => {
-                const metric = realtimeNodeMetrics[node.id] || null;
-                const isOnline = node.connectionStatus === "online";
-                const live = isOnline && metric;
-
-                return (
-                  <ListRow
-                    key={node.id}
-                    footer={live ? <NodeMetricsStrip metric={metric} /> : null}
-                    meta={
-                      live ? (
-                        // Wider screens show these in the metrics strip.
-                        <span className="md:hidden">
-                          {[
-                            `TCP ${metric.tcpConns} · UDP ${metric.udpConns}`,
-                            `运行 ${formatUptime(metric.uptime)}`,
-                            `流量 ↑${formatBytes(metric.netOutBytes)} ↓${formatBytes(metric.netInBytes)}`,
-                          ].join(" · ")}
-                        </span>
-                      ) : isOnline ? (
-                        "在线 · 等待指标"
-                      ) : (
-                        "离线"
-                      )
-                    }
-                    status={isOnline ? "ok" : "bad"}
-                    statusTitle={isOnline ? "在线" : "离线"}
-                    title={node.name}
-                    onPress={() => {
-                      setDetailNodeId(node.id);
-                      setSelectedNodeId(node.id);
-                    }}
-                  />
-                );
-              })}
-            </ListGroup>
           )}
         </>
       )}
@@ -1487,384 +1441,483 @@ export function MonitorView({
       {!accessDenied && detailNodeId && (
         <>
           {/* Header */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              size="sm"
-              variant="flat"
-              onPress={() => (onBack ? onBack() : setDetailNodeId(null))}
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              {onBack ? "返回节点" : "返回总览"}
-            </Button>
-            <div className="flex items-center gap-2">
-              <Server
-                className={`w-5 h-5 ${detailNode?.connectionStatus === "online" ? "text-success" : "text-default-400"}`}
-              />
-              <h3 className="text-lg font-semibold">
-                {detailNode?.name || `节点 #${detailNodeId}`}
-              </h3>
-              <Chip
-                color={
-                  detailNode?.connectionStatus === "online"
-                    ? "success"
-                    : "danger"
-                }
+          <div className="flex flex-col gap-4 rounded-2xl border border-divider bg-content1 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <Button
+                className="shrink-0"
                 size="sm"
                 variant="flat"
+                onPress={() => (onBack ? onBack() : setDetailNodeId(null))}
               >
-                {detailNode?.connectionStatus === "online" ? "在线" : "离线"}
-              </Chip>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-default-500 ml-auto">
-              <div
-                className={`w-2 h-2 rounded-full ${wsConnected ? "bg-success" : wsConnecting ? "bg-warning" : "bg-default-300"}`}
-              />
-              <span>
-                {wsConnected
-                  ? "实时已连接"
-                  : wsConnecting
-                    ? "实时连接中"
-                    : "实时未连接"}
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                {onBack ? "返回节点" : "返回总览"}
+              </Button>
+              <span className="shrink-0 rounded-xl bg-default-100 p-2.5">
+                <DistroIcon
+                  className="h-6 w-6"
+                  distro={parseDistroFromVersion(detailNode?.version)}
+                  style={{
+                    color: getDistroColor(
+                      parseDistroFromVersion(detailNode?.version),
+                    ),
+                  }}
+                />
               </span>
+              <div className="min-w-0 space-y-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <h3
+                    className="min-w-0 truncate text-lg font-semibold"
+                    title={detailNode?.name}
+                  >
+                    {detailNode?.name || `节点 #${detailNodeId}`}
+                  </h3>
+                  <Chip
+                    className="shrink-0"
+                    color={
+                      detailNode?.connectionStatus === "online"
+                        ? "success"
+                        : "danger"
+                    }
+                    size="sm"
+                    variant="flat"
+                  >
+                    {detailNode?.connectionStatus === "online"
+                      ? "在线"
+                      : "离线"}
+                  </Chip>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-default-500">
+                  <span>{detailNode?.version || "等待节点信息"}</span>
+                  {detailRealtimeMetric && (
+                    <span>运行 {uptimeLabel(detailRealtimeMetric.uptime)}</span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${wsConnected ? "bg-success" : wsConnecting ? "bg-warning" : "bg-default-300"}`}
+                    />
+                    {wsConnected
+                      ? "实时已连接"
+                      : wsConnecting
+                        ? "实时连接中"
+                        : "实时未连接"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              aria-label="节点详情分类"
+              className="grid shrink-0 grid-cols-2 gap-1 rounded-xl bg-default-100 p-1 sm:ml-auto sm:flex"
+              role="tablist"
+            >
+              {(
+                [
+                  ["overview", "概况"],
+                  ["quality", "网络质量"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  aria-controls={`node-detail-${value}`}
+                  aria-selected={detailTab === value}
+                  className={`flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${detailTab === value ? "bg-content1 text-foreground shadow-sm" : "text-default-500 hover:text-foreground"}`}
+                  id={`node-tab-${value}`}
+                  role="tab"
+                  tabIndex={detailTab === value ? 0 : -1}
+                  type="button"
+                  onClick={() => setDetailTab(value)}
+                  onKeyDown={(event) => {
+                    if (
+                      !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                        event.key,
+                      )
+                    )
+                      return;
+                    event.preventDefault();
+                    const next =
+                      event.key === "Home"
+                        ? "overview"
+                        : event.key === "End"
+                          ? "quality"
+                          : value === "overview"
+                            ? "quality"
+                            : "overview";
+
+                    setDetailTab(next);
+                    document.getElementById(`node-tab-${next}`)?.focus();
+                  }}
+                >
+                  <Activity className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Realtime KPI cards */}
-          {detailRealtimeMetric && (
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
-              {[
-                {
-                  label: "CPU",
-                  value: `${detailRealtimeMetric.cpuUsage.toFixed(1)}%`,
-                  color: getColorByUsage(detailRealtimeMetric.cpuUsage),
-                },
-                {
-                  label: "内存",
-                  value: `${detailRealtimeMetric.memoryUsage.toFixed(1)}%`,
-                  color: getColorByUsage(detailRealtimeMetric.memoryUsage),
-                },
-                {
-                  label: "磁盘",
-                  value: `${detailRealtimeMetric.diskUsage.toFixed(1)}%`,
-                  color: getColorByUsage(detailRealtimeMetric.diskUsage),
-                },
-                {
-                  label: "↓ 下行",
-                  value: formatBytesPerSecond(detailRealtimeMetric.netInSpeed),
-                  color: "success" as const,
-                },
-                {
-                  label: "↑ 上行",
-                  value: formatBytesPerSecond(detailRealtimeMetric.netOutSpeed),
-                  color: "primary" as const,
-                },
-                {
-                  label: "运行时间",
-                  value: formatUptime(detailRealtimeMetric.uptime),
-                  color: "default" as const,
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="min-w-0 rounded-xl border border-divider bg-content1 px-3 py-2"
-                >
-                  <div className="truncate text-xs text-default-500">
-                    {item.label}
-                  </div>
-                  <div
-                    className={`truncate font-mono text-sm font-semibold ${item.color === "danger" ? "text-danger" : item.color === "warning" ? "text-warning" : ""}`}
-                  >
-                    {item.value}
-                  </div>
-                </div>
-              ))}
+          {detailTab === "quality" ? (
+            <div
+              aria-labelledby="node-tab-quality"
+              id="node-detail-quality"
+              role="tabpanel"
+            >
+              <NodeNetworkQuality
+                key={detailNodeId}
+                nodeId={detailNodeId}
+                nodeName={detailNode?.name || `节点${detailNodeId}`}
+              />
             </div>
-          )}
+          ) : (
+            <div
+              aria-labelledby="node-tab-overview"
+              className="space-y-4"
+              id="node-detail-overview"
+              role="tabpanel"
+            >
+              <NodeDetailOverview
+                history={chartData}
+                metric={
+                  detailNode?.connectionStatus === "online"
+                    ? detailRealtimeMetric
+                    : null
+                }
+              />
 
-          {/* Node metrics chart */}
-          <NodeMetricsChartCard
-            activeMetricType={activeMetricType}
-            data={chartData}
-            error={metricsError}
-            loading={metricsLoading}
-            maxRows={METRICS_MAX_ROWS}
-            nodeId={selectedNodeId}
-            rangeMs={metricsRangeMs}
-            truncated={metricsTruncated}
-            onMetricTypeChange={setActiveMetricType}
-            onRangeChange={setMetricsRangeMs}
-            onRefresh={loadMetrics}
-          />
+              <div className="grid items-start gap-4 xl:grid-cols-2">
+                <NodeMetricsChartCard
+                  activeMetricType={activeMetricType}
+                  data={chartData}
+                  error={metricsError}
+                  loading={metricsLoading}
+                  maxRows={METRICS_MAX_ROWS}
+                  nodeId={selectedNodeId}
+                  rangeMs={metricsRangeMs}
+                  truncated={metricsTruncated}
+                  onMetricTypeChange={setActiveMetricType}
+                  onRangeChange={setMetricsRangeMs}
+                  onRefresh={loadMetrics}
+                />
+                <NodeMetricsChartCard
+                  activeMetricType="network"
+                  data={chartData}
+                  error={metricsError}
+                  loading={metricsLoading}
+                  maxRows={METRICS_MAX_ROWS}
+                  nodeId={selectedNodeId}
+                  rangeMs={metricsRangeMs}
+                  showMetricSelector={false}
+                  title="带宽监控"
+                  truncated={metricsTruncated}
+                  onMetricTypeChange={setActiveMetricType}
+                  onRangeChange={setMetricsRangeMs}
+                  onRefresh={loadMetrics}
+                />
+              </div>
 
-          {/* Service monitors chart – same style as node metrics */}
-          {(() => {
-            // Resolve which monitor is active
-            const resolvedActiveMonitor =
-              detailServiceMonitors.find(
-                (m) => m.id === activeServiceMonitorId,
-              ) ||
-              detailServiceMonitors[0] ||
-              null;
-            const resolvedActiveMonitorId = resolvedActiveMonitor?.id ?? null;
-            const activeLatestResult =
-              resolvedActiveMonitorId != null
-                ? getLatestResult(resolvedActiveMonitorId)
-                : null;
-            const activeStale = resolvedActiveMonitor
-              ? isResultStale(resolvedActiveMonitor, activeLatestResult)
-              : false;
-            const activeResults =
-              resolvedActiveMonitorId != null
-                ? monitorResults[resolvedActiveMonitorId] || []
-                : [];
-            const activeLatencyData = [...activeResults].map((r) => ({
-              time: formatTimestamp(r.timestamp, serviceMonitorRangeMs),
-              latency: r.success === 1 ? r.latencyMs : null,
-              success: r.success,
-            }));
+              <NodeTrafficStatistics key={detailNodeId} nodeId={detailNodeId} />
 
-            return (
-              <Card>
-                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold">服务监控图表</h3>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      className="w-28"
-                      selectedKeys={[String(serviceMonitorRangeMs)]}
-                      onSelectionChange={(keys) => {
-                        const v = Number(Array.from(keys)[0]);
+              {/* Service monitors chart – same style as node metrics */}
+              {(() => {
+                // Resolve which monitor is active
+                const resolvedActiveMonitor =
+                  detailServiceMonitors.find(
+                    (m) => m.id === activeServiceMonitorId,
+                  ) ||
+                  detailServiceMonitors[0] ||
+                  null;
+                const resolvedActiveMonitorId =
+                  resolvedActiveMonitor?.id ?? null;
+                const activeLatestResult =
+                  resolvedActiveMonitorId != null
+                    ? getLatestResult(resolvedActiveMonitorId)
+                    : null;
+                const activeStale = resolvedActiveMonitor
+                  ? isResultStale(resolvedActiveMonitor, activeLatestResult)
+                  : false;
+                const activeResults =
+                  resolvedActiveMonitorId != null
+                    ? monitorResults[resolvedActiveMonitorId] || []
+                    : [];
+                const activeLatencyData = [...activeResults].map((r) => ({
+                  time: formatTimestamp(r.timestamp, serviceMonitorRangeMs),
+                  latency: r.success === 1 ? r.latencyMs : null,
+                  success: r.success,
+                }));
 
-                        if (v > 0) setServiceMonitorRangeMs(v);
-                      }}
-                    >
-                      <SelectItem key={String(60 * 60 * 1000)}>
-                        1小时
-                      </SelectItem>
-                      <SelectItem key={String(6 * 60 * 60 * 1000)}>
-                        6小时
-                      </SelectItem>
-                      <SelectItem key={String(24 * 60 * 60 * 1000)}>
-                        24小时
-                      </SelectItem>
-                    </Select>
-                    {resolvedActiveMonitorId != null && (
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        onPress={() => {
-                          void loadMonitorResults(resolvedActiveMonitorId, {
-                            rangeMs: serviceMonitorRangeMs,
-                          });
-                        }}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-1" />
-                        刷新
-                      </Button>
-                    )}
-                    <Button
-                      color="primary"
-                      size="sm"
-                      variant="flat"
-                      onPress={() => handleOpenEditModal()}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      添加监控
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardBody className="space-y-4">
-                  {monitorsLoading ? (
-                    <div className="flex justify-center py-8">
-                      <RefreshCw className="w-6 h-6 animate-spin" />
-                    </div>
-                  ) : detailServiceMonitors.length > 0 ? (
-                    <>
-                      {/* Monitor switcher buttons – like metric type tabs */}
-                      <div className="flex flex-wrap gap-2">
-                        {detailServiceMonitors.map((monitor) => {
-                          const lr = getLatestResult(monitor.id);
-                          const isActive =
-                            monitor.id === resolvedActiveMonitorId;
+                return (
+                  <Card>
+                    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-base font-semibold">服务监控图表</h3>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          className="w-28"
+                          selectedKeys={[String(serviceMonitorRangeMs)]}
+                          onSelectionChange={(keys) => {
+                            const v = Number(Array.from(keys)[0]);
 
-                          return (
-                            <Button
-                              key={monitor.id}
-                              color={isActive ? "primary" : "default"}
-                              size="sm"
-                              variant={isActive ? "solid" : "flat"}
-                              onPress={() => {
-                                setActiveServiceMonitorId(monitor.id);
-                                // Load results for this monitor if not loaded
-                                if (
-                                  !monitorResults[monitor.id] ||
-                                  monitorResults[monitor.id].length <= 1
-                                ) {
-                                  void loadMonitorResults(monitor.id, {
-                                    rangeMs: serviceMonitorRangeMs,
-                                  });
-                                }
-                              }}
-                            >
-                              <div
-                                className={`w-2 h-2 rounded-full shrink-0 mr-1 ${
-                                  monitor.enabled !== 1
-                                    ? "bg-default-300"
-                                    : !lr
-                                      ? "bg-default-400"
-                                      : lr.success === 1
-                                        ? isActive
-                                          ? "bg-white"
-                                          : "bg-success"
-                                        : isActive
-                                          ? "bg-white"
-                                          : "bg-danger"
-                                }`}
-                              />
-                              {monitor.name}
-                            </Button>
-                          );
-                        })}
+                            if (v > 0) setServiceMonitorRangeMs(v);
+                          }}
+                        >
+                          <SelectItem key={String(60 * 60 * 1000)}>
+                            1小时
+                          </SelectItem>
+                          <SelectItem key={String(6 * 60 * 60 * 1000)}>
+                            6小时
+                          </SelectItem>
+                          <SelectItem key={String(24 * 60 * 60 * 1000)}>
+                            24小时
+                          </SelectItem>
+                        </Select>
+                        {resolvedActiveMonitorId != null && (
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => {
+                              void loadMonitorResults(resolvedActiveMonitorId, {
+                                rangeMs: serviceMonitorRangeMs,
+                              });
+                            }}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-1" />
+                            刷新
+                          </Button>
+                        )}
+                        <Button
+                          color="primary"
+                          size="sm"
+                          variant="flat"
+                          onPress={() => handleOpenEditModal()}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          添加监控
+                        </Button>
                       </div>
+                    </CardHeader>
+                    <CardBody className="space-y-4">
+                      {monitorsLoading ? (
+                        <div className="flex justify-center py-8">
+                          <RefreshCw className="w-6 h-6 animate-spin" />
+                        </div>
+                      ) : detailServiceMonitors.length > 0 ? (
+                        <>
+                          {/* Monitor switcher buttons – like metric type tabs */}
+                          <div className="flex flex-wrap gap-2">
+                            {detailServiceMonitors.map((monitor) => {
+                              const lr = getLatestResult(monitor.id);
+                              const isActive =
+                                monitor.id === resolvedActiveMonitorId;
 
-                      {/* Active monitor info bar */}
-                      {resolvedActiveMonitor && (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-divider bg-default-50 px-3 py-2">
-                          <div className="flex items-center gap-3 min-w-0 flex-wrap">
-                            <Chip color="primary" size="sm" variant="flat">
-                              {resolvedActiveMonitor.type.toUpperCase()}
-                            </Chip>
-                            <span className="font-mono text-xs text-default-500">
-                              {resolvedActiveMonitor.target}
-                            </span>
-                            <span className="text-xs text-default-500">
-                              每秒测试，30秒上报
-                            </span>
-                            {activeLatestResult &&
-                            Number.isFinite(activeLatestResult.latencyMs) ? (
-                              <span className="font-mono text-xs font-semibold text-success">
-                                {activeLatestResult.latencyMs.toFixed(0)}ms
-                              </span>
-                            ) : null}
-                            {activeStale ? (
-                              <Chip color="warning" size="sm" variant="flat">
-                                陈旧
-                              </Chip>
-                            ) : null}
-                            {resolvedActiveMonitor.enabled !== 1 ? (
-                              <Chip color="default" size="sm" variant="flat">
-                                已禁用
-                              </Chip>
-                            ) : null}
+                              return (
+                                <Button
+                                  key={monitor.id}
+                                  color={isActive ? "primary" : "default"}
+                                  size="sm"
+                                  variant={isActive ? "solid" : "flat"}
+                                  onPress={() => {
+                                    setActiveServiceMonitorId(monitor.id);
+                                    // Load results for this monitor if not loaded
+                                    if (
+                                      !monitorResults[monitor.id] ||
+                                      monitorResults[monitor.id].length <= 1
+                                    ) {
+                                      void loadMonitorResults(monitor.id, {
+                                        rangeMs: serviceMonitorRangeMs,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <div
+                                    className={`w-2 h-2 rounded-full shrink-0 mr-1 ${
+                                      monitor.enabled !== 1
+                                        ? "bg-default-300"
+                                        : !lr
+                                          ? "bg-default-400"
+                                          : lr.success === 1
+                                            ? isActive
+                                              ? "bg-white"
+                                              : "bg-success"
+                                            : isActive
+                                              ? "bg-white"
+                                              : "bg-danger"
+                                    }`}
+                                  />
+                                  {monitor.name}
+                                </Button>
+                              );
+                            })}
                           </div>
-                          <Dropdown>
-                            <DropdownTrigger>
-                              <Button
-                                className="shrink-0"
-                                size="sm"
-                                startContent={
-                                  <MoreHorizontal className="h-4 w-4" />
-                                }
-                                variant="flat"
-                              >
-                                操作
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu>
-                              <DropdownItem
-                                startContent={<Play className="w-4 h-4" />}
-                                onPress={() =>
-                                  resolvedActiveMonitorId != null &&
-                                  handleRunMonitor(resolvedActiveMonitorId)
-                                }
-                              >
-                                立即检查
-                              </DropdownItem>
-                              <DropdownItem
-                                startContent={<Activity className="w-4 h-4" />}
-                                onPress={() =>
-                                  resolvedActiveMonitorId != null &&
-                                  openResultsModal(resolvedActiveMonitorId)
-                                }
-                              >
-                                查看记录
-                              </DropdownItem>
-                              <DropdownItem
-                                startContent={<Edit className="w-4 h-4" />}
-                                onPress={() =>
-                                  resolvedActiveMonitor &&
-                                  handleOpenEditModal(resolvedActiveMonitor)
-                                }
-                              >
-                                编辑
-                              </DropdownItem>
-                              <DropdownItem
-                                className="text-danger"
-                                color="danger"
-                                startContent={<Trash2 className="w-4 h-4" />}
-                                onPress={() =>
-                                  resolvedActiveMonitorId != null &&
-                                  handleDeleteMonitor(resolvedActiveMonitorId)
-                                }
-                              >
-                                删除
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      )}
 
-                      {/* Chart area – same h-64 as node metrics */}
-                      {activeLatencyData.length > 0 ? (
-                        <div className="h-64">
-                          <ResponsiveContainer height="100%" width="100%">
-                            <LineChart data={activeLatencyData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="time" fontSize={12} />
-                              <YAxis
-                                fontSize={12}
-                                tickFormatter={(v: number) =>
-                                  `${Math.round(v)}ms`
-                                }
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: "rgba(0,0,0,0.8)",
-                                  border: "none",
-                                  borderRadius: "8px",
-                                }}
-                                formatter={(value: unknown) => [
-                                  `${Number(value).toFixed(0)}ms`,
-                                  "延迟",
-                                ]}
-                                labelStyle={{ color: "#fff" }}
-                              />
-                              <Line
-                                connectNulls={false}
-                                dataKey="latency"
-                                dot={false}
-                                name="延迟"
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                type="monotone"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
+                          {/* Active monitor info bar */}
+                          {resolvedActiveMonitor && (
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-divider bg-default-50 px-3 py-2">
+                              <div className="flex items-center gap-3 min-w-0 flex-wrap">
+                                <Chip color="primary" size="sm" variant="flat">
+                                  {resolvedActiveMonitor.type.toUpperCase()}
+                                </Chip>
+                                <span className="font-mono text-xs text-default-500">
+                                  {resolvedActiveMonitor.target}
+                                </span>
+                                <span className="text-xs text-default-500">
+                                  每秒测试，30秒上报
+                                </span>
+                                {activeLatestResult &&
+                                Number.isFinite(
+                                  activeLatestResult.latencyMs,
+                                ) ? (
+                                  <span className="font-mono text-xs font-semibold text-success">
+                                    {activeLatestResult.latencyMs.toFixed(0)}ms
+                                  </span>
+                                ) : null}
+                                {activeStale ? (
+                                  <Chip
+                                    color="warning"
+                                    size="sm"
+                                    variant="flat"
+                                  >
+                                    陈旧
+                                  </Chip>
+                                ) : null}
+                                {resolvedActiveMonitor.enabled !== 1 ? (
+                                  <Chip
+                                    color="default"
+                                    size="sm"
+                                    variant="flat"
+                                  >
+                                    已禁用
+                                  </Chip>
+                                ) : null}
+                              </div>
+                              <Dropdown>
+                                <DropdownTrigger>
+                                  <Button
+                                    className="shrink-0"
+                                    size="sm"
+                                    startContent={
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    }
+                                    variant="flat"
+                                  >
+                                    操作
+                                  </Button>
+                                </DropdownTrigger>
+                                <DropdownMenu>
+                                  <DropdownItem
+                                    startContent={<Play className="w-4 h-4" />}
+                                    onPress={() =>
+                                      resolvedActiveMonitorId != null &&
+                                      handleRunMonitor(resolvedActiveMonitorId)
+                                    }
+                                  >
+                                    立即检查
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    startContent={
+                                      <Activity className="w-4 h-4" />
+                                    }
+                                    onPress={() =>
+                                      resolvedActiveMonitorId != null &&
+                                      openResultsModal(resolvedActiveMonitorId)
+                                    }
+                                  >
+                                    查看记录
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    startContent={<Edit className="w-4 h-4" />}
+                                    onPress={() =>
+                                      resolvedActiveMonitor &&
+                                      handleOpenEditModal(resolvedActiveMonitor)
+                                    }
+                                  >
+                                    编辑
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    className="text-danger"
+                                    color="danger"
+                                    startContent={
+                                      <Trash2 className="w-4 h-4" />
+                                    }
+                                    onPress={() =>
+                                      resolvedActiveMonitorId != null &&
+                                      handleDeleteMonitor(
+                                        resolvedActiveMonitorId,
+                                      )
+                                    }
+                                  >
+                                    删除
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          )}
+
+                          {/* Chart area – same h-64 as node metrics */}
+                          {activeLatencyData.length > 0 ? (
+                            <div className="h-64">
+                              <ResponsiveContainer
+                                height="100%"
+                                initialDimension={{ width: 400, height: 256 }}
+                                minWidth={0}
+                                width="100%"
+                              >
+                                <LineChart data={activeLatencyData}>
+                                  <CartesianGrid
+                                    stroke="var(--divider)"
+                                    vertical={false}
+                                  />
+                                  <XAxis
+                                    axisLine={false}
+                                    dataKey="time"
+                                    fontSize={10}
+                                    minTickGap={30}
+                                    stroke="var(--default-500)"
+                                    tickLine={false}
+                                  />
+                                  <YAxis
+                                    fontSize={12}
+                                    tickFormatter={(v: number) =>
+                                      `${Math.round(v)}ms`
+                                    }
+                                  />
+                                  <Tooltip
+                                    contentStyle={{
+                                      backgroundColor: "rgba(0,0,0,0.8)",
+                                      border: "none",
+                                      borderRadius: "8px",
+                                    }}
+                                    formatter={(value: unknown) => [
+                                      `${Number(value).toFixed(0)}ms`,
+                                      "延迟",
+                                    ]}
+                                    labelStyle={{ color: "var(--foreground)" }}
+                                  />
+                                  <Line
+                                    connectNulls={false}
+                                    dataKey="latency"
+                                    dot={false}
+                                    name="延迟"
+                                    stroke="#10b981"
+                                    strokeWidth={2}
+                                    type="monotone"
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          ) : (
+                            <div className="text-center py-8 text-default-500">
+                              暂无检查记录
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="text-center py-8 text-default-500">
-                          暂无检查记录
+                          暂无服务监控，点击&quot;添加监控&quot;创建
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="text-center py-8 text-default-500">
-                      暂无服务监控，点击&quot;添加监控&quot;创建
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
-            );
-          })()}
+                    </CardBody>
+                  </Card>
+                );
+              })()}
+            </div>
+          )}
         </>
       )}
 

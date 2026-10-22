@@ -1,7 +1,7 @@
 import type { InstallRequest } from "@/pages/inbound/kernel-panel";
 
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AnimatedPage } from "@/components/animated-page";
 import { PageHeader, PageTabs } from "@/components/page-kit";
@@ -32,17 +32,38 @@ function readTab(): NodeTab {
 /** Servers and the kernels installed on them. */
 export default function NodeHubPage() {
   const location = useLocation();
+  const pageTop = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const state = (location.state ?? {}) as NodeHubState;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedNode = Number(searchParams.get("id"));
+  const monitorNode =
+    Number.isSafeInteger(requestedNode) && requestedNode > 0
+      ? requestedNode
+      : null;
+  const setMonitorNode = (id: number | null) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+
+      next.delete("view");
+
+      if (id === null) next.delete("id");
+      else next.set("id", String(id));
+
+      return next;
+    });
+  };
   const [tab, setTabState] = useState<NodeTab>(
-    state.install ? "kernels" : (state.tab ?? readTab()),
+    monitorNode
+      ? "nodes"
+      : state.install
+        ? "kernels"
+        : (state.tab ?? readTab()),
   );
   const [install, setInstall] = useState<InstallRequest | null>(
     state.install ?? null,
   );
   const [addNode, setAddNode] = useState(0);
-  // A node's 监控 replaces the list; the list stays mounted underneath.
-  const [monitorNode, setMonitorNode] = useState<number | null>(null);
 
   const setTab = (t: NodeTab) => {
     setTabState(t);
@@ -54,18 +75,26 @@ export default function NodeHubPage() {
     }
   };
 
+  useEffect(() => {
+    if (monitorNode !== null) setTabState("nodes");
+    pageTop.current?.closest("main")?.scrollTo({ top: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [monitorNode]);
+
   // The request is consumed once; a reload must not reopen the dialog.
   useEffect(() => {
-    if (location.state) navigate(location.pathname, { replace: true });
-  }, [location.state, location.pathname, navigate]);
+    if (location.state)
+      navigate(`${location.pathname}${location.search}`, { replace: true });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   return (
     <AnimatedPage className="px-3 py-6 lg:px-6">
+      <div ref={pageTop} aria-hidden />
       <PageHeader
         description={
           tab === "kernels"
             ? "节点上安装的 Xray / sing-box / Snell 等内核，落地的入站跑在内核上"
-            : "装了 agent 的服务器：实时状态、监控和管理都在这里"
+            : "查看服务器的实时资源、网络状态与运行情况"
         }
         // The kernel tab has its own 安装内核 button.
         primary={

@@ -29,7 +29,6 @@ import {
 import { AnimatedPage } from "@/components/animated-page";
 import { EmptyHint, PageHeader } from "@/components/page-kit";
 import { CARD_GRID, InfoCard } from "@/components/info-card";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { PageLoadingState } from "@/components/page-state";
 import { PROTOCOL_LABELS } from "@/pages/inbound/presets";
 import { copyText, panelOrigin } from "@/pages/inbound/share";
@@ -145,14 +144,14 @@ function expiryLabel(ms: number): string {
 }
 
 /** Used / limit of a subscription, with a bar when it has a limit. */
-function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
+function Usage({ s }: { s: SubscriptionItem }) {
   const used = s.uploadBytes + s.downloadBytes;
   const pct = s.trafficLimit ? Math.min(100, (used / s.trafficLimit) * 100) : 0;
   const tone =
     pct >= 100 ? "bg-danger" : pct >= 90 ? "bg-warning" : "bg-primary";
 
   return (
-    <div className={compact ? "space-y-1" : "space-y-1.5"}>
+    <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-2 text-xs text-default-500">
         <span className="font-mono">
           {formatTraffic(used)}
@@ -160,25 +159,19 @@ function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
             ? ` / ${formatTraffic(s.trafficLimit)}`
             : " · 不限流量"}
         </span>
-        {!compact && (
-          <span>{s.resetDay ? `每月 ${s.resetDay} 号重置` : "不自动重置"}</span>
-        )}
+        <span>{s.resetDay ? `每月 ${s.resetDay} 号重置` : "不自动重置"}</span>
       </div>
       {s.trafficLimit > 0 && (
-        <div
-          className={`h-1.5 overflow-hidden rounded-full ${compact ? "bg-default-100" : "bg-default-200"}`}
-        >
+        <div className="h-1.5 overflow-hidden rounded-full bg-default-200">
           <div
             className={`h-full rounded-full ${tone}`}
             style={{ width: `${Math.max(2, pct)}%` }}
           />
         </div>
       )}
-      {!compact && (
-        <div className="font-mono text-xs text-default-400">
-          ↑ {formatTraffic(s.uploadBytes)} · ↓ {formatTraffic(s.downloadBytes)}
-        </div>
-      )}
+      <div className="font-mono text-xs text-default-400">
+        ↑ {formatTraffic(s.uploadBytes)} · ↓ {formatTraffic(s.downloadBytes)}
+      </div>
     </div>
   );
 }
@@ -1403,7 +1396,7 @@ function Editor({
 
 export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useViewMode("subscription");
+
   const [subs, setSubs] = useState<SubscriptionItem[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [ruleGroups, setRuleGroups] = useState<SubRuleGroup[]>([]);
@@ -1558,38 +1551,6 @@ export default function SubscriptionPage() {
         ]
           .filter(Boolean)
           .join(" + ");
-  const stateChip = (s: SubscriptionItem) =>
-    !s.enabled ? (
-      <Chip size="sm" variant="flat">
-        已停用
-      </Chip>
-    ) : (
-      !s.active && (
-        <Chip color="danger" size="sm" variant="flat">
-          {s.overQuota ? "流量用完" : "已过期"}
-        </Chip>
-      )
-    );
-  const actions = (s: SubscriptionItem) => (
-    <>
-      <Button
-        isIconOnly
-        aria-label={`复制 ${s.name} 的订阅链接`}
-        size="sm"
-        variant="flat"
-        onPress={() => copyText(url(s), "订阅链接已复制")}
-      >
-        <Copy className="h-4 w-4" />
-      </Button>
-      <Switch
-        aria-label={`${s.enabled ? "停用" : "启用"} ${s.name}`}
-        isDisabled={toggling === s.id}
-        isSelected={s.enabled}
-        size="sm"
-        onValueChange={() => toggle(s)}
-      />
-    </>
-  );
   const subCard = (s: SubscriptionItem) => (
     <InfoCard
       key={s.id}
@@ -1650,48 +1611,6 @@ export default function SubscriptionPage() {
       <Usage s={s} />
     </InfoCard>
   );
-  const row = (s: SubscriptionItem) => (
-    <div
-      key={s.id}
-      className="flex cursor-pointer items-center gap-3 rounded-xl border border-divider bg-content1 px-3 py-2.5 shadow-sm transition-colors hover:bg-default-100"
-      role="button"
-      tabIndex={0}
-      onClick={() => setDetail(s)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setDetail(s);
-        }
-      }}
-    >
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${s.active ? "bg-success" : "bg-default-300"}`}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{s.name}</span>
-          {stateChip(s)}
-        </div>
-        <div className="truncate text-xs text-default-500">
-          {s.userId ? `👤 ${s.userName || `#${s.userId}`} · ` : ""}
-          {s.nodeCount} 个节点 · {sourceText(s)}
-          {s.expireTime ? ` · ${expiryLabel(s.expireTime)}` : ""}
-          {s.remark ? ` · ${s.remark}` : ""}
-        </div>
-        <div className="mt-1.5">
-          <Usage compact s={s} />
-        </div>
-      </div>
-      <div
-        className="flex shrink-0 items-center gap-2"
-        role="presentation"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {actions(s)}
-      </div>
-    </div>
-  );
 
   return (
     <AnimatedPage className="space-y-4 px-3 py-6 lg:px-6">
@@ -1727,20 +1646,7 @@ export default function SubscriptionPage() {
           }
         />
       ) : (
-        <>
-          <div className="flex justify-end">
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          </div>
-          <div
-            className={
-              viewMode === "card"
-                ? CARD_GRID
-                : "grid grid-cols-1 gap-2 2xl:grid-cols-2"
-            }
-          >
-            {subs.map(viewMode === "card" ? subCard : row)}
-          </div>
-        </>
+        <div className={CARD_GRID}>{subs.map(subCard)}</div>
       )}
 
       {/* Detail: import into a client, copy links, actions. */}

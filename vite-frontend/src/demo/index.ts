@@ -7,6 +7,8 @@ import type {
 import axios from "axios";
 import toast from "react-hot-toast";
 
+import { demoNodeAnalytics } from "./node-analytics";
+
 /**
  * The online demo (VITE_DEMO=true builds, published with the docs): the
  * panel runs without a backend. Every API call is answered in the browser
@@ -151,6 +153,17 @@ async function answer(config: InternalAxiosRequestConfig) {
   const last = bare.split("/").pop() ?? "";
   const write = isWrite(last);
   const delta = Math.max(0, Date.now() - fixtures.recordedAt);
+
+  const analytics = demoNodeAnalytics(
+    path,
+    book,
+    Date.now(),
+    fixtures.recordedAt,
+  );
+
+  if (analytics) {
+    return { code: 0, msg: "操作成功", data: analytics, ts: Date.now() };
+  }
 
   if (PROBES[bare]) {
     const [list, field] = PROBES[bare];

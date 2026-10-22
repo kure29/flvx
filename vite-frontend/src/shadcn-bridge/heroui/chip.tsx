@@ -13,6 +13,16 @@ type ChipColor =
 type ChipVariant = "solid" | "flat" | "light" | "bordered";
 type ChipSize = "sm" | "md" | "lg";
 
+const flatColors: Record<ChipColor, string> = {
+  default: "border-divider bg-default-100 text-default-600",
+  primary: "border-primary/25 bg-primary/10 text-primary",
+  secondary: "border-secondary/25 bg-secondary/10 text-secondary",
+  success: "border-success/25 bg-success/10 text-success",
+  warning:
+    "border-warning/25 bg-warning/10 text-warning-700 dark:text-warning-400",
+  danger: "border-danger/25 bg-danger/10 text-danger",
+};
+
 export interface ChipProps extends React.ComponentProps<"span"> {
   color?: ChipColor;
   size?: ChipSize;
@@ -47,7 +57,8 @@ export function Chip({
   return (
     <Badge
       className={cn(
-        variant === "flat" || variant === "light" ? "bg-opacity-15" : "",
+        variant !== "solid" ? flatColors[color] : "",
+        variant === "light" ? "border-transparent bg-transparent" : "",
         variant === "bordered" ? "border-current bg-transparent" : "",
         size === "sm" ? "px-2 py-0 text-[10px]" : "",
         size === "lg" ? "px-3 py-1 text-sm" : "",

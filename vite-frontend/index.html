@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#101010" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="FLYX" />
@@ -93,12 +93,12 @@
         try { savedMode = localStorage.getItem('flvx:theme') || ''; } catch (_) {}
 
         var useDark;
-        if (savedMode === 'dark') {
+        if (!savedMode || savedMode === 'dark') {
           useDark = true;
         } else if (savedMode === 'light') {
           useDark = false;
         } else {
-          // "system" 或无保存：跟随系统
+          // 显式选择 system 时跟随系统
           useDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
         
@@ -112,12 +112,12 @@
         }
         
         // 仅在"跟随系统"模式下监听系统主题变化
-        if ((!savedMode || savedMode === 'system') && window.matchMedia) {
+        if (savedMode === 'system' && window.matchMedia) {
           window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
             // 运行时可能已由 React 接管，这里仅做 fallback
             var currentMode = '';
             try { currentMode = localStorage.getItem('flvx:theme') || ''; } catch (_) {}
-            if (currentMode && currentMode !== 'system') return; // 用户已手动选择，不干预
+            if (currentMode !== 'system') return; // 用户已手动选择，不干预
             if (e.matches) {
               document.documentElement.classList.add('dark');
               document.documentElement.style.colorScheme = 'dark';
@@ -144,23 +144,23 @@
     <style>
       /* 防止页面闪烁的基础样式 */
       :root {
-        --toaster-bg: #ffffff;
-        --toaster-color: #000000;
-        --toaster-border: #e5e7eb;
+        --toaster-bg: var(--content1, #ffffff);
+        --toaster-color: var(--foreground, #202225);
+        --toaster-border: var(--divider, #e7e8eb);
       }
       
       html.dark {
-        --toaster-bg: #374151;
-        --toaster-color: #ffffff;
-        --toaster-border: #4b5563;
+        --toaster-bg: var(--content1, #131313);
+        --toaster-color: var(--foreground, #e9e9ec);
+        --toaster-border: var(--divider, #292b2e);
       }
       
       /* 默认浅色主题样式 */
       body {
         margin: 0;
         padding: 0;
-        background-color: #ffffff;
-        color: #000000;
+        background-color: var(--background, #f7f8fa);
+        color: var(--foreground, #202225);
         transition: background-color 0.2s ease, color 0.2s ease;
         /* 禁用弹性滚动 */
         overscroll-behavior: none;
@@ -169,8 +169,8 @@
       
       /* 暗色主题样式 */
       html.dark body {
-        background-color: #000000;
-        color: #ffffff;
+        background-color: var(--background, #101010);
+        color: var(--foreground, #e9e9ec);
       }
       
       #root {
@@ -204,19 +204,19 @@
       
       /* 防止布局切换时的闪屏 */
       .h5-mode #root {
-        background-color: #ffffff;
+        background-color: var(--background, #f7f8fa);
       }
       
       .h5-mode.dark #root {
-        background-color: #000000;
+        background-color: var(--background, #101010);
       }
       
       .pc-mode #root {
-        background-color: #ffffff;
+        background-color: var(--background, #f7f8fa);
       }
       
       .pc-mode.dark #root {
-        background-color: #000000;
+        background-color: var(--background, #101010);
       }
             
       /* 移动端滚动优化 */

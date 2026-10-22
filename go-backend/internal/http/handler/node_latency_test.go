@@ -157,3 +157,59 @@ func TestInboundProbeViewUsesNodeLatency(t *testing.T) {
 		t.Fatalf("fallback view = %+v", v)
 	}
 }
+
+func TestNodeLatencyScheduledRoundsDoNotOverlapAndStopOnCancel(t *testing.T) {
+	h, r := setupLatencyHandler(t, `[{"name":"A","host":"a.example.com","port":80,"enabled":true}]`)
+	id := mustCreateLatencyNode(t, r, "one", 1, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	ticks := make(chan time.Time, 1)
+	started := make(chan struct{}, 2)
+	release := make(chan struct{}, 1)
+	done := make(chan struct{})
+	calls := stubLatencyPing(t, func(int64, string) (map[string]interface{}, error) {
+		started <- struct{}{}
+		<-release
+		return map[string]interface{}{"success": true, "averageTime": 25.0}, nil
+	})
+	go func() {
+		defer close(done)
+		h.runNodeLatencyProbeRounds(ctx, ticks)
+	}()
+	defer func() {
+		cancel()
+		close(release)
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("probe loop did not stop")
+		}
+	}()
+	waitRound := func() {
+		t.Helper()
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("scheduled probe did not start")
+		}
+	}
+	waitRound() // The first round runs immediately.
+	ticks <- time.Now()
+	select {
+	case <-started:
+		t.Fatal("a tick started another round before the previous one finished")
+	case <-time.After(20 * time.Millisecond):
+	}
+	release <- struct{}{}
+	waitRound() // A pending tick runs after the first measurement is saved.
+	cancel()
+	release <- struct{}{}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled probe loop did not finish")
+	}
+	rows, err := r.ListNodeLatencySamples(id, 0)
+	if err != nil || len(rows) != 1 || rows[0].LatencyMs != 25 || len(*calls) != 2 {
+		t.Fatalf("completed round must be stored, cancelled round must not: rows=%+v calls=%v err=%v", rows, *calls, err)
+	}
+}
