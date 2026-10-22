@@ -35,7 +35,7 @@ const (
 	releaseChannelStable = "stable"
 	releaseChannelDev    = "dev"
 
-	defaultGithubProxyEnabled = false
+	defaultGithubProxyEnabled = true
 	defaultGithubProxyURL     = "https://gcode.hostcentral.cc"
 )
 
