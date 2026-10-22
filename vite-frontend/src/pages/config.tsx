@@ -194,7 +194,8 @@ const CONFIG_ITEMS: ConfigItem[] = [
   {
     key: "github_proxy_enabled",
     label: "开启 GitHub 加速",
-    description: "节点安装、升级和内核下载经代理，适合 GitHub 访问受限的地区",
+    description:
+      "默认关闭，直接连接 GitHub；开启后更新检测、节点安装、升级和内核下载经代理",
     type: "switch",
   },
   {
@@ -1192,7 +1193,7 @@ export default function ConfigPage() {
           <Switch
             aria-label={item.label}
             className={isChanged ? "ring-2 ring-warning-300" : undefined}
-            isSelected={configs[item.key] === "true"}
+            isSelected={(configs[item.key] ?? "false") === "true"}
             size="sm"
             onValueChange={(checked) =>
               handleConfigChange(item.key, checked ? "true" : "false")

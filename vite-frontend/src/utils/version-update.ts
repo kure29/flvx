@@ -170,20 +170,28 @@ export const getLatestVersionByChannel = async (
     return null;
   }
 
-  const response = await fetch(
-    `https://api.github.com/repos/${repoPath}/releases?per_page=50`,
-    {
-      headers: {
-        Accept: "application/vnd.github+json",
-      },
-    },
-  );
+  let releases: ReleaseItem[];
 
-  if (!response.ok) {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repoPath}/releases?per_page=50`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    releases = (await response.json()) as ReleaseItem[];
+  } catch {
+    // Background update checks also run when GitHub is unreachable.
     return null;
   }
 
-  const releases = (await response.json()) as ReleaseItem[];
   const candidateTags = releases
     .filter((release) => !release.draft && typeof release.tag_name === "string")
     .map((release) => (release.tag_name || "").trim())
