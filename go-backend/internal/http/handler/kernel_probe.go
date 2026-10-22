@@ -254,7 +254,7 @@ func (h *Handler) probeInboundReach(ctx context.Context, ids []int64) (map[int64
 		if node == nil || node.Status != 1 || !running {
 			return "", false
 		}
-		return strings.TrimSpace(node.ServerIP), true
+		return inboundShareAddress(row, node), true
 	}
 	hosts := make(map[int64]string, len(targets))
 	for _, row := range targets {

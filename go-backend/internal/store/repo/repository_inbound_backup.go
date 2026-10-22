@@ -33,7 +33,7 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 		out.Inbounds = append(out.Inbounds, model.InboundBackup{
 			ID: i.ID, KernelID: i.KernelID, NodeID: i.NodeID, Name: i.Name, Protocol: i.Protocol,
 			Listen: i.Listen, Port: i.Port, Transport: i.Transport, Security: i.Security,
-			Settings: i.Settings, Extra: i.Extra, ShareHost: i.ShareHost, Remark: i.Remark,
+			Settings: i.Settings, Extra: i.Extra, ShareHost: i.ShareHost, ShareAddressMode: i.ShareAddressMode, Remark: i.Remark,
 			RelayOnly: i.RelayOnly, AcceptProxyProtocol: i.AcceptProxyProtocol,
 			RelayWhitelist: i.RelayWhitelist, WhitelistExtra: i.WhitelistExtra, Enabled: i.Enabled,
 			UploadBytes: i.UploadBytes, DownloadBytes: i.DownloadBytes, Inx: i.Inx,
@@ -175,7 +175,7 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 		item := model.NodeInbound{
 			ID: i.ID, KernelID: i.KernelID, NodeID: i.NodeID, Name: i.Name, Protocol: i.Protocol,
 			Listen: listen, Port: i.Port, Transport: i.Transport, Security: i.Security,
-			Settings: i.Settings, Extra: i.Extra, ShareHost: i.ShareHost, Remark: i.Remark,
+			Settings: i.Settings, Extra: i.Extra, ShareHost: i.ShareHost, ShareAddressMode: i.ShareAddressMode, Remark: i.Remark,
 			RelayOnly: i.RelayOnly, AcceptProxyProtocol: i.AcceptProxyProtocol,
 			RelayWhitelist: i.RelayWhitelist, WhitelistExtra: i.WhitelistExtra, Enabled: i.Enabled,
 			UploadBytes: i.UploadBytes, DownloadBytes: i.DownloadBytes, Inx: i.Inx,
@@ -186,7 +186,7 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 			Columns: []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"kernel_id", "node_id", "name", "protocol", "listen", "port", "transport", "security",
-				"settings", "extra", "share_host", "remark", "relay_only", "accept_proxy_protocol",
+				"settings", "extra", "share_host", "share_address_mode", "remark", "relay_only", "accept_proxy_protocol",
 				"relay_whitelist", "whitelist_extra", "enabled", "upload_bytes", "download_bytes",
 				"inx", "updated_time", "source_id", "outbound_id", "split_rules", "outbound_ip_strategy",
 			}),

@@ -21,20 +21,21 @@ func (NodeKernel) TableName() string { return "node_kernel" }
 // NodeInbound is one listening proxy service served by a NodeKernel. The
 // protocol specific parts are stored as JSON text (see internal/kernel).
 type NodeInbound struct {
-	ID        int64  `gorm:"primaryKey;autoIncrement"`
-	KernelID  int64  `gorm:"column:kernel_id;not null;index"`
-	NodeID    int64  `gorm:"column:node_id;not null;index"`
-	Name      string `gorm:"type:varchar(100);not null"`
-	Protocol  string `gorm:"type:varchar(30);not null"`
-	Listen    string `gorm:"type:varchar(100);not null;default:'::'"`
-	Port      int    `gorm:"not null"`
-	Transport string `gorm:"type:text;not null;default:''"`
-	Security  string `gorm:"type:text;not null;default:''"`
-	Settings  string `gorm:"type:text;not null;default:''"`
-	Extra     string `gorm:"type:text;not null;default:''"`
-	ShareHost string `gorm:"column:share_host;type:varchar(255);not null;default:''"`
-	Remark    string `gorm:"type:text;not null;default:''"`
-	RelayOnly int    `gorm:"column:relay_only;not null;default:0"`
+	ID               int64  `gorm:"primaryKey;autoIncrement"`
+	KernelID         int64  `gorm:"column:kernel_id;not null;index"`
+	NodeID           int64  `gorm:"column:node_id;not null;index"`
+	Name             string `gorm:"type:varchar(100);not null"`
+	Protocol         string `gorm:"type:varchar(30);not null"`
+	Listen           string `gorm:"type:varchar(100);not null;default:'::'"`
+	Port             int    `gorm:"not null"`
+	Transport        string `gorm:"type:text;not null;default:''"`
+	Security         string `gorm:"type:text;not null;default:''"`
+	Settings         string `gorm:"type:text;not null;default:''"`
+	Extra            string `gorm:"type:text;not null;default:''"`
+	ShareAddressMode string `gorm:"column:share_address_mode;type:varchar(16);not null;default:'auto'"`
+	ShareHost        string `gorm:"column:share_host;type:varchar(255);not null;default:''"`
+	Remark           string `gorm:"type:text;not null;default:''"`
+	RelayOnly        int    `gorm:"column:relay_only;not null;default:0"`
 	// AcceptProxyProtocol: relays send PROXY protocol so the kernel sees
 	// the real client IP; direct access is then impossible (forces RelayOnly).
 	AcceptProxyProtocol int `gorm:"column:accept_proxy_protocol;not null;default:0"`

@@ -130,7 +130,7 @@ const CONFIRM_TEXT: Record<
 };
 
 function detailRows(item: InboundApiItem): Array<[string, string]> {
-  const host = item.shareHost || item.nodeServerIp;
+  const host = item.shareAddress || item.shareHost || item.nodeServerIp;
 
   if (item.importedParams) {
     return [

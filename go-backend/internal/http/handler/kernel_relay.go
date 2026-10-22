@@ -442,10 +442,7 @@ func (h *Handler) inboundEndpoints(rows []model.NodeInbound) ([]kernel.Endpoint,
 		}
 		proxy := importedProxy(&row)
 		if row.RelayOnly != 1 && !isLoopbackListen(row.Listen) {
-			host := strings.TrimSpace(row.ShareHost)
-			if host == "" && node != nil {
-				host = strings.TrimSpace(node.ServerIP)
-			}
+			host := inboundShareAddress(&row, node)
 			if host != "" {
 				endpoints = append(endpoints, kernel.Endpoint{Name: row.Name, Host: host, Port: row.Port, Inbound: in, Direct: true, Proxy: proxy, SourceID: row.SourceID})
 				kinds = append(kinds, "direct")

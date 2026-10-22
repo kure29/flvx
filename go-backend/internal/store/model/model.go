@@ -497,6 +497,7 @@ type InboundBackup struct {
 	Security            string `json:"security"`
 	Settings            string `json:"settings"`
 	Extra               string `json:"extra"`
+	ShareAddressMode    string `json:"shareAddressMode,omitempty"`
 	ShareHost           string `json:"shareHost"`
 	Remark              string `json:"remark"`
 	RelayOnly           int    `json:"relayOnly"`

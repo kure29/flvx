@@ -176,6 +176,7 @@ func (r *Repository) SaveNodeInbound(in *model.NodeInbound) error {
 		"settings":              in.Settings,
 		"extra":                 in.Extra,
 		"share_host":            in.ShareHost,
+		"share_address_mode":    in.ShareAddressMode,
 		"remark":                in.Remark,
 		"relay_only":            in.RelayOnly,
 		"accept_proxy_protocol": in.AcceptProxyProtocol,
