@@ -142,7 +142,7 @@ export const validateTunnelForm = (
   }
 
   if (!form.inNodeId || form.inNodeId.length === 0) {
-    errors.inNodeId = "请至少选择一个入口节点";
+    errors.inNodeId = "请至少选择一个入口服务器";
   } else if (!isEdit) {
     // Only enforce online check for new tunnels. During edit the backend
     // allows existing offline nodes (user may be removing them).
@@ -153,7 +153,7 @@ export const validateTunnelForm = (
     });
 
     if (offlineInNodes.length > 0) {
-      errors.inNodeId = "所有入口节点必须在线";
+      errors.inNodeId = "所有入口服务器必须在线";
     }
   }
 
@@ -188,11 +188,11 @@ export const validateTunnelForm = (
 
   if (form.type === 2) {
     if (form.forwardMode === "nftables") {
-      errors.type = "nftables 节点仅支持端口转发";
+      errors.type = "nftables 服务器仅支持端口转发";
     }
 
     if (!form.outNodeId || form.outNodeId.length === 0) {
-      errors.outNodeId = "请至少选择一个出口节点";
+      errors.outNodeId = "请至少选择一个出口服务器";
     } else {
       if (!isEdit) {
         const offlineOutNodes = form.outNodeId.filter((item) => {
@@ -202,7 +202,7 @@ export const validateTunnelForm = (
         });
 
         if (offlineOutNodes.length > 0) {
-          errors.outNodeId = "所有出口节点必须在线";
+          errors.outNodeId = "所有出口服务器必须在线";
         }
       }
 
@@ -211,7 +211,7 @@ export const validateTunnelForm = (
       const overlap = inNodeIds.filter((id) => outNodeIds.includes(id));
 
       if (overlap.length > 0) {
-        errors.outNodeId = "隧道转发模式下，入口和出口不能有相同节点";
+        errors.outNodeId = "隧道转发模式下，入口和出口不能有相同服务器";
       }
     }
   }
@@ -225,10 +225,10 @@ export const validateTunnelForm = (
 
     if (nftEntryNodes.length > 0) {
       if (form.inNodeId.length !== 1) {
-        errors.inNodeId = "nftables 节点仅支持单入口隧道";
+        errors.inNodeId = "nftables 服务器仅支持单入口隧道";
       }
       if ((form.outNodeId || []).length > 0) {
-        errors.outNodeId = "nftables 节点不支持出口节点配置";
+        errors.outNodeId = "nftables 服务器不支持出口服务器配置";
       }
     }
   }

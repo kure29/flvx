@@ -159,7 +159,7 @@ function UserDashboard() {
               {node.name}
             </div>
             <div className="mt-1 text-xs text-default-500">
-              节点 ID: {node.id}
+              服务器 ID: {node.id}
             </div>
           </div>
           <span
@@ -870,11 +870,11 @@ function UserDashboard() {
                 </div>
                 <div>
                   <h2 className="text-lg lg:text-xl font-semibold text-foreground">
-                    节点到期提醒
+                    服务器到期提醒
                   </h2>
                   <p className="text-sm text-default-500">
                     展示 7
-                    天内需要续费或已经逾期的节点，基于月付/季付/年付周期自动推算
+                    天内需要续费或已经逾期的服务器，基于月付/季付/年付周期自动推算
                   </p>
                 </div>
               </div>
@@ -890,7 +890,7 @@ function UserDashboard() {
             {nodeExpiryReminders.length > 6 && (
               <p className="mt-4 text-xs text-default-500">
                 还有 {nodeExpiryReminders.length - 6}{" "}
-                个节点未展开显示，可前往节点页面继续处理。
+                个服务器未展开显示，可前往服务器页面继续处理。
               </p>
             )}
           </CardBody>

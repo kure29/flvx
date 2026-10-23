@@ -456,7 +456,7 @@ export default function TunnelPage({
 
         if ((deleteResult?.warnings?.length ?? 0) > 0) {
           toast.success(
-            `删除成功，另有 ${deleteResult?.warnings?.length ?? 0} 条节点清理提示`,
+            `删除成功，另有 ${deleteResult?.warnings?.length ?? 0} 条服务器清理提示`,
           );
         } else {
           toast.success("删除成功");
@@ -1051,7 +1051,7 @@ export default function TunnelPage({
         if (result.failCount === 0) {
           toast.success(
             warningCount > 0
-              ? `成功删除 ${result.successCount} 项，另有 ${warningCount} 条节点清理提示`
+              ? `成功删除 ${result.successCount} 项，另有 ${warningCount} 条服务器清理提示`
               : `成功删除 ${result.successCount} 项`,
           );
           setBatchProgress({
@@ -1516,7 +1516,7 @@ export default function TunnelPage({
       {tunnels.length === 0 ? (
         <EmptyHint
           action={addAction}
-          text="还没有隧道。新建一条，选好入口和出口节点，就能在上面添加转发规则"
+          text="还没有隧道。新建一条，选好入口和出口服务器，就能在上面添加转发规则"
         />
       ) : sortedTunnels.length === 0 ? (
         <EmptyHint text="没有匹配的隧道" />

@@ -48,7 +48,7 @@ func (h *Handler) nodeImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := IsSafeRemoteAddr(rURL.Host); err != nil {
-		response.WriteJSON(w, response.Err(403, "禁止将远程节点地址设置为内部网络"))
+		response.WriteJSON(w, response.Err(403, "禁止将远程服务器地址设置为内部网络"))
 		return
 	}
 

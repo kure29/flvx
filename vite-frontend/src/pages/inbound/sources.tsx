@@ -266,7 +266,7 @@ export function RemoteSourcesSection({
       </div>
       {sources.length === 0 ? (
         <p className="rounded-xl border border-dashed border-divider px-3 py-4 text-center text-xs text-default-500">
-          填机场或别人的订阅链接，或上传订阅文件：节点出现在“入站”里，可以给自建落地做前置中转，也能和自己的落地合并成一个订阅。在“导入”里粘贴订阅地址并打开“定时同步”也会存到这里
+          填机场或别人的订阅链接，或上传订阅文件：节点出现在“入站”里，可以给自建节点做前置中转，也能和自己的节点一起放进订阅。在“导入”里粘贴订阅地址并打开“定时同步”也会存到这里
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-2 2xl:grid-cols-2">

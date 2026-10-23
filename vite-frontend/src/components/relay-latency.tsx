@@ -15,7 +15,7 @@ function RelayPath({ latency }: { latency: RelayLatency }) {
     <div className="space-y-1 border-t border-divider px-2 py-2 text-xs">
       <div className="text-default-500">
         {pathOnly
-          ? "入口到落地的各段延迟"
+          ? "入口到节点的各段延迟"
           : `= ${latency.entry ?? "入口"} 到测试点 + 下面各段`}
       </div>
       {latency.hops.map((h, i) => (

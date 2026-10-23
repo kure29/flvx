@@ -1,6 +1,6 @@
 # 安装面板
 
-面板管理所有节点、入站、隧道和订阅，用 Docker 部署在一台服务器上。节点端（agent）的安装见 [安装节点](./agent.md)。
+面板管理所有服务器、入站、隧道和订阅，用 Docker 部署在一台服务器上。服务器端（agent）的安装见 [安装 agent](./agent.md)。
 
 ## 环境要求
 
@@ -45,8 +45,8 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 
 ## 下一步
 
-1. **设置 → 基本** 里填写“面板后端地址”（`ip:port` 或 `域名:port`），节点用它连接面板，可以套 CDN / HTTPS
-2. [安装节点](./agent.md)
+1. **设置 → 基本** 里填写“面板后端地址”（`ip:port` 或 `域名:port`），服务器用它连接面板，可以套 CDN / HTTPS
+2. [安装 agent](./agent.md)
 
 ## 反向代理（可选）
 

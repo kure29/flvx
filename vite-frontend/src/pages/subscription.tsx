@@ -498,7 +498,7 @@ function Editor({
               />
               <p className="text-xs text-default-500">
                 有独立的 UUID /
-                密码：停用、到期或流量用完后从节点上删除，已导入的配置也连不上
+                密码：停用、到期或流量用完后从服务器上删除，已导入的配置也连不上
               </p>
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="sub-expire">
@@ -569,7 +569,7 @@ function Editor({
                 </div>
                 <p className="text-xs text-default-500">
                   上传 +
-                  下载合计，用完自动断开；在落地节点上按用户统计，仅支持多用户协议
+                  下载合计，用完自动断开；在服务器上按用户统计，仅支持多用户协议
                 </p>
               </div>
             </Section>
@@ -672,7 +672,7 @@ function Editor({
               )}
               {pickedGroups.length > 1 && (
                 <p className="text-xs text-default-500">
-                  几个组里有同一个落地时它会出现多次，可以在节点组里用筛选区分
+                  几个组里有同一个节点时它会出现多次，可以在节点组里用筛选区分
                 </p>
               )}
             </Section>
@@ -1419,7 +1419,7 @@ export default function SubscriptionPage() {
         description={
           tab === "subs"
             ? "每个订阅一个链接：选节点组、分流和链式代理，客户端自动识别格式"
-            : "节点组：从落地和订阅源挑节点，筛选、改名后给订阅用，多个订阅可以共用"
+            : "节点组：从自建、导入的节点和订阅源里挑选，筛选、改名后给订阅用，多个订阅可以共用"
         }
         primary={
           tab === "subs"
@@ -1482,7 +1482,7 @@ export default function SubscriptionPage() {
         <EmptyHint
           text={
             inbounds.length === 0
-              ? "还没有落地。先在“落地”里搭建或导入节点，订阅里才会有内容"
+              ? "还没有节点。先在“节点”里搭建或导入，订阅里才会有内容"
               : "每个订阅一个链接，有独立凭据：可以设到期和流量上限，停用后自动断开"
           }
         />
@@ -1556,7 +1556,7 @@ export default function SubscriptionPage() {
                       className={`text-xs ${detail.overQuota ? "text-danger" : "text-default-500"}`}
                     >
                       {detail.overQuota
-                        ? "流量已用完，已从节点上断开"
+                        ? "流量已用完，已从服务器上断开"
                         : [
                             `↑ ${formatTraffic(detail.uploadBytes)} ↓ ${formatTraffic(detail.downloadBytes)}`,
                             `${new Date(detail.trafficSince).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })} 起`,
@@ -1606,7 +1606,7 @@ export default function SubscriptionPage() {
                         {detail.sharedIds.length > 0 && (
                           <p className="text-warning">
                             {detail.sharedIds.length}{" "}
-                            个落地是共用凭据，停用后已导入的配置仍能连接
+                            个节点是共用凭据，停用后已导入的配置仍能连接
                           </p>
                         )}
                       </div>

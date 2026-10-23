@@ -23,7 +23,7 @@ export type TargetKey = string;
 const SEARCH_FROM = 8;
 
 export function targetSource(i: InboundApiItem): string {
-  if (!i.external) return i.nodeName || "节点";
+  if (!i.external) return i.nodeName || "服务器";
 
   return i.sourceName ? `订阅源 · ${i.sourceName}` : "导入";
 }
@@ -178,7 +178,7 @@ export function TargetPicker({
         <ModalBody className="space-y-1 pb-4">
           {!q && (
             <div className="rounded-xl bg-content1">
-              {row("direct", "直连", "从本节点出去")}
+              {row("direct", "直连", "从本服务器出去")}
               {withBlock && row("block", "阻断", "丢弃匹配的流量")}
             </div>
           )}

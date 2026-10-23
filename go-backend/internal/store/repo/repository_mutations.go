@@ -525,12 +525,12 @@ func (r *Repository) IsRemoteNodeTx(tx *gorm.DB, nodeID int64) (bool, error) {
 		return false, errors.New("database unavailable")
 	}
 	if nodeID <= 0 {
-		return false, errors.New("节点不存在")
+		return false, errors.New("服务器不存在")
 	}
 	var node model.Node
 	err := tx.Select("is_remote").Where("id = ?", nodeID).First(&node).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, errors.New("节点不存在")
+		return false, errors.New("服务器不存在")
 	}
 	if err != nil {
 		return false, err
@@ -551,7 +551,7 @@ func (r *Repository) pickNodePortTx(tx *gorm.DB, nodeID int64, allocated map[int
 		return 0, errors.New("database unavailable")
 	}
 	if nodeID <= 0 {
-		return 0, errors.New("节点不存在")
+		return 0, errors.New("服务器不存在")
 	}
 	if port, ok := allocated[nodeID]; ok && port > 0 {
 		return port, nil
@@ -560,7 +560,7 @@ func (r *Repository) pickNodePortTx(tx *gorm.DB, nodeID int64, allocated map[int
 	var node model.Node
 	err := tx.Select("port").Where("id = ?", nodeID).First(&node).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, errors.New("节点不存在")
+		return 0, errors.New("服务器不存在")
 	}
 	if err != nil {
 		return 0, err
@@ -568,7 +568,7 @@ func (r *Repository) pickNodePortTx(tx *gorm.DB, nodeID int64, allocated map[int
 
 	candidates := parsePortRangeSpec(node.Port)
 	if len(candidates) == 0 {
-		return 0, errors.New("节点端口已满，无可用端口")
+		return 0, errors.New("服务器端口已满，无可用端口")
 	}
 
 	used := make(map[int]struct{})
@@ -619,7 +619,7 @@ func (r *Repository) pickNodePortTx(tx *gorm.DB, nodeID int64, allocated map[int
 	}
 
 	if len(available) == 0 {
-		return 0, errors.New("节点端口已满，无可用端口")
+		return 0, errors.New("服务器端口已满，无可用端口")
 	}
 	if !randomPick {
 		allocated[nodeID] = available[0]

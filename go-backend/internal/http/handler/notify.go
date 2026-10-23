@@ -227,7 +227,7 @@ func (h *Handler) nodeLabel(nodeID int64) string {
 	if node, err := h.repo.GetNodeByID(nodeID); err == nil && node != nil && node.Name != "" {
 		return node.Name
 	}
-	return fmt.Sprintf("节点 %d", nodeID)
+	return fmt.Sprintf("服务器 %d", nodeID)
 }
 
 // ---- node online / offline ----
@@ -251,7 +251,7 @@ func (h *Handler) notifyNodeOffline(nodeID int64) {
 		}
 		n.offlineAlerted[nodeID] = true
 		n.mu.Unlock()
-		h.notify(notifyEventNodeOffline, "节点掉线", "节点："+h.nodeLabel(nodeID))
+		h.notify(notifyEventNodeOffline, "服务器掉线", "服务器："+h.nodeLabel(nodeID))
 	})
 }
 
@@ -269,7 +269,7 @@ func (h *Handler) notifyNodeOnline(nodeID int64) {
 	delete(n.offlineAlerted, nodeID)
 	n.mu.Unlock()
 	if alerted {
-		h.notify(notifyEventNodeOffline, "节点恢复在线", "节点："+h.nodeLabel(nodeID))
+		h.notify(notifyEventNodeOffline, "服务器恢复在线", "服务器："+h.nodeLabel(nodeID))
 	}
 }
 
@@ -303,13 +303,13 @@ func (h *Handler) checkNodeExpiry(now time.Time) {
 		if sent {
 			continue
 		}
-		title := "节点即将到期"
+		title := "服务器即将到期"
 		detail := fmt.Sprintf("剩余约 %d 天", int(left.Hours()/24)+1)
 		if left <= 0 {
-			title = "节点已到期"
+			title = "服务器已到期"
 			detail = "已过期"
 		}
-		h.notify(notifyEventNodeExpiry, title, fmt.Sprintf("节点：%s\n到期：%s（%s）",
+		h.notify(notifyEventNodeExpiry, title, fmt.Sprintf("服务器：%s\n到期：%s（%s）",
 			node.Name, expiry.Format("2006-01-02"), detail))
 	}
 }

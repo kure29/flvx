@@ -275,7 +275,7 @@ func (c *Checker) executeCheck(m *model.ServiceMonitor, timestamp int64, limits 
 		c.checkTCP(m.Target, timeout, result)
 	case "icmp":
 		result.Success = 0
-		result.ErrorMessage = "ICMP 监控必须指定执行节点"
+		result.ErrorMessage = "ICMP 监控必须指定执行服务器"
 	default:
 		result.Success = 0
 		result.ErrorMessage = fmt.Sprintf("不支持的检查类型: %s", m.Type)
@@ -317,7 +317,7 @@ func (c *Checker) checkOnNode(m *model.ServiceMonitor, timeoutSec int, timeout t
 	}
 	if c.commander == nil {
 		result.Success = 0
-		result.ErrorMessage = "节点检查不可用"
+		result.ErrorMessage = "服务器检查不可用"
 		return
 	}
 
@@ -354,7 +354,7 @@ func (c *Checker) checkOnNode(m *model.ServiceMonitor, timeoutSec int, timeout t
 	}
 	if cmdRes.Data == nil {
 		result.Success = 0
-		result.ErrorMessage = "节点返回为空"
+		result.ErrorMessage = "服务器返回为空"
 		return
 	}
 

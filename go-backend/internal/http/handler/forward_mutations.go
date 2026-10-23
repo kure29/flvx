@@ -360,7 +360,7 @@ func (h *Handler) forwardUpdate(w http.ResponseWriter, r *http.Request) {
 				if n, nErr := h.getNodeRecord(nodeID); nErr == nil && n != nil && strings.TrimSpace(n.Name) != "" {
 					nodeLabel = strings.TrimSpace(n.Name)
 				}
-				warnings = append(warnings, fmt.Sprintf("节点 %s 清理旧转发监听失败: %v", nodeLabel, delErr))
+				warnings = append(warnings, fmt.Sprintf("服务器 %s 清理旧转发监听失败: %v", nodeLabel, delErr))
 			}
 		}
 		time.Sleep(tunnelServiceBindRetryDelay)
@@ -383,7 +383,7 @@ func (h *Handler) forwardUpdate(w http.ResponseWriter, r *http.Request) {
 				if n, nErr := h.getNodeRecord(nodeID); nErr == nil && n != nil && strings.TrimSpace(n.Name) != "" {
 					nodeLabel = strings.TrimSpace(n.Name)
 				}
-				warnings = append(warnings, fmt.Sprintf("节点 %s 清理旧隧道残留服务失败: %v", nodeLabel, delErr))
+				warnings = append(warnings, fmt.Sprintf("服务器 %s 清理旧隧道残留服务失败: %v", nodeLabel, delErr))
 			}
 		}
 	}
@@ -414,7 +414,7 @@ func (h *Handler) forwardDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if nftMode {
 		if len(entryNodeIDs) == 0 {
-			response.WriteJSON(w, response.ErrDefault("nftables 转发缺少入口节点"))
+			response.WriteJSON(w, response.ErrDefault("nftables 转发缺少入口服务器"))
 			return
 		}
 		nftNodeID = entryNodeIDs[0]
@@ -614,7 +614,7 @@ func (h *Handler) forwardBatchDelete(w http.ResponseWriter, r *http.Request) {
 		} else if nftMode {
 			if len(entryNodeIDs) == 0 {
 				f++
-				failures = appendBatchFailureReason(failures, id, forward.Name, "nftables 转发缺少入口节点")
+				failures = appendBatchFailureReason(failures, id, forward.Name, "nftables 转发缺少入口服务器")
 				continue
 			}
 			nftNodeID = entryNodeIDs[0]
@@ -743,7 +743,7 @@ func (h *Handler) forwardBatchRedeploy(w http.ResponseWriter, r *http.Request) {
 		} else if nftMode {
 			if len(entryNodeIDs) == 0 {
 				f++
-				failures = appendBatchFailureReason(failures, id, forward.Name, "nftables 转发缺少入口节点")
+				failures = appendBatchFailureReason(failures, id, forward.Name, "nftables 转发缺少入口服务器")
 				continue
 			}
 			if err := h.reconcileNftablesNodeByRequest(entryNodeIDs[0]); err != nil {
@@ -1017,7 +1017,7 @@ func validateLocalNodePort(node *nodeRecord, port int) error {
 		return nil
 	}
 	if port < minPort || port > maxPort {
-		return fmt.Errorf("端口 %d 超出节点 %s 允许范围 %d-%d", port, node.Name, minPort, maxPort)
+		return fmt.Errorf("端口 %d 超出服务器 %s 允许范围 %d-%d", port, node.Name, minPort, maxPort)
 	}
 	return nil
 }
@@ -1031,7 +1031,7 @@ func (h *Handler) validateForwardPortAvailability(node *nodeRecord, port int, cu
 		return err
 	}
 	if occupied {
-		return fmt.Errorf("节点 %s 端口 %d 已被其他转发占用", node.Name, port)
+		return fmt.Errorf("服务器 %s 端口 %d 已被其他转发占用", node.Name, port)
 	}
 	return nil
 }

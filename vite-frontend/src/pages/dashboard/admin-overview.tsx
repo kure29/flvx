@@ -63,28 +63,28 @@ const KINDS: Record<
   { label: (n: number) => string; hint: string; path: string }
 > = {
   offline: {
-    label: (n) => `${n} 个节点离线`,
+    label: (n) => `${n} 个服务器离线`,
     hint: "agent 没有连接面板，检查服务器上的 agent 是否在运行",
     path: "/node",
   },
   expired: {
-    label: (n) => `${n} 个节点已到期`,
-    hint: "续费后在节点里更新到期时间",
+    label: (n) => `${n} 个服务器已到期`,
+    hint: "续费后在服务器里更新到期时间",
     path: "/node",
   },
   expiring: {
-    label: (n) => `${n} 个节点即将到期`,
+    label: (n) => `${n} 个服务器即将到期`,
     hint: "3 天内到期",
     path: "/node",
   },
   kernel: {
     label: (n) => `${n} 个内核出错`,
-    hint: "在落地 → 内核里查看日志",
-    path: "/inbound",
+    hint: "在服务器 → 内核里查看日志",
+    path: "/node",
   },
   inbound: {
-    label: (n) => `${n} 个落地未运行`,
-    hint: "内核已停止或等待下发，节点上线后会自动补上",
+    label: (n) => `${n} 个节点未运行`,
+    hint: "内核已停止或等待下发，服务器上线后会自动补上",
     path: "/inbound",
   },
   probe: {
@@ -392,7 +392,7 @@ export function AdminOverview() {
       )
       .map((n) => ({
         key: `n${n.id}`,
-        kind: "节点",
+        kind: "服务器",
         name: n.name,
         at: n.expiryTime ?? 0,
         path: "/node",
@@ -432,7 +432,7 @@ export function AdminOverview() {
         <Metric
           foot={
             nodes.length === 0
-              ? "还没有节点"
+              ? "还没有服务器"
               : online === nodes.length
                 ? "全部在线"
                 : `${nodes.length - online} 个离线`
@@ -450,7 +450,7 @@ export function AdminOverview() {
                 : undefined
           }
           icon={Server}
-          label="节点在线"
+          label="服务器在线"
           tone="blue"
           total={nodes.length}
           value={online}
@@ -460,7 +460,7 @@ export function AdminOverview() {
           foot={
             enabledInbounds.length === 0
               ? inbounds.length === 0
-                ? "还没有落地"
+                ? "还没有节点"
                 : "全部停用"
               : runningInbounds.length === enabledInbounds.length
                 ? "全部正常"
@@ -479,7 +479,7 @@ export function AdminOverview() {
                 : undefined
           }
           icon={Globe}
-          label="落地运行"
+          label="节点运行"
           tone="green"
           total={enabledInbounds.length}
           value={runningInbounds.length}
@@ -622,7 +622,7 @@ export function AdminOverview() {
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               }
-              title="节点状态"
+              title="服务器状态"
             >
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {shownNodes.map((n) => {
@@ -659,7 +659,7 @@ export function AdminOverview() {
         <div className="space-y-4">
           <Panel
             action={<span className="text-xs text-default-400">累计</span>}
-            title="落地流量"
+            title="节点流量"
           >
             <div className="mb-3 grid grid-cols-2 gap-2">
               {(
@@ -725,7 +725,7 @@ export function AdminOverview() {
                       onClick={() => navigate(e.path)}
                     >
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${e.kind === "节点" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/20" : "bg-orange-50 text-orange-700 dark:bg-orange-500/20"}`}
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${e.kind === "服务器" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/20" : "bg-orange-50 text-orange-700 dark:bg-orange-500/20"}`}
                       >
                         {e.kind}
                       </span>

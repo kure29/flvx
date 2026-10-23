@@ -62,7 +62,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 		remoteURL := strings.TrimSpace(node.RemoteURL)
 		remoteToken := strings.TrimSpace(node.RemoteToken)
 		if remoteURL == "" || remoteToken == "" {
-			return bindings, releaseRefs, fmt.Errorf("远程节点 %s 缺少共享配置", nodeDisplayName(node))
+			return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 缺少共享配置", nodeDisplayName(node))
 		}
 
 		resourceKey := federationRuntimeResourceKey(state.TunnelID, outNode.NodeID, 3, 0)
@@ -77,7 +77,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 			reserveRes, err = fc.ReservePort(remoteURL, remoteToken, localDomain, reserveReq)
 		}
 		if err != nil {
-			return bindings, releaseRefs, fmt.Errorf("远程节点 %s 端口分配失败: %w", nodeDisplayName(node), err)
+			return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 端口分配失败: %w", nodeDisplayName(node), err)
 		}
 
 		releaseRefs = append(releaseRefs, federationRuntimeReleaseRef{
@@ -97,7 +97,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 		}
 		applyRes, err := fc.ApplyRole(remoteURL, remoteToken, localDomain, applyReq)
 		if err != nil {
-			return bindings, releaseRefs, fmt.Errorf("远程节点 %s 运行时下发失败: %w", nodeDisplayName(node), err)
+			return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 运行时下发失败: %w", nodeDisplayName(node), err)
 		}
 		if applyRes.AllocatedPort > 0 {
 			state.OutNodes[outIdx].Port = applyRes.AllocatedPort
@@ -130,7 +130,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 			remoteURL := strings.TrimSpace(node.RemoteURL)
 			remoteToken := strings.TrimSpace(node.RemoteToken)
 			if remoteURL == "" || remoteToken == "" {
-				return bindings, releaseRefs, fmt.Errorf("远程节点 %s 缺少共享配置", nodeDisplayName(node))
+				return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 缺少共享配置", nodeDisplayName(node))
 			}
 
 			resourceKey := federationRuntimeResourceKey(state.TunnelID, chainNode.NodeID, 2, hopIdx+1)
@@ -145,7 +145,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 				reserveRes, err = fc.ReservePort(remoteURL, remoteToken, localDomain, reserveReq)
 			}
 			if err != nil {
-				return bindings, releaseRefs, fmt.Errorf("远程节点 %s 端口分配失败: %w", nodeDisplayName(node), err)
+				return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 端口分配失败: %w", nodeDisplayName(node), err)
 			}
 
 			releaseRefs = append(releaseRefs, federationRuntimeReleaseRef{
@@ -166,14 +166,14 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 			for _, target := range nextTargets {
 				targetNode := state.Nodes[target.NodeID]
 				if targetNode == nil {
-					return bindings, releaseRefs, errors.New("节点不存在")
+					return bindings, releaseRefs, errors.New("服务器不存在")
 				}
 				host, hostErr := selectTunnelDialHost(node, targetNode, state.IPPreference, target.ConnectIP)
 				if hostErr != nil {
 					return bindings, releaseRefs, hostErr
 				}
 				if target.Port <= 0 {
-					return bindings, releaseRefs, errors.New("节点端口不能为空")
+					return bindings, releaseRefs, errors.New("服务器端口不能为空")
 				}
 				applyTargets = append(applyTargets, client.RuntimeTarget{
 					Host:     host,
@@ -192,7 +192,7 @@ func (h *Handler) applyFederationRuntime(state *tunnelCreateState, localDomain s
 			}
 			applyRes, err := fc.ApplyRole(remoteURL, remoteToken, localDomain, applyReq)
 			if err != nil {
-				return bindings, releaseRefs, fmt.Errorf("远程节点 %s 运行时下发失败: %w", nodeDisplayName(node), err)
+				return bindings, releaseRefs, fmt.Errorf("远程服务器 %s 运行时下发失败: %w", nodeDisplayName(node), err)
 			}
 			if applyRes.AllocatedPort > 0 {
 				state.ChainHops[hopIdx][nodeIdx].Port = applyRes.AllocatedPort
@@ -281,7 +281,7 @@ func (h *Handler) releaseFederationTunnelBinding(b repo.FederationTunnelBinding)
 		return err
 	}
 	if node == nil {
-		return fmt.Errorf("共享节点 %d 不存在，保留待清理绑定", b.NodeID)
+		return fmt.Errorf("共享服务器 %d 不存在，保留待清理绑定", b.NodeID)
 	}
 	remoteURL := strings.TrimSpace(b.RemoteURL)
 	if remoteURL == "" {
@@ -289,13 +289,13 @@ func (h *Handler) releaseFederationTunnelBinding(b repo.FederationTunnelBinding)
 	}
 	remoteToken := strings.TrimSpace(node.RemoteToken.String)
 	if remoteURL == "" || remoteToken == "" {
-		return fmt.Errorf("共享节点 %d 缺少连接配置，保留待清理绑定", b.NodeID)
+		return fmt.Errorf("共享服务器 %d 缺少连接配置，保留待清理绑定", b.NodeID)
 	}
 	req := client.RuntimeReleaseRoleRequest{
 		BindingID: strings.TrimSpace(b.RemoteBindingID), ResourceKey: strings.TrimSpace(b.ResourceKey),
 	}
 	if err := client.NewFederationClient().ReleaseRole(remoteURL, remoteToken, h.federationLocalDomain(), req); err != nil {
-		return fmt.Errorf("共享节点 %d 清理失败: %w", b.NodeID, err)
+		return fmt.Errorf("共享服务器 %d 清理失败: %w", b.NodeID, err)
 	}
 	return h.repo.DeleteFederationTunnelBinding(b.ID)
 }

@@ -108,10 +108,10 @@ function namingSummary(o: NodeGroupOptions): string {
 
 /** Where a group's nodes come from, e.g. "3 个落地 + 1 个订阅源". */
 export function groupSourceText(g: NodeGroupItem | NodeGroupDraft): string {
-  if (g.sourceAll) return "全部落地";
+  if (g.sourceAll) return "全部节点";
 
   return [
-    g.inboundIds.length ? `${g.inboundIds.length} 个落地` : "",
+    g.inboundIds.length ? `${g.inboundIds.length} 个节点` : "",
     g.sourceIds.length ? `${g.sourceIds.length} 个订阅源` : "",
   ]
     .filter(Boolean)
@@ -151,7 +151,7 @@ export function NodeGroupList({
 }) {
   if (groups.length === 0) {
     return (
-      <EmptyHint text="节点组把落地和订阅源的节点筛选、改名后存成一份列表，多个订阅可以共用；新建订阅前先建一个" />
+      <EmptyHint text="节点组把自建、导入的节点和订阅源筛选、改名后存成一份列表，多个订阅可以共用；新建订阅前先建一个" />
     );
   }
 
@@ -420,18 +420,18 @@ export function NodeGroupEditor({
                 </p>
               )}
             </Section>
-            <Section hint="中转线路会跟着它的落地一起出现" title="来源">
+            <Section hint="中转线路会跟着它的节点一起出现" title="来源">
               <Segmented
                 options={[
-                  ["all", "全部落地"],
-                  ["pick", "指定落地"],
+                  ["all", "全部节点"],
+                  ["pick", "指定节点"],
                 ]}
                 value={draft.sourceAll ? "all" : "pick"}
                 onChange={(v) => set({ sourceAll: v === "all" })}
               />
               {draft.sourceAll ? (
                 <p className="text-xs text-default-500">
-                  包括以后新增的落地和订阅源；只想要一部分可以在“处理”里筛选
+                  包括以后新增的节点和订阅源；只想要一部分可以在“处理”里筛选
                 </p>
               ) : (
                 <div className="max-h-56 space-y-3 overflow-y-auto rounded-xl border border-divider p-2">
@@ -499,7 +499,7 @@ export function NodeGroupEditor({
                 />
                 {o.lines === "prefer_relay" && (
                   <p className="text-xs text-default-500">
-                    同一落地有启用的中转时隐藏原直连，保留全部中转线路；没有中转则保留直连。按中转配置判断，不随测速结果变化，其他筛选继续生效。
+                    同一节点有启用的中转时隐藏原直连，保留全部中转线路；没有中转则保留直连。按中转配置判断，不随测速结果变化，其他筛选继续生效。
                   </p>
                 )}
               </div>

@@ -101,7 +101,7 @@ func TestTunnelDeleteWithForwardsReplaceReturnsFailureDetailsContract(t *testing
 	if contractValueAsInt64(result["failCount"]) != 1 {
 		t.Fatalf("expected failCount=1, got %#v", result["failCount"])
 	}
-	assertBatchFailureNameAndReason(t, result, "replace-forward", "节点 replace-target-node 端口 23001 已被其他转发占用")
+	assertBatchFailureNameAndReason(t, result, "replace-forward", "服务器 replace-target-node 端口 23001 已被其他转发占用")
 
 	if count := mustQueryInt(t, repo, `SELECT COUNT(1) FROM tunnel WHERE id = ?`, sourceTunnelID); count != 1 {
 		t.Fatalf("expected source tunnel kept, got count=%d", count)
@@ -168,7 +168,7 @@ func TestTunnelBatchDeleteWithForwardsReturnsTunnelLevelFailuresContract(t *test
 	if contractValueAsInt64(result["failCount"]) != 1 {
 		t.Fatalf("expected failCount=1, got %#v", result["failCount"])
 	}
-	assertBatchFailureNameAndReason(t, result, "batch-replace-source-b", "batch-replace-forward-b: 节点 batch-replace-target-node 端口 25002 已被其他转发占用")
+	assertBatchFailureNameAndReason(t, result, "batch-replace-source-b", "batch-replace-forward-b: 服务器 batch-replace-target-node 端口 25002 已被其他转发占用")
 
 	if count := mustQueryInt(t, repo, `SELECT COUNT(1) FROM tunnel WHERE id = ?`, sourceTunnelA); count != 0 {
 		t.Fatalf("expected source tunnel A deleted, got count=%d", count)

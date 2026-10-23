@@ -75,7 +75,7 @@ opencode
 ```
 你: 查看我的转发列表
 你: 创建一个转发到 192.168.1.100:80 使用隧道 1
-你: 检查节点状态
+你: 检查服务器状态
 你: 查看流量使用情况
 ```
 
@@ -98,7 +98,7 @@ ln -sf /path/to/flyx/skills/flvx-api ~/.openclaw/skills/flvx-api
 ```bash
 openclaw
 
->>> 查看所有节点状态
+>>> 查看所有服务器状态
 >>> 给用户 alice 分配 50GB 流量
 >>> 导出系统备份
 ```
@@ -142,7 +142,7 @@ Authorization: <token>
 POST /api/v1/forward/create
 {"name": "xxx", "tunnelId": 1, "remoteAddr": "1.2.3.4:80"}
 
-### 查看节点
+### 查看服务器
 POST /api/v1/node/list
 {}
 ```
@@ -176,7 +176,7 @@ cat ~/.agents/skills/flvx-api/SKILL.md >> ~/.claude/CLAUDE.md
 
 **示例对话:**
 ```
->>> 帮我查看 FLYX 面板上有哪些节点
+>>> 帮我查看 FLYX 面板上有哪些服务器
 >>> 创建一个名为 test 的转发，目标地址 10.0.0.1:80
 >>> 查看我的流量使用情况
 ```
@@ -189,12 +189,12 @@ cat ~/.agents/skills/flvx-api/SKILL.md >> ~/.claude/CLAUDE.md
 |------|------|
 | 认证 | 登录、Token 管理 |
 | 用户 | 增删改查、流量重置、密码 |
-| 节点 | 增删改查、安装、升级、状态 |
+| 服务器 | 增删改查、安装、升级、状态 |
 | 隧道 | 增删改查、用户分配 |
 | 转发 | 增删改查、暂停/恢复、诊断 |
 | 分组 | 用户/隧道分组、权限 |
 | 限速 | 增删改查 |
-| 联邦 | 节点共享、远程节点 |
+| 联邦 | 服务器共享、远程服务器 |
 | 备份 | 导出/导入 |
 
 ## 安全提示

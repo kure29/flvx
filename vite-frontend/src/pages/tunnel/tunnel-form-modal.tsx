@@ -87,7 +87,7 @@ export function TunnelFormModal({
               </h2>
               <p className="text-small text-default-500">
                 {isEdit
-                  ? "修改节点配置会中断现有连接，隧道类型不可修改"
+                  ? "修改服务器配置会中断现有连接，隧道类型不可修改"
                   : "创建新的隧道配置"}
               </p>
             </ModalHeader>
@@ -129,15 +129,15 @@ export function TunnelFormModal({
                 {form.type === 1 &&
                   (getTunnelForwardMode(form.inNodeId, nodes) === "nftables" ? (
                     <p className="text-small text-default-500">
-                      入口是 nftables 节点，由 nftables
-                      转发（在节点的转发模式里设置）
+                      入口是 nftables 服务器，由 nftables
+                      转发（在服务器的转发模式里设置）
                     </p>
                   ) : (
                     <Select
                       description={
                         form.engine === "realm"
-                          ? "入口节点自动安装 realm 运行这条隧道的转发；不支持限速和连接数限制，节点 agent 需 3.3.26 及以上"
-                          : "节点 agent 直接转发，支持限速和连接数限制"
+                          ? "入口服务器自动安装 realm 运行这条隧道的转发；不支持限速和连接数限制，服务器 agent 需 3.3.26 及以上"
+                          : "服务器 agent 直接转发，支持限速和连接数限制"
                       }
                       label="转发引擎"
                       selectedKeys={[
@@ -187,8 +187,8 @@ export function TunnelFormModal({
                     ]}
                     errorMessage={errors.inNodeId}
                     isInvalid={!!errors.inNodeId}
-                    label="入口节点"
-                    placeholder="请选择入口节点（可多选）"
+                    label="入口服务器"
+                    placeholder="请选择入口服务器（可多选）"
                     selectedKeys={form.inNodeId.map((ct) =>
                       ct.nodeId.toString(),
                     )}
@@ -369,8 +369,8 @@ export function TunnelFormModal({
                                         .map((id) => id.toString()),
                                     ]}
                                     dropdownPlacement="top"
-                                    label="节点"
-                                    placeholder="选择节点（可多选）"
+                                    label="服务器"
+                                    placeholder="选择服务器（可多选）"
                                     selectedKeys={groupNodes
                                       .filter((ct) => ct.nodeId !== -1)
                                       .map((ct) => ct.nodeId.toString())}
@@ -526,8 +526,8 @@ export function TunnelFormModal({
                                 }}
                                 description={
                                   isMultiNodeGroup
-                                    ? "多节点跳不支持设置自定义连接IP，使用各节点默认IP"
-                                    : "按当前跳所选节点的共有IP进行选择，留空使用默认"
+                                    ? "多服务器跳不支持设置自定义连接IP，使用各服务器默认IP"
+                                    : "按当前跳所选服务器的共有IP进行选择，留空使用默认"
                                 }
                                 isDisabled={
                                   groupSelectedNodeIds.length === 0 ||
@@ -537,12 +537,12 @@ export function TunnelFormModal({
                                 label="连接IP"
                                 placeholder={
                                   isMultiNodeGroup
-                                    ? "多节点跳使用节点默认IP"
+                                    ? "多服务器跳使用服务器默认IP"
                                     : groupSelectedNodeIds.length === 0
-                                      ? "请先选择节点"
+                                      ? "请先选择服务器"
                                       : groupIpOptions.length > 0
                                         ? "选择连接IP"
-                                        : "所选节点无共同可选IP"
+                                        : "所选服务器无共同可选IP"
                                 }
                                 selectedKeys={[
                                   selectedGroupConnectIp || "__default__",
@@ -634,8 +634,8 @@ export function TunnelFormModal({
                                 dropdownPlacement="top"
                                 errorMessage={errors.outNodeId}
                                 isInvalid={!!errors.outNodeId}
-                                label="节点"
-                                placeholder="请选择出口节点（可多选）"
+                                label="服务器"
+                                placeholder="请选择出口服务器（可多选）"
                                 selectedKeys={
                                   form.outNodeId
                                     ? form.outNodeId
@@ -869,8 +869,8 @@ export function TunnelFormModal({
                             }}
                             description={
                               isMultiExit
-                                ? "多出口隧道不支持设置自定义连接IP，使用各节点默认IP"
-                                : "按出口节点共同可用IP选择，留空使用默认"
+                                ? "多出口隧道不支持设置自定义连接IP，使用各服务器默认IP"
+                                : "按出口服务器共同可用IP选择，留空使用默认"
                             }
                             isDisabled={
                               selectedOutNodeIds.length === 0 ||
@@ -880,12 +880,12 @@ export function TunnelFormModal({
                             label="连接IP"
                             placeholder={
                               isMultiExit
-                                ? "多出口隧道使用节点默认IP"
+                                ? "多出口隧道使用服务器默认IP"
                                 : selectedOutNodeIds.length === 0
-                                  ? "请先选择出口节点"
+                                  ? "请先选择出口服务器"
                                   : commonOutIpOptions.length > 0
                                     ? "选择连接IP"
-                                    : "所选节点无共同可选IP"
+                                    : "所选服务器无共同可选IP"
                             }
                             selectedKeys={[
                               form.outNodeId && form.outNodeId.length > 0
@@ -998,7 +998,7 @@ export function TunnelFormModal({
                       </div>
 
                       <Textarea
-                        description="入口IP由系统自动从入口节点采集，无需手动填写。支持多个IP，每行一个地址，留空则使用入口节点IP"
+                        description="入口IP由系统自动从入口服务器采集，无需手动填写。支持多个IP，每行一个地址，留空则使用入口服务器IP"
                         errorMessage={errors.inIp}
                         isInvalid={!!errors.inIp}
                         label="入口IP"
@@ -1017,7 +1017,7 @@ export function TunnelFormModal({
 
                       {form.type === 2 && (
                         <Select
-                          description="当节点同时拥有IPv4和IPv6地址时，选择隧道连接使用的地址类型"
+                          description="当服务器同时拥有IPv4和IPv6地址时，选择隧道连接使用的地址类型"
                           label="隧道连接地址偏好"
                           placeholder="自动选择"
                           selectedKeys={[form.ipPreference || ""]}

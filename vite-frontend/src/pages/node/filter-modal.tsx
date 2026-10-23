@@ -66,7 +66,7 @@ export function NodeFilterModal({
                       setNodeFilterMode(selected || "all");
                     }}
                   >
-                    <SelectItem key="all">全部节点</SelectItem>
+                    <SelectItem key="all">全部服务器</SelectItem>
                     <SelectItem key="expiringSoon">
                       7天内续费 ({nodeExpiryStats.expiringSoon})
                     </SelectItem>

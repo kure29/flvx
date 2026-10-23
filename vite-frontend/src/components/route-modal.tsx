@@ -161,7 +161,7 @@ export function RouteModal({
         <ModalHeader closable className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">回程路由</h2>
           <p className="text-xs font-normal text-default-500">
-            {nodeName ? `${nodeName} → 各测试点` : "节点 → 各测试点"}
+            {nodeName ? `${nodeName} → 各测试点` : "服务器 → 各测试点"}
             {route ? ` · ${ago(route.checkedAt)}检测` : ""}
           </p>
         </ModalHeader>

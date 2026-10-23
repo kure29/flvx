@@ -284,13 +284,13 @@ func latencyCommandError(err error) string {
 	case errors.Is(err, errTCPPingQueueTimeout):
 		return msg
 	case strings.Contains(msg, "任务过多"), strings.Contains(msg, "并发过多"):
-		return "节点繁忙，请稍后重试"
+		return "服务器繁忙，请稍后重试"
 	case strings.Contains(msg, "队列已满"), strings.Contains(msg, "TCP探测"):
 		return msg
-	case strings.Contains(msg, "节点不在线"):
-		return "节点离线"
-	case errors.Is(err, context.DeadlineExceeded), strings.Contains(strings.ToLower(msg), "timeout"), strings.Contains(msg, "等待节点响应超时"):
-		return "节点响应超时"
+	case strings.Contains(msg, "服务器不在线"), strings.Contains(msg, "节点不在线"):
+		return "服务器离线"
+	case errors.Is(err, context.DeadlineExceeded), strings.Contains(strings.ToLower(msg), "timeout"), strings.Contains(msg, "等待服务器响应超时"), strings.Contains(msg, "等待节点响应超时"):
+		return "服务器响应超时"
 	case errors.Is(err, context.Canceled), strings.Contains(msg, "Agent is shutting down"):
 		return "探测已取消"
 	case msg == "":

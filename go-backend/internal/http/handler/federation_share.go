@@ -528,7 +528,7 @@ func validateRemoteNodePort(node *nodeRecord, port int) error {
 		return nil
 	}
 	if port < start || port > end {
-		return fmt.Errorf("远程节点端口 %d 超出允许范围 %d-%d", port, start, end)
+		return fmt.Errorf("远程服务器端口 %d 超出允许范围 %d-%d", port, start, end)
 	}
 	return nil
 }

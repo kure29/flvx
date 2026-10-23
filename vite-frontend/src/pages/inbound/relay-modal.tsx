@@ -44,11 +44,11 @@ export function relayBlocker(
   const exits = tunnelExits(tunnel);
 
   if (tunnel.type === 2 && exits.includes(inbound.nodeId)) {
-    return exits.length > 1 ? "出口为落地节点时只能有这一个出口" : null;
+    return exits.length > 1 ? "出口为节点所在服务器时只能有这一个出口" : null;
   }
 
   return isLoopback(inbound.listen)
-    ? "入站只监听本机，需用出口为落地节点的隧道转发"
+    ? "入站只监听本机，需用出口为节点所在服务器的隧道转发"
     : null;
 }
 
@@ -65,7 +65,7 @@ export function relayRoute(
 
   return tunnelExits(tunnel).includes(inbound.nodeId)
     ? "隧道转发到本机"
-    : "隧道经出口节点转发到公网地址";
+    : "隧道经出口服务器转发到公网地址";
 }
 
 export function RelayModal({
@@ -442,11 +442,11 @@ export function RelayModal({
                         );
                       })}
                     </Select>
-                    {selectedRoute === "隧道经出口节点转发到公网地址" && (
+                    {selectedRoute === "隧道经出口服务器转发到公网地址" && (
                       <p className="text-xs text-default-500">
-                        流量经隧道到出口节点（如
-                        IX），再由出口节点连接落地机的公网地址。
-                        开启入站白名单后，会自动放行出口节点的地址。
+                        流量经隧道到出口服务器（如
+                        IX），再由出口服务器连接节点的公网地址。
+                        开启入站白名单后，会自动放行出口服务器的地址。
                       </p>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -518,7 +518,7 @@ export function RelayModal({
                 </p>
                 {removeFailed && (
                   <p className="text-small text-warning">
-                    中转节点上的转发删除失败（可能离线），可以强制删除面板记录。
+                    中转服务器上的转发删除失败（可能离线），可以强制删除面板记录。
                   </p>
                 )}
               </ModalBody>

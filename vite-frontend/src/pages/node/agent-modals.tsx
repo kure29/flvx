@@ -111,13 +111,13 @@ export function InstallCommandModal({
                     <ul className="list-disc space-y-1 pl-5 text-xs text-default-500">
                       <li>
                         使用 host 网络，数据保存在宿主机 /etc/flux_agent；
-                        不要和一键脚本安装的节点同时运行。
+                        不要和一键脚本装的 agent 同时运行。
                       </li>
                       <li>
                         面板一键升级会替换数据目录里的程序并自动重启容器；
                         拉取新镜像后重建容器也会升级。
                       </li>
-                      <li>节点调优需要容器以 --privileged 运行。</li>
+                      <li>服务器调优需要容器以 --privileged 运行。</li>
                     </ul>
                   </div>
                 </Tab>
@@ -188,8 +188,8 @@ export function UpgradeNodeModal({
             <ModalHeader className="flex flex-col gap-1">
               <h2 className="text-xl font-bold">
                 {upgradeTarget === "batch"
-                  ? `批量升级 (${selectedIds.size} 个节点)`
-                  : "升级节点"}
+                  ? `批量升级 (${selectedIds.size} 个服务器)`
+                  : "升级服务器"}
               </h2>
             </ModalHeader>
             <ModalBody>

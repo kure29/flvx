@@ -455,7 +455,7 @@ func (h *Handler) planTunnelDeleteForwardMigrations(sourceTunnelID, targetTunnel
 		return nil, nil, err
 	}
 	if len(entryNodes) == 0 {
-		return nil, nil, errors.New("目标隧道缺少入口节点")
+		return nil, nil, errors.New("目标隧道缺少入口服务器")
 	}
 
 	plans := make([]tunnelForwardMigrationPlan, 0, len(forwards))
@@ -525,7 +525,7 @@ func (h *Handler) planSingleTunnelDeleteForwardMigration(forward *forwardRecord,
 			return tunnelForwardMigrationPlan{}, err
 		}
 		if reservedOnNode, ok := reservedPorts[nodeID]; ok && reservedOnNode[targetPort] {
-			return tunnelForwardMigrationPlan{}, fmt.Errorf("目标隧道入口节点端口 %d 已被本次迁移中的其他规则占用", targetPort)
+			return tunnelForwardMigrationPlan{}, fmt.Errorf("目标隧道入口服务器端口 %d 已被本次迁移中的其他规则占用", targetPort)
 		}
 	}
 
@@ -603,7 +603,7 @@ func (h *Handler) applyTunnelDeleteForwardMigration(plan tunnelForwardMigrationP
 				if n, nErr := h.getNodeRecord(nodeID); nErr == nil && n != nil && strings.TrimSpace(n.Name) != "" {
 					nodeLabel = strings.TrimSpace(n.Name)
 				}
-				warnings = append(warnings, fmt.Sprintf("节点 %s 清理旧转发监听失败: %v", nodeLabel, delErr))
+				warnings = append(warnings, fmt.Sprintf("服务器 %s 清理旧转发监听失败: %v", nodeLabel, delErr))
 			}
 		}
 		time.Sleep(tunnelServiceBindRetryDelay)
@@ -623,7 +623,7 @@ func (h *Handler) applyTunnelDeleteForwardMigration(plan tunnelForwardMigrationP
 				if n, nErr := h.getNodeRecord(nodeID); nErr == nil && n != nil && strings.TrimSpace(n.Name) != "" {
 					nodeLabel = strings.TrimSpace(n.Name)
 				}
-				warnings = append(warnings, fmt.Sprintf("节点 %s 清理旧隧道残留服务失败: %v", nodeLabel, delErr))
+				warnings = append(warnings, fmt.Sprintf("服务器 %s 清理旧隧道残留服务失败: %v", nodeLabel, delErr))
 			}
 		}
 	}

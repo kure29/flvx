@@ -69,7 +69,7 @@ func TestTunnelQualityProberSkipsAllOfflineExits(t *testing.T) {
 	if len(snaps) != 1 {
 		t.Fatalf("expected one quality snapshot, got %+v", snaps)
 	}
-	if snaps[0].Success || snaps[0].ErrorMessage != "出口节点均不在线" {
+	if snaps[0].Success || snaps[0].ErrorMessage != "出口服务器均不在线" {
 		t.Fatalf("expected offline exit snapshot, got %+v", snaps[0])
 	}
 	if snaps[0].EntryToExitLoss != 100 {

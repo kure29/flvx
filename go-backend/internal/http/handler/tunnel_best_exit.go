@@ -183,14 +183,14 @@ func evaluateBestExitOwner(owner chainNodeRecord, exits []chainNodeRecord, nodes
 
 func resolveBestExitProbeTarget(fromNode, targetNode *nodeRecord, preferredPort int, ipPreference string, connectIP string) (string, int, error) {
 	if targetNode == nil {
-		return "", 0, errors.New("目标节点不存在")
+		return "", 0, errors.New("目标服务器不存在")
 	}
 	host, err := selectTunnelDialHost(fromNode, targetNode, ipPreference, connectIP)
 	if err != nil {
 		return "", 0, err
 	}
 	if strings.TrimSpace(host) == "" {
-		return "", 0, errors.New("目标节点地址为空")
+		return "", 0, errors.New("目标服务器地址为空")
 	}
 	port := preferredPort
 	if port <= 0 {

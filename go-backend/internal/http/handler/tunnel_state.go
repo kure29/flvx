@@ -245,26 +245,26 @@ func (h *Handler) prepareTunnelCreateState(tx *gorm.DB, req map[string]interface
 	seen := make(map[int64]struct{}, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 		if _, ok := seen[nodeID]; ok {
-			return nil, errors.New("节点重复")
+			return nil, errors.New("服务器重复")
 		}
 		seen[nodeID] = struct{}{}
 		state.NodeIDList = append(state.NodeIDList, nodeID)
 		node, err := h.repo.GetNodeRecordTx(tx, nodeID)
 		if err != nil {
 			if strings.Contains(err.Error(), "不存在") {
-				return nil, errors.New("节点不存在")
+				return nil, errors.New("服务器不存在")
 			}
 			return nil, err
 		}
 		if node == nil {
-			return nil, errors.New("节点不存在")
+			return nil, errors.New("服务器不存在")
 		}
 		if node.IsRemote != 1 && node.Status != 1 {
 			// For tunnel updates, allow offline nodes that already belong to the
 			// tunnel (user may be removing them). Only reject genuinely new offline nodes.
 			_, isExisting := existingNodeIDs[nodeID]
 			if excludeTunnelID <= 0 || !isExisting {
-				return nil, errors.New("部分节点不在线")
+				return nil, errors.New("部分服务器不在线")
 			}
 		}
 		state.Nodes[nodeID] = node
@@ -292,7 +292,7 @@ func validateTunnelRuntimeBeforeApply(state *tunnelCreateState) error {
 	}
 	for _, node := range state.Nodes {
 		if node.IsRemote == 1 && (strings.TrimSpace(node.RemoteURL) == "" || strings.TrimSpace(node.RemoteToken) == "") {
-			return fmt.Errorf("远程节点 %s 缺少共享配置", nodeDisplayName(node))
+			return fmt.Errorf("远程服务器 %s 缺少共享配置", nodeDisplayName(node))
 		}
 	}
 	groups := append([][]tunnelRuntimeNode{state.InNodes}, state.ChainHops...)
@@ -302,13 +302,13 @@ func validateTunnelRuntimeBeforeApply(state *tunnelCreateState) error {
 			for _, target := range groups[i+1] {
 				node := state.Nodes[target.NodeID]
 				if node == nil {
-					return errors.New("节点不存在")
+					return errors.New("服务器不存在")
 				}
 				if _, err := selectTunnelDialHost(state.Nodes[source.NodeID], node, state.IPPreference, target.ConnectIP); err != nil {
 					return err
 				}
 				if node.IsRemote != 1 && target.Port <= 0 {
-					return errors.New("节点端口不能为空")
+					return errors.New("服务器端口不能为空")
 				}
 			}
 		}
@@ -399,7 +399,7 @@ func validateTunnelConnectIPConstraints(req map[string]interface{}) error {
 
 		for _, item := range hopNodes {
 			if strings.TrimSpace(asString(item["connectIp"])) != "" {
-				return fmt.Errorf("转发链第%d跳有多个节点时不支持设置自定义连接IP", hopIdx+1)
+				return fmt.Errorf("转发链第%d跳有多个服务器时不支持设置自定义连接IP", hopIdx+1)
 			}
 		}
 	}

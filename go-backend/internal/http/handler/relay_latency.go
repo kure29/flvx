@@ -116,7 +116,7 @@ func (h *Handler) planRelayPath(rw repo.InboundRelayView, landing string, cache 
 	}
 	inNodes, hopGroups, outNodes := splitChainNodeGroups(rows)
 	if len(inNodes) == 0 {
-		return relayPlan{err: "隧道没有入口节点"}
+		return relayPlan{err: "隧道没有入口服务器"}
 	}
 	plan := relayPlan{entry: inNodes[0]}
 	prev := inNodes[0]
@@ -254,7 +254,7 @@ func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64
 		if len(ids) > 0 && !want[rw.ID] {
 			continue
 		}
-		plan := h.planRelayPath(rw, firstNonEmpty(landing[rw.InboundID], "落地"), cache)
+		plan := h.planRelayPath(rw, firstNonEmpty(landing[rw.InboundID], "节点"), cache)
 		for i := range plan.legs {
 			l := &plan.legs[i]
 			if l.err != "" {
@@ -263,9 +263,9 @@ func (h *Handler) probeRelayLatency(ctx context.Context, ids []int64) (map[int64
 			if n, err := h.cachedNode(cache, l.fromID); err != nil {
 				l.err = err.Error()
 			} else if n.IsRemote == 1 {
-				l.err = "共享节点不检测"
+				l.err = "共享服务器不检测"
 			} else if n.Status != 1 {
-				l.err = "节点离线"
+				l.err = "服务器离线"
 			}
 		}
 		plans[rw.ID] = plan

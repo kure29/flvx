@@ -243,7 +243,7 @@ func TestIPv6RouteByOriginAS(t *testing.T) {
 	if p.Family != "IPv6" || p.Route != "电信 CN2 GIA" {
 		t.Fatalf("IPv6 point = %+v", p)
 	}
-	if e := routePointFrom(latencyTarget{Name: "电信"}, nil, errors.New("节点没有 IPv4 路由，目标没有 IPv6 地址")).Error; e != "节点只有 IPv6，测试点没有 IPv6 地址" {
+	if e := routePointFrom(latencyTarget{Name: "电信"}, nil, errors.New("节点没有 IPv4 路由，目标没有 IPv6 地址")).Error; e != "服务器只有 IPv6，测试点没有 IPv6 地址" {
 		t.Fatalf("error = %q", e)
 	}
 }

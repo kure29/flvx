@@ -253,15 +253,15 @@ func routePointFrom(t latencyTarget, data map[string]interface{}, err error) rou
 		msg := err.Error()
 		switch {
 		case strings.Contains(msg, "未知命令"):
-			p.Error = "节点 agent 版本过旧，升级后可检测回程"
+			p.Error = "服务器 agent 版本过旧，升级后可检测回程"
 		case strings.Contains(msg, "NET_RAW"):
-			p.Error = "节点没有 root / NET_RAW 权限"
+			p.Error = "服务器没有 root / NET_RAW 权限"
 		case strings.Contains(msg, "没有 IPv6 地址"):
-			p.Error = "节点只有 IPv6，测试点没有 IPv6 地址"
+			p.Error = "服务器只有 IPv6，测试点没有 IPv6 地址"
 		case strings.Contains(msg, "没有 IPv4 地址"):
-			p.Error = "测试点只有 IPv6 地址，节点没有 IPv6"
+			p.Error = "测试点只有 IPv6 地址，服务器没有 IPv6"
 		case strings.Contains(msg, "路由"):
-			p.Error = "节点到测试点没有路由"
+			p.Error = "服务器到测试点没有路由"
 		case strings.Contains(msg, "DNS"):
 			p.Error = "域名解析失败"
 		default:
@@ -398,7 +398,7 @@ func (h *Handler) traceNodeRoutes(ctx context.Context, ids []int64, force bool) 
 			if prev, ok := h.nodeRoutes.get(nodeID); ok {
 				if changes := routeChanges(prev, r); len(changes) > 0 {
 					h.notify(notifyEventRouteChange, "回程线路变化",
-						fmt.Sprintf("节点：%s\n%s", name, strings.Join(changes, "\n")))
+						fmt.Sprintf("服务器：%s\n%s", name, strings.Join(changes, "\n")))
 				}
 			}
 			h.nodeRoutes.set(nodeID, r)

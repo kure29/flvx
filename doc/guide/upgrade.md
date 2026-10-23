@@ -24,11 +24,11 @@ curl -L https://github.com/kure29/flyx/releases/latest/download/panel_install.sh
 curl -L https://github.com/kure29/flyx/releases/download/3.0.7/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
-## 节点 agent 升级
+## agent 升级
 
-**节点** 页选择节点 → **升级**，留空版本即使用最新版；点 **多选** 可以批量升级。也可以在节点上重新运行节点安装脚本。
+**服务器** 页选择服务器 → **升级**，留空版本即使用最新版；点 **多选** 可以批量升级。也可以在服务器上重新运行服务器安装脚本。
 
-面板升级后建议把节点 agent 也升级到同一版本：新功能（例如回程检测、订阅流量统计）需要新 agent，旧 agent 能照常转发，只是用不了这些功能。内核（Xray / sing-box / Snell）的版本在 **落地 → 内核** 里单独更换，见 [内核与协议](./kernels.md)。
+面板升级后建议把 agent 也升级到同一版本：新功能（例如回程检测、订阅流量统计）需要新 agent，旧 agent 能照常转发，只是用不了这些功能。内核（Xray / sing-box / Snell）的版本在 **落地 → 内核** 里单独更换，见 [内核与协议](./kernels.md)。
 
 ## 修复面板内升级
 

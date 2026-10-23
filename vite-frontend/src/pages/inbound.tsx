@@ -113,7 +113,7 @@ const CONFIRM_TEXT: Record<
 > = {
   delete: {
     title: "删除入站",
-    body: "删除后节点上的该服务会立即停止，且无法恢复。",
+    body: "删除后服务器上的该服务会立即停止，且无法恢复。",
     button: "确认删除",
     color: "danger",
   },
@@ -202,7 +202,7 @@ function groupKeyOf(i: InboundApiItem): string {
 }
 
 function groupLabelOf(i: InboundApiItem): string {
-  if (!i.external) return i.nodeName || `节点 ${i.nodeId}`;
+  if (!i.external) return i.nodeName || `服务器 ${i.nodeId}`;
 
   return i.sourceId ? `订阅源 · ${i.sourceName || i.sourceId}` : EXTERNAL_LABEL;
 }
@@ -760,7 +760,7 @@ export default function InboundPage() {
               </span>,
             ],
             [
-              item.external ? "地址" : "节点",
+              item.external ? "地址" : "服务器",
               <span key="where" className="font-mono">
                 {item.external ? item.listen : item.nodeName}
               </span>,
@@ -915,8 +915,8 @@ export default function InboundPage() {
   return (
     <AnimatedPage className="px-3 lg:px-6 py-6">
       <PageHeader
-        description="落地是客户端最终连到的节点：在自己的服务器上搭建，或导入现成的节点"
-        title="落地"
+        description="客户端最终连上的节点：在自己的服务器上搭建，或导入现成的"
+        title="节点"
       />
       <PageTabs tabs={tabs} value={tab} onChange={setTab} />
 
@@ -950,7 +950,7 @@ export default function InboundPage() {
                   onPress: () => setSelectMode(true),
                 },
               ]}
-              placeholder="搜索名称、节点、协议、端口"
+              placeholder="搜索名称、服务器、协议、端口"
               primary={{
                 key: "create",
                 label: "新建入站",
@@ -963,12 +963,12 @@ export default function InboundPage() {
             >
               {nodeOptions.length > 1 && (
                 <select
-                  aria-label="按节点筛选"
+                  aria-label="按服务器筛选"
                   className="h-9 max-w-[8rem] shrink-0 rounded-full bg-default-100 px-3 text-sm"
                   value={nodeFilter}
                   onChange={(e) => setNodeFilter(e.target.value)}
                 >
-                  <option value="">全部节点</option>
+                  <option value="">全部服务器</option>
                   {nodeOptions.map(([id, name]) => (
                     <option key={id} value={id}>
                       {name}
@@ -1036,10 +1036,10 @@ export default function InboundPage() {
                 </h3>
                 <p className="text-default-500 text-sm max-w-sm">
                   {kernels.length === 0 && inbounds.length === 0
-                    ? "先为落地节点安装内核，然后在这里创建 VLESS-Reality、SS2022 等入站；也可以点“导入”，导入别处搭好的 ss 节点用来对接中转。"
+                    ? "先在服务器上安装内核，然后在这里创建 VLESS-Reality、SS2022 等入站；也可以点“导入”，导入别处搭好的 ss 节点用来对接中转。"
                     : inbounds.length === 0
                       ? "点击“新建入站”，选择一个模板即可快速创建。"
-                      : "换个关键词或节点试试。"}
+                      : "换个关键词或服务器试试。"}
                 </p>
                 {kernels.length === 0 && inbounds.length === 0 && (
                   <Button
@@ -1418,7 +1418,7 @@ export default function InboundPage() {
                   <p className="text-small text-default-500">
                     {panelOnly
                       ? "只删除面板里的记录和相关中转，原服务器上的节点不受影响。"
-                      : "相关中转会一并删除；面板创建的入站会在节点上立即停止，且无法恢复。"}
+                      : "相关中转会一并删除；面板创建的入站会在服务器上立即停止，且无法恢复。"}
                   </p>
                 </ModalBody>
                 <ModalFooter>

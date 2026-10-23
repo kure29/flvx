@@ -801,7 +801,7 @@ func (h *Handler) validateForwardPortAvailabilityTx(tx *gorm.DB, node *nodeRecor
 		return err
 	}
 	if occupied {
-		return fmt.Errorf("节点 %s 端口 %d 已被其他转发占用", node.Name, port)
+		return fmt.Errorf("服务器 %s 端口 %d 已被其他转发占用", node.Name, port)
 	}
 	return nil
 }
@@ -1159,7 +1159,7 @@ func (h *Handler) tunnelBatchRedeploy(w http.ResponseWriter, r *http.Request) {
 		} else if nftMode {
 			if len(entryNodeIDs) == 0 {
 				fail++
-				failures = appendBatchFailureReason(failures, tunnelID, tunnelName, "nftables 转发缺少入口节点")
+				failures = appendBatchFailureReason(failures, tunnelID, tunnelName, "nftables 转发缺少入口服务器")
 				continue
 			}
 			if reconcileErr := h.reconcileNftablesNodeByRequest(entryNodeIDs[0]); reconcileErr != nil {

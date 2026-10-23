@@ -24,15 +24,15 @@
 ### IPv6 无法使用？
 面板安装脚本会自动尝试配置 Docker 的 IPv6。如果失败，请手动检查 `/etc/docker/daemon.json` 配置，确保 `ipv6: true` 且分配了正确的 `fixed-cidr-v6` 子网。
 
-## 节点 agent
+## agent
 
-### 节点显示离线？
-1. 检查节点服务器与面板服务器之间的网络连通性。
-2. 确认在节点端安装时输入的 **面板地址** 和 **密钥** 是否正确。
-3. 检查节点端服务状态：`systemctl status flux_agent`（Alpine 用 `rc-service flux_agent status`）。
-4. 查看节点端日志：`journalctl -u flux_agent -f`。
+### 服务器显示离线？
+1. 检查服务器与面板服务器之间的网络连通性。
+2. 确认在服务器端安装时输入的 **面板地址** 和 **密钥** 是否正确。
+3. 检查服务器端服务状态：`systemctl status flux_agent`（Alpine 用 `rc-service flux_agent status`）。
+4. 查看服务器端日志：`journalctl -u flux_agent -f`。
 
-### 部署或升级节点提示 “API rate limit exceeded”？
+### 部署或升级服务器提示 “API rate limit exceeded”？
 
 面板要向 GitHub 查询最新版本号。不登录的查询每个 IP 每小时只有 60 次，VPS 的 IP 常常和别人共用，可能早就被用完。面板会把查询结果缓存 10 分钟，查询失败时用上次的结果，正式版还会改用不受这个限制的方式查询，所以一般不会再遇到。
 
@@ -57,15 +57,15 @@ GITHUB_TOKEN=github_pat_xxx
 
 有两种：Snell 内核（官方 snell-server：5.x 支持 v4 / v5，含 v5 的 QUIC 代理模式；6.0.0 测试版只支持 v6）和 sing-box 1.14 起内置的 Snell（支持 v4 / v5 / v6、分流和链式出站，不支持 QUIC 模式）。对比和选择见 [Snell 用哪个内核](./kernels.md#snell-用哪个内核)。
 
-用 Snell 内核时，入站的 Snell 版本要和节点安装的版本对得上：v5 入站需要 Snell 5.x，v6 入站需要 Snell 6.0.0（测试版，只接受 v6 客户端）。
+用 Snell 内核时，入站的 Snell 版本要和服务器安装的版本对得上：v5 入站需要 Snell 5.x，v6 入站需要 Snell 6.0.0（测试版，只接受 v6 客户端）。
 
 ### sing-box 提示需要 1.14 及以上
 
-自动申请证书（ACME）和内置 Snell 是 sing-box 1.14 才有的功能。在 **落地 → 内核** 点该 sing-box → 更换版本，选最新版即可。已经有这类入站时，也不能把 sing-box 换回 1.14 以前的版本。
+自动申请证书（ACME）和内置 Snell 是 sing-box 1.14 才有的功能。在 **服务器 → 内核** 点该 sing-box → 更换版本，选最新版即可。已经有这类入站时，也不能把 sing-box 换回 1.14 以前的版本。
 
 ### ACME 一直申请不到证书
 
-确认域名已解析到节点；HTTP 验证时 80 端口不能被其他程序占用，并且要能从公网访问；也可以改用 DNS 验证。
+确认域名已解析到服务器；HTTP 验证时 80 端口不能被其他程序占用，并且要能从公网访问；也可以改用 DNS 验证。
 
 ### Reality 用 Clash / Mihomo 连不上
 
@@ -75,7 +75,7 @@ Xray 26.7.11 起，Reality 未设置“最低客户端版本”时默认只接�
 
 ### 流量一直是 0
 
-检查节点是否安装了 nftables；流量每分钟左右同步一次。订阅流量还需要节点 agent 和面板一起更新到最新版，Shadowsocks、Snell 等共用凭据的入站不按订阅计数，见 [凭据、到期与流量](./subscription-users.md#流量上限)。
+检查服务器是否安装了 nftables；流量每分钟左右同步一次。订阅流量还需要 agent 和面板一起更新到最新版，Shadowsocks、Snell 等共用凭据的入站不按订阅计数，见 [凭据、到期与流量](./subscription-users.md#流量上限)。
 
 ### 某个客户端里少了几个节点
 
@@ -83,17 +83,17 @@ Xray 26.7.11 起，Reality 未设置“最低客户端版本”时默认只接�
 
 ## 延迟与回程
 
-### 落地卡片上的延迟是从哪里测的
+### 节点卡片上的延迟是从哪里测的
 
-设置了 [延迟测试点](./latency.md) 时，是所在节点到各测试点（各地运营商）的延迟；没设置时是面板服务器到入站的延迟，只能作为参考。导入的节点没有 agent，只有面板发起的连通性检测。
+设置了 [延迟测试点](./latency.md) 时，是所在服务器到各测试点（各地运营商）的延迟；没设置时是面板服务器到入站的延迟，只能作为参考。导入的节点没有 agent，只有面板发起的连通性检测。
 
-### 回程提示“节点 agent 版本过旧”
+### 回程提示“agent 版本过旧”
 
-回程检测需要新版节点 agent。到 **节点** 页把节点升级到最新版，升级后面板会马上重新检测，不用等第二天。
+回程检测需要新版 agent。到 **服务器** 页把服务器升级到最新版，升级后面板会马上重新检测，不用等第二天。
 
 ### 回程提示“没有 root / NET_RAW 权限”
 
-路由追踪要发原始 ICMP 包，节点 agent 需要以 root 运行，或者有 `CAP_NET_RAW` 权限。用面板生成的命令安装的 agent 默认是 root。
+路由追踪要发原始 ICMP 包，agent 需要以 root 运行，或者有 `CAP_NET_RAW` 权限。用面板生成的命令安装的 agent 默认是 root。
 
 ### 回程显示“未识别”
 

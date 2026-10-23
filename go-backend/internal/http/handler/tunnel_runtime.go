@@ -47,7 +47,7 @@ func (h *Handler) applyTunnelRuntimeWithMode(state *tunnelCreateState, upsert bo
 			if shouldDeferTunnelRuntimeApplyError(err) {
 				continue
 			}
-			return createdChains, createdServices, fmt.Errorf("入口节点 %s 下发转发链失败: %w", nodeDisplayName(state.Nodes[inNode.NodeID]), err)
+			return createdChains, createdServices, fmt.Errorf("入口服务器 %s 下发转发链失败: %w", nodeDisplayName(state.Nodes[inNode.NodeID]), err)
 		}
 		createdChains = append(createdChains, inNode.NodeID)
 	}
@@ -72,7 +72,7 @@ func (h *Handler) applyTunnelRuntimeWithMode(state *tunnelCreateState, upsert bo
 				if shouldDeferTunnelRuntimeApplyError(err) {
 					continue
 				}
-				return createdChains, createdServices, fmt.Errorf("转发链节点 %s 下发转发链失败: %w", nodeDisplayName(state.Nodes[chainNode.NodeID]), err)
+				return createdChains, createdServices, fmt.Errorf("转发链服务器 %s 下发转发链失败: %w", nodeDisplayName(state.Nodes[chainNode.NodeID]), err)
 			}
 			createdChains = append(createdChains, chainNode.NodeID)
 
@@ -81,7 +81,7 @@ func (h *Handler) applyTunnelRuntimeWithMode(state *tunnelCreateState, upsert bo
 				if shouldDeferTunnelRuntimeApplyError(err) {
 					continue
 				}
-				return createdChains, createdServices, fmt.Errorf("转发链节点 %s 下发服务失败: %w", nodeDisplayName(state.Nodes[chainNode.NodeID]), err)
+				return createdChains, createdServices, fmt.Errorf("转发链服务器 %s 下发服务失败: %w", nodeDisplayName(state.Nodes[chainNode.NodeID]), err)
 			}
 			createdServices = append(createdServices, chainNode.NodeID)
 		}
@@ -97,7 +97,7 @@ func (h *Handler) applyTunnelRuntimeWithMode(state *tunnelCreateState, upsert bo
 			if shouldDeferTunnelRuntimeApplyError(err) {
 				continue
 			}
-			return createdChains, createdServices, fmt.Errorf("出口节点 %s 下发服务失败: %w", nodeDisplayName(state.Nodes[outNode.NodeID]), err)
+			return createdChains, createdServices, fmt.Errorf("出口服务器 %s 下发服务失败: %w", nodeDisplayName(state.Nodes[outNode.NodeID]), err)
 		}
 		createdServices = append(createdServices, outNode.NodeID)
 	}
@@ -186,21 +186,21 @@ func (h *Handler) applyRemoteBestExitChainOrder(tunnelID, ownerNodeID int64, own
 	}
 	remoteToken := strings.TrimSpace(owner.RemoteToken)
 	if remoteURL == "" || remoteToken == "" {
-		return errors.New("远程节点缺少共享配置")
+		return errors.New("远程服务器缺少共享配置")
 	}
 
 	applyTargets := make([]client.RuntimeTarget, 0, len(targets))
 	for _, target := range targets {
 		targetNode := nodes[target.NodeID]
 		if targetNode == nil {
-			return errors.New("节点不存在")
+			return errors.New("服务器不存在")
 		}
 		host, hostErr := selectTunnelDialHost(owner, targetNode, ipPreference, target.ConnectIP)
 		if hostErr != nil {
 			return hostErr
 		}
 		if target.Port <= 0 {
-			return errors.New("节点端口不能为空")
+			return errors.New("服务器端口不能为空")
 		}
 		applyTargets = append(applyTargets, client.RuntimeTarget{
 			Host:     host,
@@ -339,10 +339,10 @@ func shouldDeferTunnelRuntimeApplyError(err error) bool {
 	if msg == "" {
 		return false
 	}
-	if strings.Contains(msg, "节点不在线") {
+	if strings.Contains(msg, "服务器不在线") || strings.Contains(msg, "节点不在线") {
 		return true
 	}
-	if strings.Contains(msg, "等待节点响应超时") || strings.Contains(msg, "timeout") || strings.Contains(msg, "超时") {
+	if strings.Contains(msg, "等待服务器响应超时") || strings.Contains(msg, "timeout") || strings.Contains(msg, "超时") {
 		return true
 	}
 	return false
@@ -358,7 +358,7 @@ func isNodeOfflineOrTimeoutError(err error) bool {
 func buildTunnelChainConfig(tunnelID int64, fromNodeID int64, targets []tunnelRuntimeNode, nodes map[int64]*nodeRecord, ipPreference string) (map[string]interface{}, error) {
 	fromNode := nodes[fromNodeID]
 	if fromNode == nil {
-		return nil, errors.New("节点不存在")
+		return nil, errors.New("服务器不存在")
 	}
 	if len(targets) == 0 {
 		return nil, errors.New("转发链目标不能为空")
@@ -367,7 +367,7 @@ func buildTunnelChainConfig(tunnelID int64, fromNodeID int64, targets []tunnelRu
 	for idx, target := range targets {
 		targetNode := nodes[target.NodeID]
 		if targetNode == nil {
-			return nil, errors.New("节点不存在")
+			return nil, errors.New("服务器不存在")
 		}
 		host, err := selectTunnelDialHost(fromNode, targetNode, ipPreference, target.ConnectIP)
 		if err != nil {
@@ -375,7 +375,7 @@ func buildTunnelChainConfig(tunnelID int64, fromNodeID int64, targets []tunnelRu
 		}
 		port := target.Port
 		if port <= 0 {
-			return nil, errors.New("节点端口不能为空")
+			return nil, errors.New("服务器端口不能为空")
 		}
 		protocol := defaultString(target.Protocol, "tls")
 		connector := map[string]interface{}{
@@ -491,7 +491,7 @@ func buildTunnelChainServiceConfig(tunnelID int64, chainNode tunnelRuntimeNode, 
 
 func selectTunnelDialHost(fromNode, toNode *nodeRecord, ipPreference string, connectIp string) (string, error) {
 	if fromNode == nil || toNode == nil {
-		return "", errors.New("节点不存在")
+		return "", errors.New("服务器不存在")
 	}
 	if strings.TrimSpace(connectIp) != "" {
 		return strings.TrimSpace(connectIp), nil
@@ -548,7 +548,7 @@ func selectTunnelDialHost(fromNode, toNode *nodeRecord, ipPreference string, con
 			}
 		}
 	}
-	return "", fmt.Errorf("节点链路不兼容：%s(v4=%t,v6=%t) -> %s(v4=%t,v6=%t)", nodeDisplayName(fromNode), fromV4, fromV6, nodeDisplayName(toNode), toV4, toV6)
+	return "", fmt.Errorf("服务器链路不兼容：%s(v4=%t,v6=%t) -> %s(v4=%t,v6=%t)", nodeDisplayName(fromNode), fromV4, fromV6, nodeDisplayName(toNode), toV4, toV6)
 }
 
 func nodeDisplayName(node *nodeRecord) string {

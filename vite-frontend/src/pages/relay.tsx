@@ -243,7 +243,7 @@ function LinesView() {
   return (
     <div className="space-y-3">
       <PageToolbar
-        placeholder="搜索落地名称"
+        placeholder="搜索节点名称"
         search={query}
         view={{ value: viewMode, onChange: setViewMode }}
         onSearch={setQuery}
@@ -265,9 +265,9 @@ function LinesView() {
         <EmptyHint
           text={
             inbounds.length === 0
-              ? "还没有落地。先在“落地”里搭建或导入节点，再回来对接中转"
+              ? "还没有节点。先在“节点”里搭建或导入，再回来对接中转"
               : query
-                ? "没有匹配的落地"
+                ? "没有匹配的节点"
                 : "还没有中转线路"
           }
         />
@@ -342,7 +342,7 @@ function LinesView() {
                 >
                   <div className="space-y-2">
                     <p className="truncate text-xs text-default-500">
-                      落地：{landing}
+                      节点：{landing}
                     </p>
                     {lineList}
                   </div>
@@ -412,7 +412,7 @@ export default function RelayPage() {
   return (
     <AnimatedPage className="px-3 py-6 lg:px-6">
       <PageHeader
-        description="让客户端先连中转再到落地：线路按落地管理，隧道和规则是底层的转发配置"
+        description="让客户端先连中转再到节点：线路按节点管理，隧道和规则是底层的转发配置"
         title="中转"
       />
       <PageTabs tabs={TABS} value={tab} onChange={setTab} />

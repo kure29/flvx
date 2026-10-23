@@ -23,12 +23,12 @@ export default defineConfig({
           { text: "基本概念", link: "/guide/concepts" },
           { text: "快速上手", link: "/guide/getting-started" },
           { text: "安装面板", link: "/guide/install" },
-          { text: "安装节点", link: "/guide/agent" },
+          { text: "安装 agent", link: "/guide/agent" },
           { text: "升级", link: "/guide/upgrade" },
         ],
       },
       {
-        text: "落地",
+        text: "节点",
         items: [
           { text: "内核与协议", link: "/guide/kernels" },
           { text: "新建入站", link: "/guide/nodes" },

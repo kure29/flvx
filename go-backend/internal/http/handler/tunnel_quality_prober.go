@@ -331,7 +331,7 @@ func (p *tunnelQualityProber) probeTunnel(tunnelID int64) {
 				snap.ErrorMessage = err.Error()
 			}
 		} else {
-			snap.ErrorMessage = "入口节点均不在线"
+			snap.ErrorMessage = "入口服务器均不在线"
 		}
 	case 2:
 		// Tunnel forwarding: entry → exit + exit → Bing
@@ -339,12 +339,12 @@ func (p *tunnelQualityProber) probeTunnel(tunnelID int64) {
 
 		if !entryOnline {
 			probeOK = false
-			snap.ErrorMessage = "入口节点均不在线"
+			snap.ErrorMessage = "入口服务器均不在线"
 			snap.EntryToExitLatency = -1
 			snap.EntryToExitLoss = 100
 		} else if !exitOnline {
 			probeOK = false
-			snap.ErrorMessage = "出口节点均不在线"
+			snap.ErrorMessage = "出口服务器均不在线"
 			snap.EntryToExitLatency = -1
 			snap.EntryToExitLoss = 100
 		} else {
@@ -380,7 +380,7 @@ func (p *tunnelQualityProber) probeTunnel(tunnelID int64) {
 
 				targetNode, nodeErr := h.getNodeRecord(target.NodeID)
 				if nodeErr != nil || !isTunnelProbeNodeOnline(targetNode) {
-					snap.ErrorMessage = "节点 " + target.NodeName + " 不可用"
+					snap.ErrorMessage = "服务器 " + target.NodeName + " 不可用"
 					probeOK = false
 					hop.Latency = -1
 					hop.Loss = 100
@@ -391,7 +391,7 @@ func (p *tunnelQualityProber) probeTunnel(tunnelID int64) {
 				fromNode, _ := h.getNodeRecord(source.NodeID)
 				targetIP, targetPort, resolveErr := resolveChainProbeTarget(fromNode, targetNode, target.Port, ipPreference, target.ConnectIP)
 				if resolveErr != nil {
-					snap.ErrorMessage = "解析节点 " + target.NodeName + " 失败: " + resolveErr.Error()
+					snap.ErrorMessage = "解析服务器 " + target.NodeName + " 失败: " + resolveErr.Error()
 					probeOK = false
 					hop.Latency = -1
 					hop.Loss = 100
@@ -457,7 +457,7 @@ func (p *tunnelQualityProber) probeTunnel(tunnelID int64) {
 				snap.ErrorMessage = err.Error()
 			}
 		} else {
-			snap.ErrorMessage = "入口节点均不在线"
+			snap.ErrorMessage = "入口服务器均不在线"
 		}
 	}
 
@@ -569,13 +569,13 @@ func (p *tunnelQualityProber) probeCandidateGroupLinks(
 
 			sourceNode, sourceErr := p.handler.getNodeRecord(source.NodeID)
 			if sourceErr != nil || !isTunnelProbeNodeOnline(sourceNode) {
-				item.ErrorMessage = "来源节点不在线"
+				item.ErrorMessage = "来源服务器不在线"
 				items = append(items, item)
 				continue
 			}
 			targetNode, targetErr := p.handler.getNodeRecord(target.NodeID)
 			if targetErr != nil || !isTunnelProbeNodeOnline(targetNode) {
-				item.ErrorMessage = "目标节点不在线"
+				item.ErrorMessage = "目标服务器不在线"
 				items = append(items, item)
 				continue
 			}
@@ -630,7 +630,7 @@ func (p *tunnelQualityProber) probePublicTargetCandidates(
 		}
 		sourceNode, sourceErr := p.handler.getNodeRecord(source.NodeID)
 		if sourceErr != nil || !isTunnelProbeNodeOnline(sourceNode) {
-			item.ErrorMessage = "来源节点不在线"
+			item.ErrorMessage = "来源服务器不在线"
 			items = append(items, item)
 			continue
 		}
@@ -724,7 +724,7 @@ func (p *tunnelQualityProber) tcpPingNode(nodeID int64, ip string, port int, opt
 		return 0, 100, nodeErr
 	}
 	if !isTunnelProbeNodeOnline(node) {
-		return 0, 100, errors.New("节点不在线")
+		return 0, 100, errors.New("服务器不在线")
 	}
 
 	var pingData map[string]interface{}

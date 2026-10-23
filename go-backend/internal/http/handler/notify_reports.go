@@ -191,7 +191,7 @@ func (h *Handler) maybeDailyReport(now time.Time) {
 func (h *Handler) dailyReportText(now time.Time) string {
 	var lines []string
 	if online, total, err := h.repo.CountNodesOnline(); err == nil && total > 0 {
-		lines = append(lines, fmt.Sprintf("节点在线：%d / %d", online, total))
+		lines = append(lines, fmt.Sprintf("服务器在线：%d / %d", online, total))
 	}
 	if kernels, err := h.repo.ListNodeKernels(0); err == nil && len(kernels) > 0 {
 		bad := 0

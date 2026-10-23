@@ -61,7 +61,7 @@ func validateShareAddress(mode, host string, node *model.Node) error {
 		}
 	case "ipv4", "ipv6":
 		if nodeShareIP(node, mode == "ipv6") == "" {
-			return errText("节点未设置可用的 " + map[string]string{"ipv4": "IPv4", "ipv6": "IPv6"}[mode] + " 地址")
+			return errText("服务器未设置可用的 " + map[string]string{"ipv4": "IPv4", "ipv6": "IPv6"}[mode] + " 地址")
 		}
 	default:
 		return errText("分享地址类型无效")

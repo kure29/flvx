@@ -47,13 +47,13 @@ func (h *Handler) validateRealmTunnelTx(tx *gorm.DB, typeVal int, entryNodeIDs [
 			return err
 		}
 		if node == nil {
-			return errors.New("节点不存在")
+			return errors.New("服务器不存在")
 		}
 		if node.IsRemote == 1 {
-			return fmt.Errorf("节点 %s 是远程节点，不能使用 realm 引擎", node.Name)
+			return fmt.Errorf("服务器 %s 是远程服务器，不能使用 realm 引擎", node.Name)
 		}
 		if isNftablesForwardMode(node.ForwardMode) {
-			return fmt.Errorf("节点 %s 是 nftables 模式，不能使用 realm 引擎", node.Name)
+			return fmt.Errorf("服务器 %s 是 nftables 模式，不能使用 realm 引擎", node.Name)
 		}
 	}
 	return nil
@@ -209,13 +209,13 @@ func (h *Handler) syncRealmNodes(nodeIDs []int64, override map[int64]bool) ([]st
 		install := k.InstalledVersion == ""
 		if err := h.applyKernelWith(k.ID, install, override); err != nil {
 			if isNodeOfflineOrTimeoutError(err) {
-				warnings = append(warnings, fmt.Sprintf("节点 %s 不在线，realm 配置待节点上线后下发", h.nodeLabel(nodeID)))
+				warnings = append(warnings, fmt.Sprintf("服务器 %s 不在线，realm 配置待服务器上线后下发", h.nodeLabel(nodeID)))
 				continue
 			}
 			if strings.Contains(err.Error(), "不支持的内核类型") {
-				return warnings, fmt.Errorf("节点 %s 的 agent 版本过旧，不支持 realm，请先升级节点", h.nodeLabel(nodeID))
+				return warnings, fmt.Errorf("服务器 %s 的 agent 版本过旧，不支持 realm，请先升级服务器", h.nodeLabel(nodeID))
 			}
-			return warnings, fmt.Errorf("节点 %s realm 下发失败: %w", h.nodeLabel(nodeID), err)
+			return warnings, fmt.Errorf("服务器 %s realm 下发失败: %w", h.nodeLabel(nodeID), err)
 		}
 	}
 	return warnings, nil

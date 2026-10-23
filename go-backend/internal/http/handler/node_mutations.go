@@ -25,7 +25,7 @@ func (h *Handler) nodeCreate(w http.ResponseWriter, r *http.Request) {
 	name := asString(req["name"])
 	serverIP := asString(req["serverIp"])
 	if name == "" || serverIP == "" {
-		response.WriteJSON(w, response.ErrDefault("节点名称和地址不能为空"))
+		response.WriteJSON(w, response.ErrDefault("服务器名称和地址不能为空"))
 		return
 	}
 	if err := IsValidNodeAddress(serverIP); err != nil {
@@ -94,14 +94,14 @@ func (h *Handler) nodeUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	id := asInt64(req["id"], 0)
 	if id <= 0 {
-		response.WriteJSON(w, response.ErrDefault("节点ID不能为空"))
+		response.WriteJSON(w, response.ErrDefault("服务器ID不能为空"))
 		return
 	}
 
 	currentStatus, currentHTTP, currentTLS, currentSocks, err := h.repo.GetNodeStatusFields(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			response.WriteJSON(w, response.ErrDefault("节点不存在"))
+			response.WriteJSON(w, response.ErrDefault("服务器不存在"))
 			return
 		}
 		response.WriteJSON(w, response.Err(-2, err.Error()))
@@ -188,7 +188,7 @@ func (h *Handler) findCreatedNodeID(name, serverIP string) (int64, error) {
 			return nodeID, nil
 		}
 	}
-	return 0, errors.New("节点创建成功，但未能查询到节点记录")
+	return 0, errors.New("服务器创建成功，但未能查询到服务器记录")
 }
 
 func (h *Handler) persistNodeSSHConfig(nodeID int64, req map[string]interface{}, forwardMode string, now int64, preserveSecrets bool) error {
@@ -196,7 +196,7 @@ func (h *Handler) persistNodeSSHConfig(nodeID int64, req map[string]interface{},
 		return errors.New("handler not initialized")
 	}
 	if nodeID <= 0 {
-		return errors.New("节点ID不能为空")
+		return errors.New("服务器ID不能为空")
 	}
 	if forwardMode != "nftables" {
 		return h.repo.DeleteNodeSSHConfig(nodeID)
@@ -248,27 +248,27 @@ func (h *Handler) persistNodeSSHConfig(nodeID int64, req map[string]interface{},
 	}
 
 	if host == "" || username == "" {
-		return errors.New("nftables 节点 SSH 配置不完整")
+		return errors.New("nftables 服务器 SSH 配置不完整")
 	}
 	if port <= 0 || port > 65535 {
-		return errors.New("nftables 节点 SSH 端口无效")
+		return errors.New("nftables 服务器 SSH 端口无效")
 	}
 
 	authType = strings.ToLower(authType)
 	switch authType {
 	case "password":
 		if strings.TrimSpace(password) == "" {
-			return errors.New("nftables 节点 SSH 密码不能为空")
+			return errors.New("nftables 服务器 SSH 密码不能为空")
 		}
 		privateKey = ""
 	case "private_key", "":
 		authType = "private_key"
 		if strings.TrimSpace(privateKey) == "" {
-			return errors.New("nftables 节点 SSH 私钥不能为空")
+			return errors.New("nftables 服务器 SSH 私钥不能为空")
 		}
 		password = ""
 	default:
-		return errors.New("nftables 节点 SSH 认证方式无效")
+		return errors.New("nftables 服务器 SSH 认证方式无效")
 	}
 
 	switch strings.ToLower(sudoMode) {
@@ -276,7 +276,7 @@ func (h *Handler) persistNodeSSHConfig(nodeID int64, req map[string]interface{},
 		sudoMode = "none"
 	case "sudo", "sudo_su":
 	default:
-		return errors.New("nftables 节点 sudo 模式无效")
+		return errors.New("nftables 服务器 sudo 模式无效")
 	}
 
 	return h.repo.UpsertNodeSSHConfig(nodeID, repo.NftSSHConfigInput{
@@ -337,7 +337,7 @@ func (h *Handler) nodeInstall(w http.ResponseWriter, r *http.Request) {
 
 	secret, err := h.repo.GetNodeSecret(req.ID)
 	if err != nil {
-		response.WriteJSON(w, response.ErrDefault("节点不存在"))
+		response.WriteJSON(w, response.ErrDefault("服务器不存在"))
 		return
 	}
 	panelAddr, err := h.repo.GetViteConfigValue("ip")
@@ -411,7 +411,7 @@ func (h *Handler) nodeDismissExpiryReminder(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if req.ID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("节点ID不能为空"))
+		response.WriteJSON(w, response.ErrDefault("服务器ID不能为空"))
 		return
 	}
 	if err := h.repo.UpdateNodeExpiryReminderDismissed(req.ID, 1); err != nil {

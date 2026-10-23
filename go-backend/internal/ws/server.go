@@ -349,7 +349,7 @@ func (s *Server) handleNode(w http.ResponseWriter, r *http.Request, nodeID int64
 		}
 		s.mu.Unlock()
 		if needOfflineBroadcast {
-			s.failPendingForNode(nodeID, "节点连接已断开")
+			s.failPendingForNode(nodeID, "服务器连接已断开")
 			_ = s.repo.UpdateNodeStatus(nodeID, 0)
 			s.broadcastStatus(nodeID, 0)
 			s.mu.RLock()
@@ -479,7 +479,7 @@ func (s *Server) SendCommand(nodeID int64, cmdType string, data interface{}, tim
 	ns, ok := s.nodes[nodeID]
 	s.mu.RUnlock()
 	if !ok || ns == nil || ns.conn == nil || ns.conn.conn == nil {
-		return CommandResult{}, errors.New("节点不在线")
+		return CommandResult{}, errors.New("服务器不在线")
 	}
 
 	requestID := fmt.Sprintf("%d_%d", nodeID, time.Now().UnixNano())
@@ -552,7 +552,7 @@ func (s *Server) SendCommand(nodeID int64, cmdType string, data interface{}, tim
 		return result, nil
 	case <-time.After(timeout):
 		cleanup()
-		return CommandResult{}, errors.New("等待节点响应超时")
+		return CommandResult{}, errors.New("等待服务器响应超时")
 	}
 }
 
@@ -585,7 +585,7 @@ func (s *Server) tryResolvePending(nodeID int64, message string) {
 	}
 	if p.nodeID != nodeID {
 		select {
-		case p.ch <- CommandResult{Type: resp.Type, Success: false, Message: "节点响应与请求不匹配"}:
+		case p.ch <- CommandResult{Type: resp.Type, Success: false, Message: "服务器响应与请求不匹配"}:
 		default:
 		}
 		close(p.ch)

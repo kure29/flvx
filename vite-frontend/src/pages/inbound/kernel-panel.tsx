@@ -124,7 +124,7 @@ export function KernelPanel({
 
   const doInstall = async () => {
     if (!installForm.nodeId) {
-      toast.error("请选择节点");
+      toast.error("请选择服务器");
 
       return;
     }
@@ -240,7 +240,7 @@ export function KernelPanel({
   const nodeGroups = groupItems(
     kernels,
     (k) => String(k.nodeId),
-    (_key, k) => k.nodeName || `节点 ${k.nodeId}`,
+    (_key, k) => k.nodeName || `服务器 ${k.nodeId}`,
   );
   const sheetKernel = kernels.find((k) => k.id === sheetFor) ?? null;
 
@@ -299,8 +299,8 @@ export function KernelPanel({
       {kernels.length === 0 ? (
         <Card className="shadow-sm bg-default-50/50">
           <CardBody className="text-center py-10 text-sm text-default-500">
-            还没有在任何节点上安装内核。点击“安装内核”，先在落地节点上安装
-            Xray，再到“入站”里创建节点。
+            还没有在任何服务器上安装内核。点击“安装内核”，先在服务器上安装
+            Xray，再到“节点”里创建入站。
           </CardBody>
         </Card>
       ) : (
@@ -414,7 +414,7 @@ export function KernelPanel({
         isOpen={Boolean(sheetKernel)}
         subtitle={
           sheetKernel &&
-          `${sheetKernel.nodeName || `节点 ${sheetKernel.nodeId}`} · ${
+          `${sheetKernel.nodeName || `服务器 ${sheetKernel.nodeId}`} · ${
             sheetKernel.installedVersion
               ? shortVersion(sheetKernel.installedVersion)
               : sheetKernel.version
@@ -443,15 +443,15 @@ export function KernelPanel({
               <ModalHeader className="flex flex-col gap-1">
                 <h2 className="text-xl font-bold">安装内核</h2>
                 <p className="text-small text-default-500">
-                  节点会从官方 Release 下载并校验
+                  服务器会从官方 Release 下载并校验
                   SHA256，首次安装可能需要一两分钟
                 </p>
               </ModalHeader>
               <ModalBody>
                 <div className="space-y-3">
                   <Select
-                    label="节点"
-                    placeholder="选择节点"
+                    label="服务器"
+                    placeholder="选择服务器"
                     selectedKeys={
                       installForm.nodeId ? [installForm.nodeId] : []
                     }
@@ -695,7 +695,7 @@ export function KernelPanel({
                 </p>
                 {removeFailed && (
                   <p className="text-small text-warning">
-                    节点卸载失败（可能离线）。可以强制删除面板记录，节点上线后会自动清理。
+                    服务器卸载失败（可能离线）。可以强制删除面板记录，服务器上线后会自动清理。
                   </p>
                 )}
               </ModalBody>

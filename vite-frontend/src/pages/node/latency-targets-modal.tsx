@@ -101,7 +101,7 @@ export function LatencyTargetsModal({
 
         return;
       }
-      toast.success(batch ? `已设置 ${nodes.length} 个节点` : "已保存");
+      toast.success(batch ? `已设置 ${nodes.length} 个服务器` : "已保存");
       onSaved();
       onClose();
     } catch {
@@ -140,7 +140,7 @@ export function LatencyTargetsModal({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">
-            {batch ? `为 ${nodes.length} 个节点设置测试点` : "测试点"}
+            {batch ? `为 ${nodes.length} 个服务器设置测试点` : "测试点"}
           </h2>
           <p className="truncate text-xs font-normal text-default-500">
             {nodes.map((n) => n.name).join("、")}
@@ -242,13 +242,13 @@ export function LatencyTargetsModal({
           )}
           {custom && pool.length > 0 && points.length === 0 && (
             <p className="text-xs text-default-500">
-              一个都不选：{batch ? "这些节点" : "这台节点"}
+              一个都不选：{batch ? "这些服务器" : "这台服务器"}
               不测延迟和回程，卡片上显示“不测延迟”。
             </p>
           )}
           {batch && (
             <p className="text-xs text-warning-600">
-              保存后会覆盖这些节点原来的测试点设置。
+              保存后会覆盖这些服务器原来的测试点设置。
             </p>
           )}
         </ModalBody>

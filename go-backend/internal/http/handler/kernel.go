@@ -280,13 +280,13 @@ func (h *Handler) kernelNodeEligible(nodeID int64) (*model.Node, error) {
 		return nil, err
 	}
 	if node == nil {
-		return nil, errors.New("节点不存在")
+		return nil, errors.New("服务器不存在")
 	}
 	if node.IsRemote == 1 {
-		return nil, errors.New("远程节点不支持部署内核")
+		return nil, errors.New("远程服务器不支持部署内核")
 	}
 	if isNftablesForwardMode(node.ForwardMode) {
-		return nil, errors.New("nftables 模式节点不支持部署内核")
+		return nil, errors.New("nftables 模式服务器不支持部署内核")
 	}
 	return node, nil
 }
@@ -441,7 +441,7 @@ func (h *Handler) kernelControl(w http.ResponseWriter, r *http.Request) {
 		}, kernelCommandTimeout, false, true)
 		if err != nil && !req.Force {
 			unlock()
-			response.WriteJSON(w, response.ErrDefault("节点卸载失败: "+err.Error()+"（可强制删除面板记录）"))
+			response.WriteJSON(w, response.ErrDefault("服务器卸载失败: "+err.Error()+"（可强制删除面板记录）"))
 			return
 		}
 		if rows, lerr := h.repo.ListNodeInboundsByKernel(k.ID); lerr == nil {
@@ -481,7 +481,7 @@ func (h *Handler) kernelLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	var status agentKernelStatus
 	if err := remarshal(res.Data, &status); err != nil {
-		response.WriteJSON(w, response.ErrDefault("节点返回数据格式错误"))
+		response.WriteJSON(w, response.ErrDefault("服务器返回数据格式错误"))
 		return
 	}
 	for _, ks := range status.Kernels {
@@ -674,7 +674,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 			return
 		}
 		if k == nil {
-			response.WriteJSON(w, response.ErrDefault("请先在该节点安装内核"))
+			response.WriteJSON(w, response.ErrDefault("请先在该服务器安装内核"))
 			return
 		}
 		row = model.NodeInbound{KernelID: k.ID, NodeID: k.NodeID, CreatedTime: now, Enabled: 1}
@@ -693,7 +693,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 	}
 	node, err := h.repo.GetNodeByID(row.NodeID)
 	if err != nil || node == nil {
-		response.WriteJSON(w, response.ErrDefault("节点不存在"))
+		response.WriteJSON(w, response.ErrDefault("服务器不存在"))
 		return
 	}
 	if err := validateShareAddress(mode, req.ShareHost, node); err != nil {
@@ -743,7 +743,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		return
 	}
 	if in.Security.CertMode == kernel.CertModeACME && versionBelow(k.Version, 1, 14) {
-		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("自动申请证书需要 sing-box 1.14 及以上，节点安装的是 %s", k.Version)))
+		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("自动申请证书需要 sing-box 1.14 及以上，服务器安装的是 %s", k.Version)))
 		return
 	}
 	row.OutboundIPStrategy = in.OutboundIPStrategy
@@ -753,7 +753,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		return
 	}
 	if in.Protocol == kernel.ProtocolSnell && k.KernelType == kernel.TypeSingbox && versionBelow(k.Version, 1, 14) {
-		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("sing-box 内置 Snell 需要 1.14 及以上，节点安装的是 %s", k.Version)))
+		response.WriteJSON(w, response.ErrDefault(fmt.Sprintf("sing-box 内置 Snell 需要 1.14 及以上，服务器安装的是 %s", k.Version)))
 		return
 	}
 	if in.Protocol == kernel.ProtocolSnell && k.KernelType == kernel.TypeSnell {
@@ -806,7 +806,7 @@ func (h *Handler) inboundSave(w http.ResponseWriter, r *http.Request, update boo
 		warnings = h.syncRelayProxyProtocol(row)
 	}
 	if err := h.applyKernel(k.ID, false); err != nil {
-		warnings = append([]string{"下发到节点失败: " + err.Error()}, warnings...)
+		warnings = append([]string{"下发到服务器失败: " + err.Error()}, warnings...)
 	}
 	if update {
 		warnings = append(warnings, h.applyChainReferrers(row.ID)...)
@@ -892,7 +892,7 @@ func (h *Handler) inboundPortConflict(nodeID int64, in kernel.Inbound, excludeIn
 			return "", err
 		}
 		if lo, hi := parsePortRangeMinMax(spec); lo > 0 && sp.overlaps(portSpan{lo: lo, hi: hi}) {
-			return fmt.Sprintf("%s 与节点的转发端口段 %s 重叠", sp, spec), nil
+			return fmt.Sprintf("%s 与服务器的转发端口段 %s 重叠", sp, spec), nil
 		}
 	}
 	others, err := h.repo.ListNodeInboundsByNode(nodeID)
@@ -946,7 +946,7 @@ func (h *Handler) inboundDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.applyKernel(row.KernelID, false); err != nil {
-		response.WriteJSON(w, response.R{Code: 0, Msg: "已删除，但下发到节点失败: " + err.Error(), TS: time.Now().UnixMilli()})
+		response.WriteJSON(w, response.R{Code: 0, Msg: "已删除，但下发到服务器失败: " + err.Error(), TS: time.Now().UnixMilli()})
 		return
 	}
 	response.WriteJSON(w, response.OKEmpty())
@@ -993,7 +993,7 @@ func (h *Handler) inboundBatchDelete(w http.ResponseWriter, r *http.Request) {
 	msg := "操作成功"
 	for _, kernelID := range kernelIDs {
 		if err := h.applyKernel(kernelID, false); err != nil {
-			msg = "已删除，但下发到节点失败: " + err.Error()
+			msg = "已删除，但下发到服务器失败: " + err.Error()
 		}
 	}
 	for _, targetID := range targetIDs {
@@ -1059,7 +1059,7 @@ func (h *Handler) inboundBatchToggle(w http.ResponseWriter, r *http.Request) {
 	msg := "操作成功"
 	for _, kernelID := range kernelIDs {
 		if err := h.applyKernel(kernelID, false); err != nil {
-			msg = "已保存，但下发到节点失败: " + err.Error()
+			msg = "已保存，但下发到服务器失败: " + err.Error()
 		}
 	}
 	response.WriteJSON(w, response.R{
@@ -1099,7 +1099,7 @@ func (h *Handler) inboundToggle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.applyKernel(row.KernelID, false); err != nil {
-		response.WriteJSON(w, response.R{Code: 0, Msg: "已保存，但下发到节点失败: " + err.Error(), TS: row.UpdatedTime})
+		response.WriteJSON(w, response.R{Code: 0, Msg: "已保存，但下发到服务器失败: " + err.Error(), TS: row.UpdatedTime})
 		return
 	}
 	response.WriteJSON(w, response.OKEmpty())
@@ -1155,7 +1155,7 @@ func (h *Handler) inboundRegenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.applyKernel(k.ID, false); err != nil {
-		response.WriteJSON(w, response.R{Code: 0, Msg: "已重新生成，但下发到节点失败: " + err.Error(), TS: row.UpdatedTime})
+		response.WriteJSON(w, response.R{Code: 0, Msg: "已重新生成，但下发到服务器失败: " + err.Error(), TS: row.UpdatedTime})
 		return
 	}
 	if warnings := h.applyChainReferrers(row.ID); len(warnings) > 0 {
@@ -1472,7 +1472,7 @@ func snellServes(version string, client int) error {
 	case major == 6 && client != 6:
 		return fmt.Errorf("Snell %s 只接受 v6 客户端：请把入站改成 v6，或安装 Snell 5.0.1", version)
 	case client > major:
-		return fmt.Errorf("节点安装的是 Snell %s，不支持 v%d 客户端", version, client)
+		return fmt.Errorf("服务器安装的是 Snell %s，不支持 v%d 客户端", version, client)
 	}
 	return nil
 }
@@ -1674,7 +1674,7 @@ func (h *Handler) pollNodeKernels(nodeID int64, evenIfNone bool) {
 		}
 		newStatus := kernelStateStatus(s, k.Enabled == 1)
 		if newStatus == kernelStatusError && k.Status != kernelStatusError {
-			msg := fmt.Sprintf("节点：%s\n内核：%s", h.nodeLabel(nodeID), k.KernelType)
+			msg := fmt.Sprintf("服务器：%s\n内核：%s", h.nodeLabel(nodeID), k.KernelType)
 			if s.Error != "" {
 				msg += "\n错误：" + truncate(s.Error, 300)
 			}

@@ -236,15 +236,15 @@ export function InboundFormModal({
   };
 
   const validate = (): string | null => {
-    if (!form.nodeId) return "请选择节点";
-    if (!installedKernel) return "该节点还没有安装所选内核";
+    if (!form.nodeId) return "请选择服务器";
+    if (!installedKernel) return "该服务器还没有安装所选内核";
     if (!form.name.trim()) return "请输入名称";
     if (form.shareAddressMode === "custom" && !form.shareHost.trim())
       return "请输入自定义分享地址";
     if (form.shareAddressMode === "ipv4" && !shareV4)
-      return "请先在节点设置 IPv4 地址";
+      return "请先在服务器设置 IPv4 地址";
     if (form.shareAddressMode === "ipv6" && !shareV6)
-      return "请先在节点设置 IPv6 地址";
+      return "请先在服务器设置 IPv6 地址";
     if (form.port.trim()) {
       const port = Number(form.port);
 
@@ -260,7 +260,7 @@ export function InboundFormModal({
       return "TLS 需要填写域名";
     }
     if (form.securityType === "tls" && certMode === "acme") {
-      if (!form.sni.trim()) return "自动申请证书需要填写解析到该节点的域名";
+      if (!form.sni.trim()) return "自动申请证书需要填写解析到该服务器的域名";
       const needKey = !(isEdit && form.acmeDnsSet);
 
       if (form.acmeDns === "cloudflare" && needKey && !form.acmeDnsKey.trim()) {
@@ -288,7 +288,7 @@ export function InboundFormModal({
     }
     if (form.securityType === "tls" && certMode === "file") {
       if (!form.certFile.trim() || !form.keyFile.trim()) {
-        return "请填写证书和私钥在节点上的路径";
+        return "请填写证书和私钥在服务器上的路径";
       }
     }
     if (form.extra.trim()) {
@@ -385,8 +385,8 @@ export function InboundFormModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Select
                     isDisabled={isEdit}
-                    label="节点"
-                    placeholder="选择落地节点"
+                    label="服务器"
+                    placeholder="选择服务器"
                     selectedKeys={form.nodeId ? [form.nodeId] : []}
                     onSelectionChange={(keys) =>
                       set("nodeId", String(Array.from(keys)[0] ?? ""))
@@ -422,7 +422,7 @@ export function InboundFormModal({
                 {form.nodeId && !installedKernel && (
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-warning-50 dark:bg-warning-500/10 px-3 py-2 text-sm">
                     <span className="text-warning-700 dark:text-warning-400">
-                      该节点还没有安装 {kernelInfo?.name ?? form.kernelType}
+                      该服务器还没有安装 {kernelInfo?.name ?? form.kernelType}
                     </span>
                     <Button
                       color="warning"
@@ -624,7 +624,7 @@ export function InboundFormModal({
                     description={
                       form.kernelType === "singbox"
                         ? "客户端使用的协议版本；sing-box 内置 Snell 需要 1.14 及以上，v6 的 PSK 至少 12 位"
-                        : "客户端使用的协议版本，要和节点上的 Snell 一致：v4 / v5 用 5.x（也可 4.x 跑 v4），v6 用 6.0.0（只接受 v6 客户端）"
+                        : "客户端使用的协议版本，要和服务器上的 Snell 一致：v4 / v5 用 5.x（也可 4.x 跑 v4），v6 用 6.0.0（只接受 v6 客户端）"
                     }
                     label="Snell 版本"
                     selectedKeys={[form.snellVersion || defaultSnellVersion]}
@@ -700,7 +700,7 @@ export function InboundFormModal({
                 )}
                 {form.protocol === "hysteria2" && (
                   <Input
-                    description="客户端在这段 UDP 端口间随机切换，缓解运营商对单端口 UDP 的限速；节点上由 nftables 转到入站端口。经中转连接时不跳跃"
+                    description="客户端在这段 UDP 端口间随机切换，缓解运营商对单端口 UDP 的限速；服务器上由 nftables 转到入站端口。经中转连接时不跳跃"
                     label="端口跳跃（可选）"
                     placeholder="例如 20000-30000"
                     value={form.portHopping}
@@ -869,8 +869,8 @@ export function InboundFormModal({
                       <div className="space-y-3">
                         <p className="text-xs text-default-500">
                           由 sing-box 向 Let&apos;s Encrypt
-                          申请并自动续期，域名需要解析到该节点。 HTTP
-                          验证要求节点 80 端口可从公网访问；用 DNS
+                          申请并自动续期，域名需要解析到该服务器。 HTTP
+                          验证要求服务器 80 端口可从公网访问；用 DNS
                           验证则不需要。
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1012,21 +1012,23 @@ export function InboundFormModal({
                         >
                           <SelectItem
                             key="auto"
-                            textValue="自动（节点默认地址）"
+                            textValue="自动（服务器默认地址）"
                           >
-                            自动（节点默认地址）
+                            自动（服务器默认地址）
                           </SelectItem>
                           <SelectItem
                             key="ipv4"
-                            textValue={`节点 IPv4${shareV4 ? ` · ${shareV4}` : "（未设置）"}`}
+                            textValue={`服务器 IPv4${shareV4 ? ` · ${shareV4}` : "（未设置）"}`}
                           >
-                            节点 IPv4{shareV4 ? ` · ${shareV4}` : "（未设置）"}
+                            服务器 IPv4
+                            {shareV4 ? ` · ${shareV4}` : "（未设置）"}
                           </SelectItem>
                           <SelectItem
                             key="ipv6"
-                            textValue={`节点 IPv6${shareV6 ? ` · ${shareV6}` : "（未设置）"}`}
+                            textValue={`服务器 IPv6${shareV6 ? ` · ${shareV6}` : "（未设置）"}`}
                           >
-                            节点 IPv6{shareV6 ? ` · ${shareV6}` : "（未设置）"}
+                            服务器 IPv6
+                            {shareV6 ? ` · ${shareV6}` : "（未设置）"}
                           </SelectItem>
                           <SelectItem key="custom" textValue="自定义域名 / IP">
                             自定义域名 / IP
@@ -1043,7 +1045,7 @@ export function InboundFormModal({
                         )}
                         <p className="text-xs text-default-500">
                           决定分享和订阅中的入口地址，与出站策略独立。IPv4 /
-                          IPv6 随节点设置更新；监听地址需支持对应类型。
+                          IPv6 随服务器设置更新；监听地址需支持对应类型。
                         </p>
                       </div>
                     </div>
@@ -1066,7 +1068,7 @@ export function InboundFormModal({
                         <div>
                           <p className="text-sm">仅通过中转提供</p>
                           <p className="text-xs text-default-500">
-                            订阅和分享中不再给出落地节点的直连地址
+                            订阅和分享中不再给出这个节点的直连地址
                           </p>
                         </div>
                       </div>
@@ -1086,7 +1088,7 @@ export function InboundFormModal({
                           </p>
                           <p className="text-xs text-default-500">
                             {form.kernelType === "xray"
-                              ? "中转转发会附带客户端地址，落地内核日志可见真实 IP。开启后直连将无法使用，自动变为仅中转"
+                              ? "中转转发会附带客户端地址，节点的内核日志可见真实 IP。开启后直连将无法使用，自动变为仅中转"
                               : "目前只有 Xray 内核支持"}
                           </p>
                         </div>
@@ -1102,15 +1104,15 @@ export function InboundFormModal({
                             仅允许中转机访问（防火墙白名单）
                           </p>
                           <p className="text-xs text-default-500">
-                            只放行已对接中转的入口节点 IP
-                            和本机，其他来源访问该端口一律丢弃；需要节点安装
+                            只放行已对接中转的入口服务器 IP
+                            和本机，其他来源访问该端口一律丢弃；需要服务器安装
                             nftables
                           </p>
                         </div>
                       </div>
                       {form.relayWhitelist && (
                         <Input
-                          description="中转机出口 IP 与节点地址不同时，在此补充；支持 IP 和网段，逗号分隔"
+                          description="中转机出口 IP 与服务器地址不同时，在此补充；支持 IP 和网段，逗号分隔"
                           label="额外放行"
                           placeholder="203.0.113.9, 10.0.0.0/8"
                           value={form.whitelistExtra}

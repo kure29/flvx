@@ -125,7 +125,7 @@ export function ForwardFormModal({
                   description={
                     currentTunnelPortRange
                       ? `指定入口端口，留空自动分配 (允许范围: ${currentTunnelPortRange.min}-${currentTunnelPortRange.max})`
-                      : "指定入口端口，留空则从节点可用端口中自动分配"
+                      : "指定入口端口，留空则从服务器可用端口中自动分配"
                   }
                   errorMessage={errors.inPort}
                   isInvalid={!!errors.inPort}
@@ -147,8 +147,8 @@ export function ForwardFormModal({
                 <Select
                   description={
                     isCurrentTunnelMultiEntrance
-                      ? "多入口隧道不支持自定义监听IP，使用各节点默认IP"
-                      : "从入口节点IP中选择，留空使用默认"
+                      ? "多入口隧道不支持自定义监听IP，使用各服务器默认IP"
+                      : "从入口服务器IP中选择，留空使用默认"
                   }
                   isDisabled={
                     !form.tunnelId ||
@@ -158,11 +158,11 @@ export function ForwardFormModal({
                   label="监听IP"
                   placeholder={
                     isCurrentTunnelMultiEntrance
-                      ? "多入口隧道使用节点默认IP"
+                      ? "多入口隧道使用服务器默认IP"
                       : form.tunnelId
                         ? currentTunnelIpOptions.length > 0
                           ? "选择入口监听IP"
-                          : "当前隧道入口节点暂无可选IP"
+                          : "当前隧道入口服务器暂无可选IP"
                         : "请先选择隧道"
                   }
                   selectedKeys={[form.inIp || "__default__"]}

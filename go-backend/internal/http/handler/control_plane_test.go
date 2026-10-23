@@ -266,7 +266,7 @@ func TestValidateForwardPortAvailabilityRejectsOtherForwardOccupancy(t *testing.
 	if err == nil {
 		t.Fatalf("expected occupancy error")
 	}
-	if err.Error() != "节点 test-node 端口 2000 已被其他转发占用" {
+	if err.Error() != "服务器 test-node 端口 2000 已被其他转发占用" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

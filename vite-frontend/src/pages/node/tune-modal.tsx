@@ -40,7 +40,7 @@ export function NodeTuneModal({
     nodeTune(node.id, "status")
       .then((res) => {
         if (res.code !== 0 || !res.data) {
-          setError(res.msg || "读取节点状态失败");
+          setError(res.msg || "读取服务器状态失败");
 
           return;
         }
@@ -48,7 +48,7 @@ export function NodeTuneModal({
         // Everything checked by default, as recommended.
         setChosen(new Set(res.data.groups.map((g) => g.id)));
       })
-      .catch(() => setError("读取节点状态失败"));
+      .catch(() => setError("读取服务器状态失败"));
   }, [node]);
 
   const run = async (action: "apply" | "restore") => {
@@ -101,7 +101,7 @@ export function NodeTuneModal({
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              <h2 className="text-xl font-bold">节点调优</h2>
+              <h2 className="text-xl font-bold">服务器调优</h2>
               <p className="text-sm font-normal text-default-500">
                 {node?.name}
                 {status &&

@@ -105,7 +105,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
     label: "面板后端地址",
     placeholder: "请输入面板后端IP:PORT",
     description:
-      "节点连接面板用，格式 ip:port 或 域名:port；可套 CDN / HTTPS，通讯已加密",
+      "服务器连接面板用，格式 ip:port 或 域名:port；可套 CDN / HTTPS，通讯已加密",
     type: "input",
   },
   {
@@ -165,7 +165,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
     key: "monitor_retention_days",
     label: "监控数据保留天数",
     placeholder: "7",
-    description: "节点指标、隧道流量、服务监控和隧道质量历史，默认 7 天",
+    description: "服务器指标、隧道流量、服务监控和隧道质量历史，默认 7 天",
     type: "input",
   },
   {
@@ -229,7 +229,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
   {
     key: "github_proxy_enabled",
     label: "开启 GitHub 加速",
-    description: "节点安装、升级和内核下载经代理，适合 GitHub 访问受限的地区",
+    description: "服务器安装、升级和内核下载经代理，适合 GitHub 访问受限的地区",
     type: "switch",
   },
   {
@@ -237,7 +237,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
     label: "加速地址",
     placeholder: "https://gcode.hostcentral.cc",
     description:
-      "GitHub 下载加速代理地址。节点在国内、面板在海外时选「面板中转」：节点经面板下载，面板会缓存文件",
+      "GitHub 下载加速代理地址。服务器在国内、面板在海外时选「面板中转」：服务器经面板下载，面板会缓存文件",
     type: "input",
     dependsOn: "github_proxy_enabled",
     dependsValue: "true",
@@ -253,7 +253,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
 
 const BACKUP_TYPE_OPTIONS = [
   { value: "users", label: "用户" },
-  { value: "nodes", label: "节点" },
+  { value: "nodes", label: "服务器" },
   { value: "tunnels", label: "隧道" },
   { value: "forwards", label: "规则" },
   { value: "userTunnels", label: "用户隧道权限" },
@@ -1602,7 +1602,7 @@ export default function ConfigPage() {
           summary={`${tunnelQualitySummary} · 监控保留 ${
             configs.monitor_retention_days || 7
           } 天 · GitHub 加速${onOff("github_proxy_enabled")}`}
-          title="节点与监控"
+          title="服务器与监控"
         >
           {renderItem("monitor_tunnel_quality_enabled")}
           {renderItem(TUNNEL_QUALITY_INTERVAL_CONFIG_KEY)}

@@ -135,7 +135,7 @@ func (h *Handler) diagnoseNftablesForwardRuntime(forward *forwardRecord) (map[st
 		return nil, false, nil
 	}
 	if len(entryNodeIDs) == 0 {
-		return nil, true, errors.New("nftables 转发缺少入口节点")
+		return nil, true, errors.New("nftables 转发缺少入口服务器")
 	}
 	targets, err := resolveDiagnosisTargets(forward.RemoteAddr)
 	if err != nil {
@@ -873,14 +873,14 @@ func (h *Handler) appendChainHopDiagnosis(results *[]map[string]interface{}, nod
 
 func resolveChainProbeTarget(fromNode, targetNode *nodeRecord, preferredPort int, ipPreference string, connectIp string) (string, int, error) {
 	if targetNode == nil {
-		return "", 0, errors.New("目标节点不存在")
+		return "", 0, errors.New("目标服务器不存在")
 	}
 	host, err := selectTunnelDialHost(fromNode, targetNode, ipPreference, connectIp)
 	if err != nil {
 		host = strings.Trim(strings.TrimSpace(targetNode.ServerIP), "[]")
 	}
 	if host == "" {
-		return "", 0, errors.New("目标节点地址为空")
+		return "", 0, errors.New("目标服务器地址为空")
 	}
 	port := preferredPort
 	if port <= 0 {
@@ -942,19 +942,19 @@ func (h *Handler) tcpPingViaNode(nodeID int64, ip string, port int, options diag
 		return nil, err
 	}
 	if res.Data == nil {
-		return nil, errors.New("节点未返回诊断数据")
+		return nil, errors.New("服务器未返回诊断数据")
 	}
 	return res.Data, nil
 }
 
 func (h *Handler) tcpPingViaRemoteNode(node *nodeRecord, ip string, port int, options diagnosisExecOptions) (map[string]interface{}, error) {
 	if node == nil {
-		return nil, errors.New("节点不存在")
+		return nil, errors.New("服务器不存在")
 	}
 	remoteURL := strings.TrimSpace(node.RemoteURL)
 	remoteToken := strings.TrimSpace(node.RemoteToken)
 	if remoteURL == "" || remoteToken == "" {
-		return nil, errors.New("远程节点缺少共享配置")
+		return nil, errors.New("远程服务器缺少共享配置")
 	}
 	if options.commandTimeout <= 0 {
 		options.commandTimeout = diagnosisCommandTimeout
@@ -979,12 +979,12 @@ func (h *Handler) tcpPingViaRemoteNode(node *nodeRecord, ip string, port int, op
 
 func (h *Handler) udpPingViaRemoteNode(node *nodeRecord, ip string, port int, options diagnosisExecOptions) (map[string]interface{}, error) {
 	if node == nil {
-		return nil, errors.New("节点不存在")
+		return nil, errors.New("服务器不存在")
 	}
 	remoteURL := strings.TrimSpace(node.RemoteURL)
 	remoteToken := strings.TrimSpace(node.RemoteToken)
 	if remoteURL == "" || remoteToken == "" {
-		return nil, errors.New("远程节点缺少共享配置")
+		return nil, errors.New("远程服务器缺少共享配置")
 	}
 	if options.commandTimeout <= 0 {
 		options.commandTimeout = diagnosisCommandTimeout
@@ -1039,7 +1039,7 @@ func (h *Handler) udpPingViaNode(nodeID int64, ip string, port int, options diag
 		return nil, err
 	}
 	if res.Data == nil {
-		return nil, errors.New("节点未返回诊断数据")
+		return nil, errors.New("服务器未返回诊断数据")
 	}
 	return res.Data, nil
 }

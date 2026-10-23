@@ -101,7 +101,7 @@ func (h *Handler) getNodeRecord(nodeID int64) (*nodeRecord, error) {
 		return nil, err
 	}
 	if n == nil {
-		return nil, errors.New("节点不存在")
+		return nil, errors.New("服务器不存在")
 	}
 	return n, nil
 }
@@ -176,12 +176,12 @@ func (h *Handler) sendRemoteNodeCommand(node *nodeRecord, commandType string, da
 
 func (h *Handler) sendRemoteNodeCommandWithTimeout(node *nodeRecord, commandType string, data interface{}, timeout time.Duration) (ws.CommandResult, error) {
 	if node == nil {
-		return ws.CommandResult{}, errors.New("节点不存在")
+		return ws.CommandResult{}, errors.New("服务器不存在")
 	}
 	remoteURL := strings.TrimSpace(node.RemoteURL)
 	remoteToken := strings.TrimSpace(node.RemoteToken)
 	if remoteURL == "" || remoteToken == "" {
-		return ws.CommandResult{}, errors.New("远程节点缺少共享配置")
+		return ws.CommandResult{}, errors.New("远程服务器缺少共享配置")
 	}
 
 	fc := client.NewFederationClient()
@@ -196,7 +196,7 @@ func (h *Handler) sendRemoteNodeCommandWithTimeout(node *nodeRecord, commandType
 		return ws.CommandResult{}, err
 	}
 	if res == nil {
-		return ws.CommandResult{}, errors.New("远程节点未返回命令结果")
+		return ws.CommandResult{}, errors.New("远程服务器未返回命令结果")
 	}
 
 	result := ws.CommandResult{

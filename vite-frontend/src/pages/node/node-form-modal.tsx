@@ -62,8 +62,8 @@ export function NodeFormModal({
             <Input
               errorMessage={errors.name}
               isInvalid={!!errors.name}
-              label="节点名称"
-              placeholder="请输入节点名称"
+              label="服务器名称"
+              placeholder="请输入服务器名称"
               value={form.name}
               variant="bordered"
               onChange={(e) =>
@@ -231,7 +231,7 @@ export function NodeFormModal({
             ) : (
               <Alert
                 color="primary"
-                description="agent 模式会继续使用节点 agent 执行转发与管理操作。"
+                description="agent 模式会继续使用服务器 agent 执行转发与管理操作。"
                 variant="flat"
               />
             )}
@@ -412,7 +412,7 @@ export function NodeFormModal({
                   ) : (
                     <Alert
                       color="primary"
-                      description="agent 模式下无需填写 SSH 配置；节点安装 agent 后会自行接管转发。"
+                      description="agent 模式下无需填写 SSH 配置；服务器安装 agent 后会自行接管转发。"
                       variant="flat"
                     />
                   )}
@@ -636,7 +636,7 @@ export function NodeFormModal({
 
                   <Alert
                     color="danger"
-                    description="请不要在出口节点执行屏蔽协议，否则可能影响转发；屏蔽协议仅需在入口节点执行。"
+                    description="请不要在出口服务器执行屏蔽协议，否则可能影响转发；屏蔽协议仅需在入口服务器执行。"
                     variant="flat"
                   />
                 </div>
@@ -646,7 +646,7 @@ export function NodeFormModal({
             <Alert
               className="mt-4"
               color="primary"
-              description="节点ip地址是你要添加的入口/出口的ip地址，不是面板的ip地址。"
+              description="服务器ip地址是你要添加的入口/出口的ip地址，不是面板的ip地址。"
               variant="flat"
             />
           </div>

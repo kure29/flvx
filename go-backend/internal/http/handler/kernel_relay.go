@@ -139,7 +139,7 @@ func (h *Handler) relayTarget(row *model.NodeInbound, tunnel *tunnelRecord) (str
 		}
 		if onLanding {
 			if len(exits) > 1 {
-				return "", errors.New("出口为落地节点的隧道只能有这一个出口节点")
+				return "", errors.New("出口为节点所在服务器的隧道只能有这一个出口服务器")
 			}
 			host := row.Listen
 			if isWildcardListen(host) {
@@ -150,13 +150,13 @@ func (h *Handler) relayTarget(row *model.NodeInbound, tunnel *tunnelRecord) (str
 	}
 
 	if isLoopbackListen(row.Listen) {
-		return "", errors.New("入站只监听本机，只能通过出口为落地节点的隧道转发对接")
+		return "", errors.New("入站只监听本机，只能通过出口为节点所在服务器的隧道转发对接")
 	}
 	host := row.Listen
 	if isWildcardListen(host) {
 		node, err := h.repo.GetNodeByID(row.NodeID)
 		if err != nil || node == nil {
-			return "", errors.New("落地节点不存在")
+			return "", errors.New("节点不存在")
 		}
 		host = strings.TrimSpace(node.ServerIP)
 		if v4 := strings.TrimSpace(node.ServerIPV4.String); host == "" && v4 != "" {
@@ -164,7 +164,7 @@ func (h *Handler) relayTarget(row *model.NodeInbound, tunnel *tunnelRecord) (str
 		}
 	}
 	if host == "" {
-		return "", errors.New("落地节点没有可用地址")
+		return "", errors.New("节点没有可用地址")
 	}
 	return net.JoinHostPort(strings.Trim(host, "[]"), port), nil
 }
@@ -270,7 +270,7 @@ func (h *Handler) createRelayForward(userID int64, name string, tunnel *tunnelRe
 		return 0, err
 	}
 	if len(entryNodes) == 0 {
-		return 0, errors.New("隧道没有入口节点")
+		return 0, errors.New("隧道没有入口服务器")
 	}
 	isNftTunnel, _, err := h.tunnelUsesNftables(tunnel.ID)
 	if err != nil {

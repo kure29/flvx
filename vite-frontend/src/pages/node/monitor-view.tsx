@@ -525,7 +525,7 @@ const NodeMetricsChartCard = React.memo(function NodeMetricsChartCard({
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-semibold">节点指标图表</h3>
+        <h3 className="text-base font-semibold">服务器指标图表</h3>
         <div className="flex items-center gap-2">
           <Select
             className="w-28"
@@ -1117,7 +1117,7 @@ export function MonitorView({
       monitorForm.type === "icmp" &&
       (!monitorForm.nodeId || monitorForm.nodeId <= 0)
     ) {
-      toast.error("ICMP 监控必须选择执行节点");
+      toast.error("ICMP 监控必须选择执行服务器");
 
       return;
     }
@@ -1426,7 +1426,7 @@ export function MonitorView({
           </div>
 
           {nodes.length === 0 ? (
-            <EmptyHint text="暂无节点" />
+            <EmptyHint text="暂无服务器" />
           ) : card ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {nodes.map((node) => (
@@ -1494,14 +1494,14 @@ export function MonitorView({
               onPress={() => (onBack ? onBack() : setDetailNodeId(null))}
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              {onBack ? "返回节点" : "返回总览"}
+              {onBack ? "返回服务器" : "返回总览"}
             </Button>
             <div className="flex items-center gap-2">
               <Server
                 className={`w-5 h-5 ${detailNode?.connectionStatus === "online" ? "text-success" : "text-default-400"}`}
               />
               <h3 className="text-lg font-semibold">
-                {detailNode?.name || `节点 #${detailNodeId}`}
+                {detailNode?.name || `服务器 #${detailNodeId}`}
               </h3>
               <Chip
                 color={
@@ -1889,7 +1889,7 @@ export function MonitorView({
               </div>
               {resultsMonitor?.nodeId && resultsMonitor.nodeId > 0 ? (
                 <div className="text-xs text-default-500 truncate">
-                  节点:{" "}
+                  服务器:{" "}
                   {nodeMap.get(resultsMonitor.nodeId)?.name ||
                     resultsMonitor.nodeId}
                 </div>
@@ -2095,7 +2095,7 @@ export function MonitorView({
               />
             </div>
             <Select
-              label="执行节点"
+              label="执行服务器"
               selectedKeys={
                 monitorForm.type === "icmp"
                   ? monitorForm.nodeId

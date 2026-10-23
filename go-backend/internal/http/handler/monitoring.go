@@ -149,7 +149,7 @@ func (h *Handler) monitorTunnelListHandler(w http.ResponseWriter, r *http.Reques
 func (h *Handler) handleNodeMetrics(w http.ResponseWriter, r *http.Request, nodeIDStr string) {
 	nodeID, err := strconv.ParseInt(nodeIDStr, 10, 64)
 	if err != nil || nodeID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("无效的节点ID"))
+		response.WriteJSON(w, response.ErrDefault("无效的服务器ID"))
 		return
 	}
 
@@ -192,7 +192,7 @@ func (h *Handler) handleNodeMetrics(w http.ResponseWriter, r *http.Request, node
 func (h *Handler) handleNodeMetricsLatest(w http.ResponseWriter, _ *http.Request, nodeIDStr string) {
 	nodeID, err := strconv.ParseInt(nodeIDStr, 10, 64)
 	if err != nil || nodeID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("无效的节点ID"))
+		response.WriteJSON(w, response.ErrDefault("无效的服务器ID"))
 		return
 	}
 
@@ -483,7 +483,7 @@ func (h *Handler) monitorServiceCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if n == nil {
-			response.WriteJSON(w, response.ErrDefault("节点不存在"))
+			response.WriteJSON(w, response.ErrDefault("服务器不存在"))
 			return
 		}
 	}
@@ -499,7 +499,7 @@ func (h *Handler) monitorServiceCreate(w http.ResponseWriter, r *http.Request) {
 		UpdatedTime: now,
 	}
 	if m.Type == "icmp" && m.NodeID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("ICMP 监控必须选择执行节点"))
+		response.WriteJSON(w, response.ErrDefault("ICMP 监控必须选择执行服务器"))
 		return
 	}
 	// enabled is already normalized above.
@@ -599,7 +599,7 @@ func (h *Handler) monitorServiceUpdate(w http.ResponseWriter, r *http.Request) {
 
 	existing.UpdatedTime = time.Now().UnixMilli()
 	if existing.Type == "icmp" && existing.NodeID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("ICMP 监控必须选择执行节点"))
+		response.WriteJSON(w, response.ErrDefault("ICMP 监控必须选择执行服务器"))
 		return
 	}
 	if existing.NodeID > 0 {
@@ -609,7 +609,7 @@ func (h *Handler) monitorServiceUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if n == nil {
-			response.WriteJSON(w, response.ErrDefault("节点不存在"))
+			response.WriteJSON(w, response.ErrDefault("服务器不存在"))
 			return
 		}
 	}

@@ -253,7 +253,7 @@ func (h *Handler) nodeUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("节点ID无效"))
+		response.WriteJSON(w, response.ErrDefault("服务器ID无效"))
 		return
 	}
 
@@ -435,7 +435,7 @@ func (h *Handler) nodeRollback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ID <= 0 {
-		response.WriteJSON(w, response.ErrDefault("节点ID无效"))
+		response.WriteJSON(w, response.ErrDefault("服务器ID无效"))
 		return
 	}
 

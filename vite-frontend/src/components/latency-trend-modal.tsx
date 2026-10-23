@@ -110,7 +110,7 @@ export function LatencyTrendModal({
         <ModalHeader closable className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">延迟趋势</h2>
           <p className="text-xs font-normal text-default-500">
-            {nodeName ? `${nodeName} → 各测试点` : "节点 → 各测试点"}
+            {nodeName ? `${nodeName} → 各测试点` : "服务器 → 各测试点"}
             ，每 3 分钟一次
           </p>
         </ModalHeader>

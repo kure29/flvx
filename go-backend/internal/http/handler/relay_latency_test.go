@@ -195,7 +195,7 @@ func TestRelayLatencySkipsOfflineEntry(t *testing.T) {
 	id := mustCreateRelayLine(t, r, "port", 1, "203.0.113.10:443", front, nil, 0)
 	calls := stubLatencyPing(t, func(int64, string) (map[string]interface{}, error) { return okPing(1), nil })
 	res, _ := h.probeRelayLatency(context.Background(), nil)
-	if len(*calls) != 0 || res[id].OK || res[id].Hops[0].Error != "节点离线" {
+	if len(*calls) != 0 || res[id].OK || res[id].Hops[0].Error != "服务器离线" {
 		t.Fatalf("offline entry: calls=%v res=%+v", *calls, res[id])
 	}
 }

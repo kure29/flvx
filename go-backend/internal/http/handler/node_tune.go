@@ -49,7 +49,7 @@ func (h *Handler) nodeTune(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		msg := err.Error()
 		if strings.Contains(msg, "未知命令类型") {
-			msg = "节点 agent 版本过旧，不支持调优，请先升级节点"
+			msg = "服务器 agent 版本过旧，不支持调优，请先升级服务器"
 		}
 		response.WriteJSON(w, response.Err(-2, fmt.Sprintf("调优失败: %s", msg)))
 		return

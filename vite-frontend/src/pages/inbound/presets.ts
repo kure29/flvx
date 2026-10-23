@@ -45,12 +45,12 @@ export const SECURITY_LABELS: Record<string, string> = {
 
 export const CERT_MODE_LABELS: Record<string, string> = {
   self: "自动生成自签证书",
-  file: "使用节点上的证书文件",
+  file: "使用服务器上的证书文件",
   acme: "自动申请证书（ACME）",
 };
 
 export const ACME_DNS_LABELS: Record<string, string> = {
-  "": "HTTP 验证（需要节点 80 端口）",
+  "": "HTTP 验证（需要服务器 80 端口）",
   cloudflare: "Cloudflare DNS",
   alidns: "阿里云 DNS",
 };

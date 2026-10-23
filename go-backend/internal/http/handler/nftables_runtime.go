@@ -74,27 +74,27 @@ func (h *Handler) validateNftablesForwardRequest(tunnel *tunnelRecord, remoteAdd
 		return errors.New("隧道不存在")
 	}
 	if tunnel.Type != 1 {
-		return errors.New("nftables 节点仅支持直连隧道")
+		return errors.New("nftables 服务器仅支持直连隧道")
 	}
 	if len(entryNodeIDs) != 1 {
-		return errors.New("nftables 节点仅支持单入口隧道")
+		return errors.New("nftables 服务器仅支持单入口隧道")
 	}
 	target, err := runtimenft.ParseSingleTarget(remoteAddr)
 	if err != nil {
 		return err
 	}
 	if net.ParseIP(strings.Trim(strings.TrimSpace(target.Host), "[]")) == nil {
-		return errors.New("nftables 节点仅支持 IP 目标地址")
+		return errors.New("nftables 服务器仅支持 IP 目标地址")
 	}
 	return nil
 }
 
 func sshConfigFromModel(cfg *model.NodeSSHConfig) (runtimenft.SSHConfig, error) {
 	if cfg == nil {
-		return runtimenft.SSHConfig{}, errors.New("节点缺少 SSH 配置")
+		return runtimenft.SSHConfig{}, errors.New("服务器缺少 SSH 配置")
 	}
 	if strings.TrimSpace(cfg.Host) == "" || strings.TrimSpace(cfg.Username) == "" {
-		return runtimenft.SSHConfig{}, errors.New("节点 SSH 配置不完整")
+		return runtimenft.SSHConfig{}, errors.New("服务器 SSH 配置不完整")
 	}
 	return runtimenft.SSHConfig{
 		Host:       strings.TrimSpace(cfg.Host),
@@ -132,7 +132,7 @@ func (h *Handler) validateNftablesTunnelStateTx(tx *gorm.DB, entryNodeIDs []int6
 		}
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return errors.New("nftables 节点缺少 SSH 配置")
+				return errors.New("nftables 服务器缺少 SSH 配置")
 			}
 			return err
 		}
@@ -144,7 +144,7 @@ func (h *Handler) validateNftablesTunnelStateTx(tx *gorm.DB, entryNodeIDs []int6
 			return errors.New("nftables manager not initialized")
 		}
 		if err := h.nftablesManager.Test(context.Background(), sshCfg); err != nil {
-			return fmt.Errorf("nftables 节点能力校验失败: %w", err)
+			return fmt.Errorf("nftables 服务器能力校验失败: %w", err)
 		}
 	}
 	return nil
@@ -263,7 +263,7 @@ func (h *Handler) loadNftablesSSHConfig(nodeID int64) (runtimenft.SSHConfig, err
 	cfg, err := h.repo.GetNodeSSHConfig(nodeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return runtimenft.SSHConfig{}, errors.New("nftables 节点缺少 SSH 配置")
+			return runtimenft.SSHConfig{}, errors.New("nftables 服务器缺少 SSH 配置")
 		}
 		return runtimenft.SSHConfig{}, err
 	}
@@ -302,7 +302,7 @@ func (h *Handler) reconcileNftablesNodeByRequest(nodeID int64) error {
 		return err
 	}
 	if !usesNft {
-		return errors.New("节点未启用 nftables 转发模式")
+		return errors.New("服务器未启用 nftables 转发模式")
 	}
 	return h.syncNftablesNode(nodeID)
 }
@@ -318,7 +318,7 @@ func (h *Handler) nodeNftablesTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !usesNft {
-		response.WriteJSON(w, response.ErrDefault("节点未启用 nftables 转发模式"))
+		response.WriteJSON(w, response.ErrDefault("服务器未启用 nftables 转发模式"))
 		return
 	}
 	sshCfg, err := h.loadNftablesSSHConfig(nodeID)
@@ -360,7 +360,7 @@ func (h *Handler) nodeNftablesClear(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !usesNft {
-		response.WriteJSON(w, response.ErrDefault("节点未启用 nftables 转发模式"))
+		response.WriteJSON(w, response.ErrDefault("服务器未启用 nftables 转发模式"))
 		return
 	}
 	if err := h.clearNftablesNode(nodeID); err != nil {

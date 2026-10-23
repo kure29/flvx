@@ -64,7 +64,7 @@ export default function NodeHubPage() {
       <PageHeader
         description={
           tab === "kernels"
-            ? "节点上安装的 Xray / sing-box / Snell 等内核，落地的入站跑在内核上"
+            ? "服务器上安装的 Xray / sing-box / Snell 等内核，节点（入站）跑在内核上"
             : "装了 agent 的服务器：实时状态、监控和管理都在这里"
         }
         // The kernel tab has its own 安装内核 button.
@@ -72,16 +72,16 @@ export default function NodeHubPage() {
           tab === "nodes" && monitorNode === null
             ? {
                 key: "add",
-                label: "新建节点",
+                label: "新建服务器",
                 onPress: () => setAddNode((n) => n + 1),
               }
             : undefined
         }
-        title="节点"
+        title="服务器"
       />
       <PageTabs
         tabs={[
-          { key: "nodes", label: "节点" },
+          { key: "nodes", label: "服务器" },
           { key: "kernels", label: "内核" },
         ]}
         value={tab}

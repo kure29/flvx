@@ -187,7 +187,7 @@ export default function NodePage({
   const protocolControlsDisabled = protocolDisabled || isNftablesMode;
   const protocolControlsReason = isNftablesMode
     ? "nftables 模式不支持 agent 协议开关"
-    : protocolDisabledReason || "等待节点上线后再设置";
+    : protocolDisabledReason || "等待服务器上线后再设置";
 
   const [selectMode, setSelectMode] = useState(false);
   const [viewMode, setViewMode] = useViewMode("node");
@@ -393,7 +393,7 @@ export default function NodePage({
         }
       } else {
         if (!silent) {
-          toast.error(res.msg || "加载节点列表失败");
+          toast.error(res.msg || "加载服务器列表失败");
         }
       }
     } catch {
@@ -576,13 +576,13 @@ export default function NodePage({
 
   const formatChainType = (chainType: number, hopInx: number) => {
     if (chainType === 1) {
-      return "入口节点";
+      return "入口服务器";
     }
     if (chainType === 2) {
       return `中继跳点 #${hopInx}`;
     }
     if (chainType === 3) {
-      return "出口节点";
+      return "出口服务器";
     }
 
     return "未知链路";
@@ -677,11 +677,11 @@ export default function NodePage({
     const newErrors: Record<string, string> = {};
 
     if (!form.name.trim()) {
-      newErrors.name = "请输入节点名称";
+      newErrors.name = "请输入服务器名称";
     } else if (form.name.trim().length < 2) {
-      newErrors.name = "节点名称长度至少2位";
+      newErrors.name = "服务器名称长度至少2位";
     } else if (form.name.trim().length > 50) {
-      newErrors.name = "节点名称长度不能超过50位";
+      newErrors.name = "服务器名称长度不能超过50位";
     }
 
     if (
@@ -747,12 +747,12 @@ export default function NodePage({
 
   // 新增节点
   const handleAdd = () => {
-    setDialogTitle("新增节点");
+    setDialogTitle("新增服务器");
     setIsEdit(false);
     setDialogVisible(true);
     resetForm();
     setProtocolDisabled(true);
-    setProtocolDisabledReason("节点未在线，等待节点上线后再设置");
+    setProtocolDisabledReason("服务器未在线，等待服务器上线后再设置");
   };
 
   useEffect(() => {
@@ -762,7 +762,7 @@ export default function NodePage({
 
   // 编辑节点
   const handleEdit = (node: Node) => {
-    setDialogTitle("编辑节点");
+    setDialogTitle("编辑服务器");
     setIsEdit(true);
 
     const legacy = (node.serverIp || "").trim();
@@ -807,7 +807,7 @@ export default function NodePage({
       node.forwardMode === "nftables"
         ? "nftables 模式不支持 agent 协议开关"
         : offline
-          ? "节点未在线，等待节点上线后再设置"
+          ? "服务器未在线，等待服务器上线后再设置"
           : "",
     );
     setDialogVisible(true);
@@ -958,7 +958,7 @@ export default function NodePage({
         );
 
         if (res.code === 0) {
-          toast.success(`节点升级命令已发送，节点将自动重启`);
+          toast.success(`服务器升级命令已发送，服务器将自动重启`);
         } else {
           toast.error(res.msg || "升级失败");
         }
@@ -979,7 +979,7 @@ export default function NodePage({
       });
 
       if (selectedLocalIds.length === 0) {
-        toast.error("请选择本地节点进行升级");
+        toast.error("请选择本地服务器进行升级");
         setUpgradeModalOpen(false);
 
         return;
@@ -996,7 +996,7 @@ export default function NodePage({
 
         if (res.code === 0) {
           toast.success(
-            `批量升级命令已发送到 ${selectedLocalIds.length} 个节点`,
+            `批量升级命令已发送到 ${selectedLocalIds.length} 个服务器`,
           );
         } else {
           toast.error(res.msg || "批量升级失败");
@@ -1027,7 +1027,7 @@ export default function NodePage({
       const res = await rollbackNode(node.id);
 
       if (res.code === 0) {
-        toast.success(`节点 ${node.name} 回退命令已发送，节点将自动重启`);
+        toast.success(`服务器 ${node.name} 回退命令已发送，服务器将自动重启`);
       } else {
         toast.error(res.msg || "回退失败");
       }
@@ -1203,7 +1203,7 @@ export default function NodePage({
       node.latencyTargets?.points.length === 0 ? (
         <button
           className="rounded-full bg-default-100 px-2 py-0.5 text-xs text-default-500 hover:text-default-700"
-          title="这台节点没选测试点，点此设置"
+          title="这台服务器没选测试点，点此设置"
           type="button"
           onClick={(e) => {
             e.stopPropagation();
@@ -1326,7 +1326,7 @@ export default function NodePage({
       const res = await batchDeleteNodes(Array.from(selectedIds));
 
       if (res.code === 0) {
-        toast.success(`成功删除 ${selectedIds.size} 个节点`);
+        toast.success(`成功删除 ${selectedIds.size} 个服务器`);
         setNodeList((prev) => prev.filter((n) => !selectedIds.has(n.id)));
         setSelectedIds(new Set());
         setBatchDeleteModalOpen(false);
@@ -1507,16 +1507,16 @@ export default function NodePage({
     <PageShell embedded={embedded}>
       {!embedded && (
         <PageHeader
-          description="装了 agent 的服务器，用来搭建落地和中转"
-          primary={{ key: "add", label: "新建节点", onPress: handleAdd }}
-          title="节点"
+          description="装了 agent 的机器：搭建节点和中转、看状态和监控"
+          primary={{ key: "add", label: "新建服务器", onPress: handleAdd }}
+          title="服务器"
         />
       )}
       {remoteNodes.length > 0 && (
         <PageTabs
           tabs={[
-            { key: "local", label: "本地节点", badge: localNodes.length },
-            { key: "remote", label: "远程节点", badge: remoteNodes.length },
+            { key: "local", label: "本地服务器", badge: localNodes.length },
+            { key: "remote", label: "远程服务器", badge: remoteNodes.length },
           ]}
           value={activeTab}
           onChange={setActiveTab}
@@ -1575,7 +1575,7 @@ export default function NodePage({
             },
           ]}
           placeholder={
-            activeTab === "remote" ? "搜索远程节点名称或 IP" : "搜索名称或 IP"
+            activeTab === "remote" ? "搜索远程服务器名称或 IP" : "搜索名称或 IP"
           }
           search={currentSearchKeyword}
           view={{ value: viewMode, onChange: setViewMode }}
@@ -1611,17 +1611,17 @@ export default function NodePage({
         <PageLoadingState message="正在加载..." />
       ) : nodeList.length === 0 ? (
         <EmptyHint
-          action={{ key: "add", label: "新建节点", onPress: handleAdd }}
-          text="还没有节点。新建后在服务器上运行安装命令，节点就会连上面板"
+          action={{ key: "add", label: "新建服务器", onPress: handleAdd }}
+          text="还没有服务器。新建后在服务器上运行安装命令，服务器就会连上面板"
         />
       ) : displayNodes.length === 0 ? (
         <EmptyHint
           text={
             isDisplayFiltered
-              ? "没有匹配的节点"
+              ? "没有匹配的服务器"
               : activeTab === "remote"
-                ? "暂无远程节点"
-                : "暂无本地节点"
+                ? "暂无远程服务器"
+                : "暂无本地服务器"
           }
         />
       ) : (
@@ -1715,7 +1715,7 @@ export default function NodePage({
                                 {hasInfoTrigger && (
                                   <div className="group/info relative">
                                     <button
-                                      aria-label={`查看节点信息，共 ${infoCount} 项`}
+                                      aria-label={`查看服务器信息，共 ${infoCount} 项`}
                                       className="relative flex h-7 w-7 items-center justify-center rounded-full border border-divider/80 bg-background/95 text-default-500 shadow-sm transition hover:border-default-300 hover:text-foreground focus-visible:border-default-300 focus-visible:text-foreground focus-visible:outline-none"
                                       type="button"
                                       onFocus={(event) =>
@@ -2414,7 +2414,7 @@ export default function NodePage({
             subtitle={
               node &&
               (isRemoteNode
-                ? "远程节点"
+                ? "远程服务器"
                 : online
                   ? "在线"
                   : "离线 · agent 没有连上面板")

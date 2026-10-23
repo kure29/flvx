@@ -33,7 +33,7 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 			return nil, err
 		}
 		if len(entryNodeIDs) == 0 {
-			return nil, errors.New("nftables 转发缺少入口节点")
+			return nil, errors.New("nftables 转发缺少入口服务器")
 		}
 		return nil, h.syncNftablesNode(entryNodeIDs[0])
 	}
@@ -107,7 +107,7 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 					if node != nil && strings.TrimSpace(node.Name) != "" {
 						nodeName = strings.TrimSpace(node.Name)
 					}
-					warnings = append(warnings, fmt.Sprintf("节点 %s 不在线，已跳过下发", nodeName))
+					warnings = append(warnings, fmt.Sprintf("服务器 %s 不在线，已跳过下发", nodeName))
 					continue
 				}
 				return nil, err
@@ -124,7 +124,7 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 					if node != nil && strings.TrimSpace(node.Name) != "" {
 						nodeName = strings.TrimSpace(node.Name)
 					}
-					warnings = append(warnings, fmt.Sprintf("节点 %s 不在线，已跳过下发", nodeName))
+					warnings = append(warnings, fmt.Sprintf("服务器 %s 不在线，已跳过下发", nodeName))
 					continue
 				}
 				return nil, err
@@ -135,7 +135,7 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 
 		for _, connLimiterConfig := range connLimiterConfigs {
 			if err := h.ensureConnLimiterOnNode(fp.NodeID, connLimiterConfig); err != nil {
-				warnings = append(warnings, fmt.Sprintf("节点 %d 连接限制器下发失败: %v", fp.NodeID, err))
+				warnings = append(warnings, fmt.Sprintf("服务器 %d 连接限制器下发失败: %v", fp.NodeID, err))
 			}
 		}
 
@@ -148,7 +148,7 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 		if err != nil && allowFallbackAdd && method == "UpdateService" {
 			if isNotFoundError(err) {
 				if delErr := h.deleteForwardServicesOnNode(forward, node.ID); delErr != nil && !isNotFoundError(delErr) {
-					return warnings, fmt.Errorf("节点 %s 清理旧服务失败: %w", node.Name, delErr)
+					return warnings, fmt.Errorf("服务器 %s 清理旧服务失败: %w", node.Name, delErr)
 				}
 			}
 			_, err = h.sendNodeCommand(node.ID, "AddService", services, true, false)
@@ -166,11 +166,11 @@ func (h *Handler) syncForwardServicesWithWarnings(forward *forwardRecord, method
 		// When a node is offline, skip it with a warning instead of failing.
 		// This lets users modify forward rules even when some entry nodes are down.
 		if err != nil && isNodeOfflineOrTimeoutError(err) {
-			warnings = append(warnings, fmt.Sprintf("节点 %s 不在线，已跳过下发", node.Name))
+			warnings = append(warnings, fmt.Sprintf("服务器 %s 不在线，已跳过下发", node.Name))
 			continue
 		}
 		if err != nil {
-			return warnings, fmt.Errorf("节点 %s 下发失败: %w", node.Name, err)
+			return warnings, fmt.Errorf("服务器 %s 下发失败: %w", node.Name, err)
 		}
 	}
 
@@ -209,7 +209,7 @@ func (h *Handler) fallbackForwardPortToDefaultBind(forward *forwardRecord, tunne
 		return "", err
 	}
 
-	warning := fmt.Sprintf("节点 %s 监听IP %s 不在主机网卡地址中，已自动回退为默认监听IP", strings.TrimSpace(node.Name), explicitBindIP)
+	warning := fmt.Sprintf("服务器 %s 监听IP %s 不在主机网卡地址中，已自动回退为默认监听IP", strings.TrimSpace(node.Name), explicitBindIP)
 	return warning, nil
 }
 

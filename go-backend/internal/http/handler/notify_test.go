@@ -61,7 +61,7 @@ func TestNodeOfflineNotifyIsDebounced(t *testing.T) {
 	}
 
 	h.notifyNodeOffline(7)
-	if msgs := sent(); len(msgs) != 1 || msgs[0].Title != "节点掉线" || msgs[0].Event != notifyEventNodeOffline {
+	if msgs := sent(); len(msgs) != 1 || msgs[0].Title != "服务器掉线" || msgs[0].Event != notifyEventNodeOffline {
 		t.Fatalf("offline alert: %v", msgs)
 	}
 	h.notifyNodeOffline(7)
@@ -69,7 +69,7 @@ func TestNodeOfflineNotifyIsDebounced(t *testing.T) {
 		t.Fatalf("an ongoing outage must alert once: %v", msgs)
 	}
 	h.notifyNodeOnline(7)
-	if msgs := sent(); len(msgs) != 2 || msgs[1].Title != "节点恢复在线" {
+	if msgs := sent(); len(msgs) != 2 || msgs[1].Title != "服务器恢复在线" {
 		t.Fatalf("recovery alert: %v", msgs)
 	}
 }
@@ -91,7 +91,7 @@ func TestNodeExpiryNotifiesOncePerDate(t *testing.T) {
 
 	h.checkNodeExpiry(now)
 	msgs := sent()
-	if len(msgs) != 1 || msgs[0].Event != notifyEventNodeExpiry || msgs[0].Title != "节点即将到期" {
+	if len(msgs) != 1 || msgs[0].Event != notifyEventNodeExpiry || msgs[0].Title != "服务器即将到期" {
 		t.Fatalf("expiry alert: %v", msgs)
 	}
 	h.checkNodeExpiry(now.Add(time.Hour))

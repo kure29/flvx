@@ -49,7 +49,7 @@ func (h *Handler) chainEndpoint(target *model.NodeInbound, fromNodeID int64) (ke
 		return e, nil
 	}
 	if isLoopbackListen(target.Listen) {
-		return e, fmt.Errorf("出站节点「%s」只监听本机，其他节点连不上", target.Name)
+		return e, fmt.Errorf("出站节点「%s」只监听本机，其他服务器连不上", target.Name)
 	}
 	node, _ := h.repo.GetNodeByID(target.NodeID)
 	e.Host = inboundShareAddress(target, node)
@@ -418,7 +418,7 @@ func (h *Handler) inboundSplitSave(w http.ResponseWriter, r *http.Request) {
 	}
 	var warnings []string
 	if err := h.applyKernel(k.ID, false); err != nil {
-		warnings = append(warnings, "下发到节点失败: "+err.Error())
+		warnings = append(warnings, "下发到服务器失败: "+err.Error())
 	}
 	warnings = append(warnings, h.applyChangedTargets(prevTargets, *row)...)
 	if len(warnings) > 0 {

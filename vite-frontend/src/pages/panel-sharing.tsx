@@ -240,7 +240,7 @@ export default function PanelSharingPage() {
     const nodeId = parseInt(shareForm.nodeId, 10);
 
     if (Number.isNaN(nodeId) || !nodes.some((node) => node.id === nodeId)) {
-      toast.error("仅可选择本地节点");
+      toast.error("仅可选择本地服务器");
 
       return;
     }
@@ -401,7 +401,7 @@ export default function PanelSharingPage() {
       });
 
       if (res.code === 0) {
-        toast.success("导入成功，请前往节点列表查看");
+        toast.success("导入成功，请前往服务器列表查看");
         setImportNodeOpen(false);
         setImportForm({ remoteUrl: "", token: "" });
         loadRemoteUsage();
@@ -421,13 +421,13 @@ export default function PanelSharingPage() {
 
   const formatChainType = (chainType: number, hopInx: number) => {
     if (chainType === 1) {
-      return "入口节点";
+      return "入口服务器";
     }
     if (chainType === 2) {
       return `中继跳点 #${hopInx}`;
     }
     if (chainType === 3) {
-      return "出口节点";
+      return "出口服务器";
     }
 
     return "未知链路";
@@ -478,7 +478,7 @@ export default function PanelSharingPage() {
   return (
     <AnimatedPage className="px-3 lg:px-6 py-6">
       <PageHeader
-        description="分享本地节点给其他面板，或导入别人的节点"
+        description="分享本地服务器给其他面板，或导入别人的服务器"
         primary={
           selectedTab === "my-shares"
             ? {
@@ -488,7 +488,7 @@ export default function PanelSharingPage() {
               }
             : {
                 key: "import",
-                label: "导入远程节点",
+                label: "导入远程服务器",
                 onPress: () => setImportNodeOpen(true),
               }
         }
@@ -497,7 +497,7 @@ export default function PanelSharingPage() {
       <PageTabs
         tabs={[
           { key: "my-shares", label: "我分享的" },
-          { key: "remote-nodes", label: "远程节点" },
+          { key: "remote-nodes", label: "远程服务器" },
         ]}
         value={selectedTab}
         onChange={setSelectedTab}
@@ -507,7 +507,7 @@ export default function PanelSharingPage() {
         (loading ? (
           <PageLoadingState message="正在加载..." />
         ) : shares.length === 0 ? (
-          <EmptyHint text="还没有分享。新建一个分享，把本地节点开放给其他面板使用" />
+          <EmptyHint text="还没有分享。新建一个分享，把本地服务器开放给其他面板使用" />
         ) : (
           <ListGroup>
             {shares.map((share) => {
@@ -549,7 +549,7 @@ export default function PanelSharingPage() {
         (remoteUsageLoading ? (
           <PageLoadingState message="正在加载..." />
         ) : remoteUsageNodes.length === 0 ? (
-          <EmptyHint text="还没有远程节点。导入其他面板分享的节点并创建隧道后，这里会显示端口占用" />
+          <EmptyHint text="还没有远程服务器。导入其他面板分享的服务器并创建隧道后，这里会显示端口占用" />
         ) : (
           <ListGroup>
             {remoteUsageNodes.map((node) => (
@@ -676,7 +676,7 @@ export default function PanelSharingPage() {
         isOpen={Boolean(sheetRemote)}
         subtitle={
           sheetRemote &&
-          (sheetRemote.syncError ? "同步异常" : "远程节点 · 同步正常")
+          (sheetRemote.syncError ? "同步异常" : "远程服务器 · 同步正常")
         }
         title={sheetRemote?.nodeName ?? ""}
         onClose={() => setSheetRemoteId(null)}
@@ -754,8 +754,8 @@ export default function PanelSharingPage() {
               }
             />
             <Select
-              label="选择节点"
-              placeholder="选择要分享的本地节点"
+              label="选择服务器"
+              placeholder="选择要分享的本地服务器"
               selectedKeys={shareForm.nodeId ? [shareForm.nodeId] : []}
               onChange={(e) =>
                 setShareForm({ ...shareForm, nodeId: e.target.value })
@@ -963,7 +963,7 @@ export default function PanelSharingPage() {
         onClose={() => setImportNodeOpen(false)}
       >
         <ModalContent>
-          <ModalHeader>导入远程节点</ModalHeader>
+          <ModalHeader>导入远程服务器</ModalHeader>
           <ModalBody>
             <Input
               label="远程面板地址"

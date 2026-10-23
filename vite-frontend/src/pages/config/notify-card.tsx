@@ -11,7 +11,7 @@ import { Field, SubHeading } from "@/pages/config/section";
 const NOTIFY_EVENTS = [
   {
     key: "node_offline",
-    label: "节点掉线 / 恢复",
+    label: "服务器掉线 / 恢复",
     description: "断开超过 90 秒才提醒，重启和升级不打扰",
   },
   {
@@ -36,7 +36,7 @@ const NOTIFY_EVENTS = [
   },
   {
     key: "node_expiry",
-    label: "节点即将到期",
+    label: "服务器即将到期",
     description: "到期前 3 天提醒一次",
   },
   {
@@ -47,7 +47,7 @@ const NOTIFY_EVENTS = [
   {
     key: "daily_report",
     label: "每日汇总",
-    description: "每天定时发一条：节点在线、出错、流量、共享用户",
+    description: "每天定时发一条：服务器在线、出错、流量、共享用户",
   },
 ] as const;
 
@@ -154,7 +154,7 @@ export function NotifySettings({
     <>
       <Field
         inline
-        help="节点掉线、连不上、延迟异常、回程线路变化、内核出错、快到期时推送"
+        help="服务器掉线、节点连不上、延迟异常、回程线路变化、内核出错、快到期时推送"
         label="启用通知"
       >
         <Switch

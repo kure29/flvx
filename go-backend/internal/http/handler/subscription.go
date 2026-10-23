@@ -641,7 +641,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) respondAfterSubPush(w http.ResponseWriter, inboundIDs []int64, data interface{}) {
 	msg := "操作成功"
 	if err := h.applyKernelsForInbounds(inboundIDs); err != nil {
-		msg = "已保存，但下发到节点失败: " + err.Error()
+		msg = "已保存，但下发到服务器失败: " + err.Error()
 	}
 	response.WriteJSON(w, response.R{Code: 0, Msg: msg, Data: data, TS: time.Now().UnixMilli()})
 }

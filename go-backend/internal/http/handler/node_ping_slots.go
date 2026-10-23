@@ -19,7 +19,7 @@ const (
 	agentBusyRetryDelay = 800 * time.Millisecond
 )
 
-var errTCPPingQueueTimeout = errors.New("节点上的 TCP 探测排队超时")
+var errTCPPingQueueTimeout = errors.New("服务器上的 TCP 探测排队超时")
 
 // nodePingSlots hands out each node's TcpPing slots; nil means no limit.
 type nodePingSlots struct {

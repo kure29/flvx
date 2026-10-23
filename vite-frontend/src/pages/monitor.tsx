@@ -126,9 +126,9 @@ function MonitorOverview() {
         return;
       }
 
-      if (!silent) toast.error(response.msg || "加载节点失败");
+      if (!silent) toast.error(response.msg || "加载服务器失败");
     } catch {
-      if (!silent) toast.error("加载节点失败");
+      if (!silent) toast.error("加载服务器失败");
     } finally {
       if (!silent) setNodesLoading(false);
     }
@@ -211,7 +211,7 @@ function MonitorOverview() {
 
   return (
     <AnimatedPage className="px-3 lg:px-6 py-6">
-      <PageHeader description="节点资源与隧道质量的实时状态" title="监控" />
+      <PageHeader description="服务器资源与隧道质量的实时状态" title="监控" />
 
       <div className="mb-4 grid grid-cols-3 gap-2 sm:max-w-2xl">
         {stats.map((s) => (
@@ -229,7 +229,7 @@ function MonitorOverview() {
 
       <PageTabs
         tabs={[
-          { key: "nodes", label: "节点" },
+          { key: "nodes", label: "服务器" },
           { key: "tunnels", label: "隧道" },
         ]}
         value={activeTab}
@@ -279,9 +279,9 @@ export function NodeMonitorDetail({
 
         if (!active) return;
         if (res.code === 0 && Array.isArray(res.data)) setNodes(res.data);
-        else toast.error(res.msg || "加载节点失败");
+        else toast.error(res.msg || "加载服务器失败");
       } catch {
-        if (active) toast.error("加载节点失败");
+        if (active) toast.error("加载服务器失败");
       }
     })();
 

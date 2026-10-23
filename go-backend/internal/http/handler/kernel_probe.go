@@ -222,7 +222,7 @@ func probeInboundAt(ctx context.Context, host string, port int) (reachProbe, err
 // built inbound: its own node dials the address. That confirms the kernel
 // listens there, not that outside clients get through a firewall.
 func (h *Handler) probeInboundFromNode(nodeID int64, host string, port int) reachProbe {
-	const from = "节点自检（面板没有 IPv6）"
+	const from = "服务器自检（面板没有 IPv6）"
 	data, err := nodeLatencyPing(h, nodeID, host, port)
 	now := time.Now().UnixMilli()
 	if err != nil {
