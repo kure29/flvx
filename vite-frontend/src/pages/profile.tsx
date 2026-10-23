@@ -29,6 +29,7 @@ import { updatePassword } from "@/api";
 import { safeLogout } from "@/utils/logout";
 import { getAdminFlag, getSessionName } from "@/utils/session";
 import { PasskeyManager } from "@/components/passkey-manager";
+import { GithubBinding } from "@/components/github-binding";
 import { PageHeader } from "@/components/page-kit";
 
 interface PasswordForm {
@@ -247,6 +248,7 @@ export default function ProfilePage() {
           <MenuGroup items={accountMenuItems} title="账户" />
 
           <PasskeyManager />
+          <GithubBinding />
         </div>
       </div>
 

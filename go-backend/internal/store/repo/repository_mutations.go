@@ -159,6 +159,9 @@ func (r *Repository) DeleteUserCascade(userID int64) error {
 		if err := tx.Where("user_id = ?", userID).Delete(&model.Passkey{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("user_id = ?", userID).Delete(&model.UserGithub{}).Error; err != nil {
+			return err
+		}
 		forwardIDs := tx.Model(&model.Forward{}).Select("id").Where("user_id = ?", userID)
 		if err := tx.Where("forward_id IN (?)", forwardIDs).Delete(&model.ForwardPort{}).Error; err != nil {
 			return err

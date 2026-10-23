@@ -62,6 +62,7 @@ export default defineConfig({
           { text: "备份与恢复", link: "/guide/backup" },
           { text: "PostgreSQL", link: "/guide/postgresql" },
           { text: "通行证密钥登录", link: "/guide/passkey" },
+          { text: "GitHub 登录", link: "/guide/github-login" },
           { text: "AI Skill", link: "/ai-skill" },
         ],
       },

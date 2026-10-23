@@ -29,6 +29,7 @@ var sensitiveConfigKeys = map[string]struct{}{
 	"machine_fingerprint":   {},
 	"cloudflare_secret_key": {},
 	"node_sub_token":        {},
+	"github_oauth_secret":   {},
 	// Notification credentials: hidden from non-admins and kept out of
 	// backups, like the other secrets.
 	"notify_telegram_bot_token": {},

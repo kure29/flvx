@@ -43,6 +43,8 @@ type Handler struct {
 	captchaTokens  map[string]int64
 	passkeyMu      sync.Mutex
 	passkeyPending map[string]passkeyCeremony
+	githubMu       sync.Mutex
+	githubPending  map[string]githubState
 
 	jobsMu          sync.Mutex
 	jobsCancel      context.CancelFunc
@@ -120,6 +122,7 @@ func New(repo *repo.Repository, jwtSecret string) *Handler {
 		nftablesManager:          runtimenft.NewManager(nil),
 		captchaTokens:            make(map[string]int64),
 		passkeyPending:           make(map[string]passkeyCeremony),
+		githubPending:            make(map[string]githubState),
 		pendingUpgradeRedeploy:   make(map[int64]struct{}),
 		nodeOnlineRedeployAt:     make(map[int64]time.Time),
 		nodeOnlineRedeployQueued: make(map[int64]struct{}),
@@ -176,6 +179,13 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/user/passkey/register/finish", h.passkeyRegisterFinish)
 	mux.HandleFunc("/api/v1/user/passkey/list", h.passkeyList)
 	mux.HandleFunc("/api/v1/user/passkey/delete", h.passkeyDelete)
+	mux.HandleFunc("/api/v1/user/github/status", h.githubStatus)
+	mux.HandleFunc("/api/v1/user/github/login/begin", h.githubLoginBegin)
+	mux.HandleFunc("/api/v1/user/github/login/finish", h.githubLoginFinish)
+	mux.HandleFunc("/api/v1/user/github/info", h.githubInfo)
+	mux.HandleFunc("/api/v1/user/github/bind/begin", h.githubBindBegin)
+	mux.HandleFunc("/api/v1/user/github/bind/finish", h.githubBindFinish)
+	mux.HandleFunc("/api/v1/user/github/unbind", h.githubUnbind)
 	mux.HandleFunc("/api/v1/user/list", h.userList)
 	mux.HandleFunc("/api/v1/user/create", h.userCreate)
 	mux.HandleFunc("/api/v1/user/update", h.userUpdate)

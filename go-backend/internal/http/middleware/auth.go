@@ -118,6 +118,8 @@ func shouldSkip(path string) bool {
 		return true
 	case path == "/api/v1/user/passkey/status" || path == "/api/v1/user/passkey/login/begin" || path == "/api/v1/user/passkey/login/finish":
 		return true
+	case path == "/api/v1/user/github/status" || path == "/api/v1/user/github/login/begin" || path == "/api/v1/user/github/login/finish":
+		return true
 	case path == "/api/v1/public/config/get":
 		return true
 	case path == "/api/v1/federation/connect":
