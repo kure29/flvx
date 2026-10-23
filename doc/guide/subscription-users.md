@@ -8,7 +8,7 @@
 - 可以设到期日期（到期当天 23:59 后断开）和流量上限，留空就是不限
 - **停用**、**删除** 或 **到期** 后，面板会把它的凭据从服务器上删掉，已导入的配置也连不上了
 - **重置链接和凭据**：旧链接和对方已导入的配置立即失效，适合链接泄露时使用
-- 支持单独凭据的协议：VLESS、VMess、Trojan、Hysteria2、TUIC、AnyTLS、NaïveProxy、SOCKS5、HTTP。Shadowsocks、Snell、WireGuard 和导入的节点只能共用原来的密码：停用后订阅失效，但对方已经导入的配置仍能连接（界面上会标出“共用凭据”）
+- 支持单独凭据的协议：VLESS、VMess、Trojan、Hysteria2、TUIC、AnyTLS、NaïveProxy、SOCKS5、HTTP，以及打开了 [多用户](./nodes.md#shadowsocks-多用户) 的 Shadowsocks 2022。其他 Shadowsocks、Snell、WireGuard 和导入的节点只能共用原来的密码：停用后订阅失效，但对方已经导入的配置仍能连接（界面上会标出“共用凭据”）
 - 3 天内到期会推送 [通知](./notify.md)
 
 ## 流量上限
@@ -18,7 +18,7 @@
 - 用到 90% 和用完时会推送 [通知](./notify.md)，概览页的“需要处理”里也会列出
 - 客户端里能看到已用流量、总量和到期时间（`Subscription-Userinfo`）
 - 统计在节点所在的服务器上进行：每个订阅走自己的出站，服务器用 nftables 计数，Xray 和 sing-box 都支持。需要服务器上有 nftables，并且 agent 要和面板一起更新到最新版（旧 agent 能正常转发，只是不计数）
-- 只统计支持单独凭据的协议。共用凭据的节点（Shadowsocks、Snell、导入的节点）分不清是谁在用，不计入
+- 只统计支持单独凭据的协议。共用凭据的节点（没打开多用户的 Shadowsocks、Snell、导入的节点）分不清是谁在用，不计入；Shadowsocks 2022 打开 [多用户](./nodes.md#shadowsocks-多用户) 后就能统计
 
 ## 流量统计
 

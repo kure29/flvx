@@ -346,8 +346,8 @@ export function SubTrafficStats({ id, mine }: { id: number; mine?: boolean }) {
           </div>
           <p className="text-xs text-default-400">
             统计自建节点上按用户区分的协议（VLESS、Trojan、Hysteria2
-            等）；导入的节点、Shadowsocks、Snell 不计入。3.3.29
-            起开始记录，之前的流量不在图里
+            等，以及打开多用户的 Shadowsocks 2022）；导入的节点、其他
+            Shadowsocks、Snell 不计入。3.3.29 起开始记录，之前的流量不在图里
           </p>
           <p className="text-xs text-default-400">
             订阅上方的已用流量从本周期开始（{sinceDate}

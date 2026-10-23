@@ -77,6 +77,9 @@ export interface InboundForm {
   flowVision: boolean;
   password: string;
   method: string;
+  /** Shadowsocks 2022 multi-user: subscriptions get their own keys. */
+  ssMultiUser: boolean;
+  ssUserKey: string;
   snellVersion: string;
   snellMode: string;
   masquerade: string;
@@ -323,6 +326,8 @@ export function emptyForm(
     flowVision: true,
     password: "",
     method: caps?.defaults.ssMethod ?? "2022-blake3-aes-128-gcm",
+    ssMultiUser: false,
+    ssUserKey: "",
     snellVersion: "",
     snellMode: "",
     masquerade: "",
@@ -427,6 +432,8 @@ export function formFromItem(item: InboundApiItem): InboundForm {
     flowVision: Boolean(item.settings.flow),
     password: item.settings.password ?? "",
     method: item.settings.method ?? "",
+    ssMultiUser: Boolean(item.settings.multiUser),
+    ssUserKey: item.settings.userKey ?? "",
     snellVersion: item.settings.snellVersion
       ? String(item.settings.snellVersion)
       : "",
@@ -559,6 +566,12 @@ export function toPayload(form: InboundForm): InboundMutationPayload {
         visionAllowed(form) && form.flowVision ? "xtls-rprx-vision" : undefined,
       password: usesPassword ? form.password.trim() : undefined,
       method: form.protocol === "shadowsocks" ? form.method : undefined,
+      multiUser:
+        ssMultiUserAllowed(form) && form.ssMultiUser ? true : undefined,
+      userKey:
+        ssMultiUserAllowed(form) && form.ssMultiUser && form.ssUserKey
+          ? form.ssUserKey
+          : undefined,
       snellVersion:
         form.protocol === "snell" && form.snellVersion
           ? Number(form.snellVersion)
@@ -700,4 +713,18 @@ export function describeInbound(item: InboundApiItem): string {
   }
 
   return parts.join(" + ");
+}
+
+/** Shadowsocks multi-user mode needs an AES 2022 cipher and no ShadowTLS. */
+export const SS_MULTI_USER_METHODS = [
+  "2022-blake3-aes-128-gcm",
+  "2022-blake3-aes-256-gcm",
+];
+
+export function ssMultiUserAllowed(form: InboundForm): boolean {
+  return (
+    form.protocol === "shadowsocks" &&
+    SS_MULTI_USER_METHODS.includes(form.method) &&
+    form.securityType !== "shadowtls"
+  );
 }

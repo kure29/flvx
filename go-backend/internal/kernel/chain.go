@@ -266,7 +266,7 @@ func chainTargetFromInbound(e Endpoint) (chainTarget, error) {
 		if in.Security.Type == SecurityShadowTLS {
 			return t, errors.New("Xray 无法连接 ShadowTLS 节点，请改用 sing-box 内核")
 		}
-		t.Protocol, t.Cipher, t.Password = "shadowsocks", in.Settings.Method, in.Settings.Password
+		t.Protocol, t.Cipher, t.Password = "shadowsocks", in.Settings.Method, in.ssClientPassword()
 		return t, nil
 	default:
 		return t, fmt.Errorf("Xray 无法连接 %s 节点，请改用 sing-box 内核", in.Protocol)

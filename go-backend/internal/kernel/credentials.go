@@ -48,6 +48,12 @@ func SS2022KeyLen(method string) int {
 	}
 }
 
+// SSMultiUserMethod reports whether the method has SIP023 multi-user mode
+// (the AES 2022 ciphers; ChaCha 2022 has no identity headers).
+func SSMultiUserMethod(method string) bool {
+	return method == "2022-blake3-aes-128-gcm" || method == "2022-blake3-aes-256-gcm"
+}
+
 func ShadowsocksPassword(method string) string {
 	if n := SS2022KeyLen(method); n > 0 {
 		return base64.StdEncoding.EncodeToString(randomBytes(n))

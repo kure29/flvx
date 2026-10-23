@@ -1,6 +1,8 @@
 package kernel
 
 import (
+	"encoding/base64"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -13,7 +15,7 @@ func TestRenderUsers(t *testing.T) {
 			RealityPrivateKey: "k", RealityShortIDs: []string{"ab"}},
 		Users: users}
 	ss := Inbound{ID: 2, Protocol: ProtocolShadowsocks, Port: 8388,
-		Settings: Settings{Method: "2022-blake3-aes-128-gcm", Password: "c2VydmVyc2VydmVyc2VydmVy"}, Users: users}
+		Settings: Settings{Method: "2022-blake3-aes-128-gcm", Password: "c2VydmVyLWtleS0xNmJ5dA=="}, Users: users}
 
 	r, err := Render(TypeXray, []Inbound{vless, ss})
 	if err != nil {
@@ -97,5 +99,88 @@ func TestRenderUserMarks(t *testing.T) {
 	}
 	if UserMark(70000) != 0 || UserFromMark(UserMark(12)) != 12 || UserFromMark(0x12345678) != 0 {
 		t.Fatal("mark round trip")
+	}
+}
+
+func TestShadowsocksMultiUser(t *testing.T) {
+	const server = "c2VydmVyLWtleS0xNmJ5dA==" // 16 bytes
+	const owner = "b3duZXJvd25lcm93bmVyMQ=="  // 16 bytes
+	u := User{ID: 7, Password: "userpw"}
+	userKey := ssUserKey(u, "2022-blake3-aes-128-gcm")
+	ss := Inbound{ID: 2, Protocol: ProtocolShadowsocks, Port: 8388,
+		Settings: Settings{Method: "2022-blake3-aes-128-gcm", Password: server, MultiUser: true, UserKey: owner},
+		Users:    []User{u}}
+	if !ss.SupportsUsers() || (Inbound{Protocol: ProtocolShadowsocks, Settings: Settings{Method: "2022-blake3-aes-128-gcm"}}).SupportsUsers() {
+		t.Fatal("shadowsocks carries users only in multi-user mode")
+	}
+	if len(userKey) != 24 || ssUserKey(User{ID: 8, Password: "other"}, ss.Settings.Method) == userKey {
+		t.Fatalf("user keys must be 16-byte base64 and differ per user: %q", userKey)
+	}
+
+	r, err := Render(TypeXray, []Inbound{ss})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := r.Files[0].Content
+	if !strings.Contains(cfg, `"password": "`+server+`"`) || !strings.Contains(cfg, `"password": "`+owner+`"`) ||
+		!strings.Contains(cfg, `"password": "`+userKey+`"`) || !strings.Contains(cfg, `"u7@flvx"`) ||
+		!strings.Contains(cfg, `"outboundTag": "flvx-u7"`) || len(r.UserMarks) != 1 {
+		t.Fatalf("xray multi-user shadowsocks:\n%s", cfg)
+	}
+
+	r, err = Render(TypeSingbox, []Inbound{ss})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg = r.Files[0].Content
+	if !strings.Contains(cfg, `"name": "owner"`) || !strings.Contains(cfg, `"name": "u7"`) ||
+		!strings.Contains(cfg, `"password": "`+userKey+`"`) || !strings.Contains(cfg, `"auth_user"`) || len(r.UserMarks) != 1 {
+		t.Fatalf("sing-box multi-user shadowsocks:\n%s", cfg)
+	}
+
+	// The owner and each subscription send "server:own key".
+	e := Endpoint{Name: "ss", Host: "1.2.3.4", Port: 8388, Inbound: ss}
+	if p, _ := ClashProxy(e); !strings.Contains(marshalYAML(yamlNode{{"proxies", []interface{}{p}}}), server+":"+owner) {
+		t.Fatal("the owner's link must carry its user key")
+	}
+	if got := ss.ForUser(u).Settings.Password; got != server+":"+userKey {
+		t.Fatalf("user password = %q", got)
+	}
+	e.Inbound = ss.ForUser(u)
+	if link, _ := ShareURI(e); !strings.Contains(link, url.QueryEscape(server+":"+userKey)) {
+		t.Fatalf("user share link: %s", link)
+	}
+}
+
+func TestShadowsocksMultiUserValidation(t *testing.T) {
+	in := Inbound{Protocol: ProtocolShadowsocks, Port: 8388,
+		Settings: Settings{Method: "2022-blake3-aes-256-gcm", MultiUser: true}}
+	if err := normalizeSettings(&in); err != nil {
+		t.Fatal(err)
+	}
+	if key, err := base64.StdEncoding.DecodeString(in.Settings.UserKey); err != nil || len(key) != 32 {
+		t.Fatalf("owner key must be generated: %q", in.Settings.UserKey)
+	}
+	in.Settings.MultiUser = false
+	if err := normalizeSettings(&in); err != nil || in.Settings.UserKey != "" {
+		t.Fatalf("turning it off drops the owner key: %v %q", err, in.Settings.UserKey)
+	}
+	chacha := Inbound{Protocol: ProtocolShadowsocks, Settings: Settings{Method: "2022-blake3-chacha20-poly1305", MultiUser: true}}
+	if err := normalizeSettings(&chacha); err == nil {
+		t.Fatal("chacha 2022 has no multi-user mode")
+	}
+	legacy := Inbound{Protocol: ProtocolShadowsocks, Settings: Settings{Method: "aes-256-gcm", MultiUser: true}}
+	if err := normalizeSettings(&legacy); err == nil {
+		t.Fatal("pre-2022 ciphers have no multi-user mode")
+	}
+}
+
+func TestShadowsocksMultiUserSurge(t *testing.T) {
+	ss := Inbound{Protocol: ProtocolShadowsocks, Port: 8388,
+		Settings: Settings{Method: "2022-blake3-aes-128-gcm", Password: "c2VydmVyLWtleS0xNmJ5dA==", MultiUser: true,
+			UserKey: "b3duZXJvd25lcm93bmVyMQ=="}}
+	line, _ := SurgeLine(Endpoint{Name: "ss", Host: "1.2.3.4", Port: 8388, Inbound: ss})
+	if !strings.Contains(line, "password=c2VydmVyLWtleS0xNmJ5dA==:b3duZXJvd25lcm93bmVyMQ==") {
+		t.Fatalf("surge line: %s", line)
 	}
 }

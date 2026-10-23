@@ -43,6 +43,12 @@ const MULTI_USER_PROTOCOLS = new Set([
   "naive",
 ]);
 
+/** Whether everyone connecting to the inbound shares one credential. */
+const sharedCredentials = (i: InboundApiItem) =>
+  i.external ||
+  (!MULTI_USER_PROTOCOLS.has(i.protocol) &&
+    !(i.protocol === "shadowsocks" && i.settings?.multiUser));
+
 export const EMPTY_GROUP_OPTIONS: NodeGroupOptions = {
   lines: "",
   regions: [],
@@ -278,8 +284,7 @@ export function NodeGroupEditor({
       (draft.sourceAll
         ? i.enabled
         : draft.inboundIds.includes(i.id) ||
-          draft.sourceIds.includes(i.sourceId ?? 0)) &&
-      (i.external || !MULTI_USER_PROTOCOLS.has(i.protocol)),
+          draft.sourceIds.includes(i.sourceId ?? 0)) && sharedCredentials(i),
   ).length;
 
   const runPreview = async () => {
@@ -366,7 +371,7 @@ export function NodeGroupEditor({
             {!i.enabled && (
               <span className="ml-1 text-xs text-default-400">已停用</span>
             )}
-            {(i.external || !MULTI_USER_PROTOCOLS.has(i.protocol)) && (
+            {sharedCredentials(i) && (
               <span className="ml-1 text-xs text-warning">共用凭据</span>
             )}
           </Checkbox>

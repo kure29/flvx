@@ -18,6 +18,12 @@ type Settings struct {
 	Flow     string `json:"flow,omitempty"`
 	Password string `json:"password,omitempty"`
 	Method   string `json:"method,omitempty"`
+	// MultiUser turns a Shadowsocks 2022 (AES) inbound into multi-user mode
+	// (SIP023): Password is the server key and every client, the owner
+	// included, adds its own key ("server:user"), so subscriptions get their
+	// own credentials. UserKey is the owner's key.
+	MultiUser bool   `json:"multiUser,omitempty"`
+	UserKey   string `json:"userKey,omitempty"`
 
 	// SnellVersion is the protocol version clients use (4, 5 or 6).
 	SnellVersion int `json:"snellVersion,omitempty"`
@@ -382,6 +388,9 @@ func normalizeSettings(in *Inbound) error {
 		s.PrivateKey, s.PublicKey, s.PeerPrivateKey, s.PeerPublicKey, s.PeerAddress, s.MTU = "", "", "", "", "", 0
 	}
 	s.Encryption = ""
+	if in.Protocol != ProtocolShadowsocks {
+		s.MultiUser, s.UserKey = false, ""
+	}
 
 	switch in.Protocol {
 	case ProtocolVLESS, ProtocolVMess:
@@ -421,6 +430,19 @@ func normalizeSettings(in *Inbound) error {
 			if err != nil || len(key) != n {
 				return fmt.Errorf("%s 的密钥必须是 %d 字节的 base64", s.Method, n)
 			}
+		}
+		if s.MultiUser {
+			if !SSMultiUserMethod(s.Method) {
+				return errors.New("多用户只支持 2022-blake3-aes-128-gcm 和 2022-blake3-aes-256-gcm")
+			}
+			if in.Security.Type == SecurityShadowTLS {
+				return errors.New("套了 ShadowTLS 的 Shadowsocks 不支持多用户")
+			}
+			if key, err := base64.StdEncoding.DecodeString(s.UserKey); err != nil || len(key) != SS2022KeyLen(s.Method) {
+				s.UserKey = ShadowsocksPassword(s.Method)
+			}
+		} else {
+			s.UserKey = ""
 		}
 		s.UUID, s.Flow = "", ""
 	case ProtocolHysteria2, ProtocolAnyTLS:

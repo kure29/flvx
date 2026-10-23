@@ -21,6 +21,7 @@ import {
   presetsFor,
   protocolCap,
   sniOptionalProtocols,
+  ssMultiUserAllowed,
   toPayload,
   usernameProtocols,
   uuidProtocols,
@@ -584,6 +585,7 @@ export function InboundFormModal({
                         ...prev,
                         method: String(Array.from(keys)[0] ?? prev.method),
                         password: "",
+                        ssUserKey: "",
                       }))
                     }
                   >
@@ -617,6 +619,29 @@ export function InboundFormModal({
                     variant="bordered"
                     onChange={(e) => set("password", e.target.value)}
                   />
+                )}
+                {ssMultiUserAllowed(form) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        isSelected={form.ssMultiUser}
+                        size="sm"
+                        onValueChange={(v) => set("ssMultiUser", v)}
+                      />
+                      <span className="text-sm">
+                        每个订阅单独的密钥（统计流量）
+                      </span>
+                    </div>
+                    <p className="text-xs text-default-500">
+                      打开后每个订阅有自己的密钥，能单独统计流量、停用后单独断开。客户端密码会变成「服务器密钥:用户密钥」，
+                      <span className="text-warning">
+                        原来的分享链接和已导入的配置会失效，订阅更新一下即可
+                      </span>
+                      。mihomo、sing-box
+                      支持；Surge、Shadowrocket、Loon、Quantumult X
+                      未确认，打开后先用自己的客户端试一下，连不上就关掉
+                    </p>
+                  </div>
                 )}
 
                 {form.protocol === "snell" && (
