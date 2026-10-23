@@ -32,20 +32,35 @@ if (IS_DEMO) installDemo();
 // Browsers only look for a new service worker on navigation (and at most
 // daily), and a dashboard tab rarely navigates: after a panel upgrade the
 // refresh prompt could take hours. Ask every minute and when the tab comes
-// back into view instead.
+// back into view, gets focus or comes back online instead.
 const SW_UPDATE_INTERVAL = 60 * 1000;
 
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return;
+    let checking = false;
     const check = () => {
-      if (document.visibilityState !== "visible" || !navigator.onLine) return;
-      registration.update().catch(() => {});
+      if (
+        checking ||
+        document.visibilityState !== "visible" ||
+        !navigator.onLine
+      )
+        return;
+      checking = true;
+      registration
+        .update()
+        .catch(() => {})
+        .finally(() => {
+          checking = false;
+        });
     };
 
     setInterval(check, SW_UPDATE_INTERVAL);
     document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    window.addEventListener("online", check);
+    window.addEventListener("pageshow", check);
   },
   onNeedRefresh() {
     toast(

@@ -22,7 +22,7 @@ export function SubClientGrid({
   configClients?: string[];
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-1.5">
       {SUB_CLIENTS.map((c) => {
         const url = link(c.format);
         const isConfig =
@@ -45,7 +45,7 @@ export function SubClientGrid({
         return (
           <div
             key={c.key}
-            className="relative flex h-14 items-center rounded-xl border border-divider transition-colors hover:bg-default-100"
+            className="relative flex h-11 items-center rounded-xl border border-divider transition-colors hover:bg-default-100"
           >
             <button
               className="h-full min-w-0 flex-1 truncate pl-3 pr-9 text-left text-sm font-medium"

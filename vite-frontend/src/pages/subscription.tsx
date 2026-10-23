@@ -128,12 +128,26 @@ function expiryLabel(ms: number): string {
   return `${toDateInput(ms)} 到期 · 剩 ${days} 天`;
 }
 
-/** Used / limit of a subscription, with a bar when it has a limit. */
-function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
+/** How much of its traffic limit a subscription has used. */
+function UsageBar({ s, track }: { s: SubscriptionItem; track: string }) {
   const used = s.uploadBytes + s.downloadBytes;
   const pct = s.trafficLimit ? Math.min(100, (used / s.trafficLimit) * 100) : 0;
   const tone =
     pct >= 100 ? "bg-danger" : pct >= 90 ? "bg-warning" : "bg-primary";
+
+  return (
+    <div className={`h-1.5 overflow-hidden rounded-full ${track}`}>
+      <div
+        className={`h-full rounded-full ${tone}`}
+        style={{ width: `${Math.max(2, pct)}%` }}
+      />
+    </div>
+  );
+}
+
+/** Used / limit of a subscription, with a bar when it has a limit. */
+function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
+  const used = s.uploadBytes + s.downloadBytes;
 
   return (
     <div className={compact ? "space-y-1" : "space-y-1.5"}>
@@ -149,14 +163,7 @@ function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
         )}
       </div>
       {s.trafficLimit > 0 && (
-        <div
-          className={`h-1.5 overflow-hidden rounded-full ${compact ? "bg-default-100" : "bg-default-200"}`}
-        >
-          <div
-            className={`h-full rounded-full ${tone}`}
-            style={{ width: `${Math.max(2, pct)}%` }}
-          />
-        </div>
+        <UsageBar s={s} track={compact ? "bg-default-100" : "bg-default-200"} />
       )}
       {!compact && (
         <div className="font-mono text-xs text-default-400">
@@ -1500,15 +1507,20 @@ export default function SubscriptionPage() {
                   </p>
                 </ModalHeader>
                 <ModalBody className="space-y-3">
-                  <div className="space-y-2 rounded-xl bg-default-100 p-3">
-                    <Usage s={detail} />
+                  <div className="space-y-1.5 rounded-xl bg-default-100 px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-default-500">
-                        {detail.overQuota
-                          ? "流量已用完，已从节点上断开"
-                          : `${new Date(detail.trafficSince).toLocaleDateString()} 起的上传 + 下载合计`}
+                      <span className="font-mono text-sm">
+                        {formatTraffic(
+                          detail.uploadBytes + detail.downloadBytes,
+                        )}
+                        <span className="text-default-500">
+                          {detail.trafficLimit
+                            ? ` / ${formatTraffic(detail.trafficLimit)}`
+                            : " · 不限流量"}
+                        </span>
                       </span>
                       <Button
+                        className="h-7 min-w-0 px-2 text-xs"
                         isDisabled={
                           detail.uploadBytes + detail.downloadBytes === 0
                         }
@@ -1520,6 +1532,22 @@ export default function SubscriptionPage() {
                         重置流量
                       </Button>
                     </div>
+                    {detail.trafficLimit > 0 && (
+                      <UsageBar s={detail} track="bg-default-200" />
+                    )}
+                    <p
+                      className={`text-xs ${detail.overQuota ? "text-danger" : "text-default-500"}`}
+                    >
+                      {detail.overQuota
+                        ? "流量已用完，已从节点上断开"
+                        : [
+                            `↑ ${formatTraffic(detail.uploadBytes)} ↓ ${formatTraffic(detail.downloadBytes)}`,
+                            `${new Date(detail.trafficSince).toLocaleDateString(undefined, { month: "numeric", day: "numeric" })} 起`,
+                            detail.resetDay
+                              ? `每月 ${detail.resetDay} 号重置`
+                              : "不自动重置",
+                          ].join(" · ")}
+                    </p>
                   </div>
                   <Segmented
                     options={[
@@ -1552,22 +1580,19 @@ export default function SubscriptionPage() {
                         name={detail.name}
                         rules={detail.options.rules}
                       />
-                      <p className="text-center text-xs text-default-400">
-                        点客户端直接导入，右侧按钮复制链接
-                      </p>
-                      {detail.options.rules && (
-                        <p className="text-xs text-default-500">
-                          已开启分流规则：Shadowrocket、Loon、Quantumult X
-                          导入的是完整配置，会替换 App 里原来的配置；Loon 和
-                          Quantumult X 复制链接后在 App 的配置里从 URL 下载
+                      <div className="space-y-1 text-xs leading-relaxed text-default-500">
+                        <p>
+                          点客户端直接导入，右侧按钮复制链接
+                          {detail.options.rules &&
+                            "；已开分流：Shadowrocket、Loon、Quantumult X 导入完整配置，会替换 App 原来的配置"}
                         </p>
-                      )}
-                      {detail.sharedIds.length > 0 && (
-                        <p className="text-xs text-warning">
-                          其中 {detail.sharedIds.length}{" "}
-                          个落地用的是共用凭据，停用后已导入的配置仍能连接
-                        </p>
-                      )}
+                        {detail.sharedIds.length > 0 && (
+                          <p className="text-warning">
+                            {detail.sharedIds.length}{" "}
+                            个落地是共用凭据，停用后已导入的配置仍能连接
+                          </p>
+                        )}
+                      </div>
                     </>
                   )}
                 </ModalBody>
