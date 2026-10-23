@@ -193,6 +193,42 @@ function SecurityPanel({ items }: { items: SecurityItem[] }) {
   );
 }
 
+/**
+ * The login rows (passkey, GitHub) only show once their status loads, so
+ * the page jumped as they popped in. The last status is remembered per
+ * user in this browser and shown at once, then refreshed.
+ */
+interface LoginCache {
+  passkeyEnabled: boolean;
+  passkeyCount: number;
+  github: GithubInfo | null;
+}
+
+const loginCacheKey = () => `flyx_login_rows_${getSessionName() || ""}`;
+
+function readLoginCache(): LoginCache {
+  try {
+    const raw = JSON.parse(localStorage.getItem(loginCacheKey()) || "null");
+
+    if (raw && typeof raw === "object") return raw as LoginCache;
+  } catch {
+    // ignore: the rows just load as before
+  }
+
+  return { passkeyEnabled: false, passkeyCount: 0, github: null };
+}
+
+function writeLoginCache(patch: Partial<LoginCache>) {
+  try {
+    localStorage.setItem(
+      loginCacheKey(),
+      JSON.stringify({ ...readLoginCache(), ...patch }),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const isH5 = useH5Mode();
@@ -207,9 +243,11 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
 
-  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
-  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
-  const [github, setGithub] = useState<GithubInfo | null>(null);
+  const [cached] = useState(readLoginCache);
+  const [passkeyEnabled, setPasskeyEnabled] = useState(cached.passkeyEnabled);
+  const [passkeys, setPasskeys] = useState<PasskeyItem[] | null>(null);
+  const passkeyCount = passkeys?.length ?? cached.passkeyCount;
+  const [github, setGithub] = useState<GithubInfo | null>(cached.github);
   const [openLogin, setOpenLogin] = useState<"passkey" | "github" | null>(null);
   // The app's WebView can't do passkeys or come back from GitHub.
   const webView = isWebViewFunc();
@@ -217,13 +255,19 @@ export default function ProfilePage() {
   const loadPasskeys = () =>
     listPasskeys()
       .then((res) => {
-        if (res.code === 0) setPasskeys(res.data || []);
+        if (res.code === 0) {
+          setPasskeys(res.data || []);
+          writeLoginCache({ passkeyCount: (res.data || []).length });
+        }
       })
       .catch(() => setPasskeys([]));
   const loadGithub = () =>
     getGithubInfo()
       .then((res) => {
-        if (res.code === 0) setGithub(res.data);
+        if (res.code === 0) {
+          setGithub(res.data);
+          writeLoginCache({ github: res.data });
+        }
       })
       .catch(() => setGithub(null));
 
@@ -238,10 +282,10 @@ export default function ProfilePage() {
     ) {
       getPasskeyStatus()
         .then((res) => {
-          if (res.code === 0 && res.data.enabled) {
-            setPasskeyEnabled(true);
-            void loadPasskeys();
-          }
+          if (res.code !== 0) return;
+          setPasskeyEnabled(res.data.enabled);
+          writeLoginCache({ passkeyEnabled: res.data.enabled });
+          if (res.data.enabled) void loadPasskeys();
         })
         .catch(() => setPasskeyEnabled(false));
     }
@@ -367,8 +411,8 @@ export default function ProfilePage() {
             key: "passkey",
             label: "通行证密钥",
             description: "用指纹、面容或设备密码登录，不用输入密码",
-            status: passkeys.length > 0 ? `${passkeys.length} 个` : "未设置",
-            active: passkeys.length > 0,
+            status: passkeyCount > 0 ? `${passkeyCount} 个` : "未设置",
+            active: passkeyCount > 0,
             action: "管理",
             icon: Fingerprint,
             tone: "success" as Tone,
@@ -487,7 +531,7 @@ export default function ProfilePage() {
 
       <PasskeyModal
         isOpen={openLogin === "passkey"}
-        items={passkeys}
+        items={passkeys ?? []}
         onChanged={() => void loadPasskeys()}
         onClose={() => setOpenLogin(null)}
       />
