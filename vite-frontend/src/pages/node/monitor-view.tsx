@@ -1878,7 +1878,10 @@ export function MonitorView({
         }}
       >
         <ModalContent>
-          <ModalHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <ModalHeader
+            closable
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
             <div className="min-w-0">
               <div className="text-base font-semibold truncate">
                 监控记录
@@ -1986,17 +1989,6 @@ export function MonitorView({
               </div>
             )}
           </ModalBody>
-          <ModalFooter>
-            <Button
-              variant="flat"
-              onPress={() => {
-                setResultsModalOpen(false);
-                setResultsMonitorId(null);
-              }}
-            >
-              关闭
-            </Button>
-          </ModalFooter>
         </ModalContent>
       </Modal>
 
@@ -2138,7 +2130,7 @@ export function MonitorView({
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={() => setEditModalOpen(false)}>
+            <Button variant="light" onPress={() => setEditModalOpen(false)}>
               取消
             </Button>
             <Button

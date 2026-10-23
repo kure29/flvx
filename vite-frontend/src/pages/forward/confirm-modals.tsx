@@ -67,7 +67,7 @@ export function DeleteForwardModal({
                 isLoading={deleteLoading}
                 onPress={confirmDelete}
               >
-                确认删除
+                删除
               </Button>
             </ModalFooter>
           </>
@@ -136,7 +136,7 @@ export function ResetFlowModal({
                 isLoading={resetFlowLoading}
                 onPress={confirmResetFlow}
               >
-                确认清零
+                清零
               </Button>
             </ModalFooter>
           </>
@@ -251,7 +251,7 @@ export function BatchDeleteModal({
                 isLoading={batchLoading}
                 onPress={handleBatchDelete}
               >
-                确认删除
+                删除
               </Button>
             </ModalFooter>
           </>
@@ -326,7 +326,7 @@ export function BatchChangeTunnelModal({
                 isLoading={batchLoading}
                 onPress={handleBatchChangeTunnel}
               >
-                确认换隧道
+                换隧道
               </Button>
             </ModalFooter>
           </>

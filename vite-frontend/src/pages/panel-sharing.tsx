@@ -836,7 +836,9 @@ export default function PanelSharingPage() {
             />
           </ModalBody>
           <ModalFooter>
-            <Button onPress={() => setCreateShareOpen(false)}>取消</Button>
+            <Button variant="light" onPress={() => setCreateShareOpen(false)}>
+              取消
+            </Button>
             <Button color="primary" onPress={handleCreateShare}>
               创建
             </Button>
@@ -941,7 +943,9 @@ export default function PanelSharingPage() {
             />
           </ModalBody>
           <ModalFooter>
-            <Button onPress={() => setEditShareOpen(false)}>取消</Button>
+            <Button variant="light" onPress={() => setEditShareOpen(false)}>
+              取消
+            </Button>
             <Button color="primary" onPress={handleEditShare}>
               保存
             </Button>
@@ -979,7 +983,9 @@ export default function PanelSharingPage() {
             />
           </ModalBody>
           <ModalFooter>
-            <Button onPress={() => setImportNodeOpen(false)}>取消</Button>
+            <Button variant="light" onPress={() => setImportNodeOpen(false)}>
+              取消
+            </Button>
             <Button color="primary" onPress={handleImportNode}>
               导入
             </Button>

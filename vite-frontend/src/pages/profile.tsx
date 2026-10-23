@@ -583,7 +583,7 @@ export default function ProfilePage() {
                   isLoading={passwordLoading}
                   onPress={handlePasswordSubmit}
                 >
-                  确定
+                  修改密码
                 </Button>
               </ModalFooter>
             </>

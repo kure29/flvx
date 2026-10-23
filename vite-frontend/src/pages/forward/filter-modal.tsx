@@ -59,9 +59,11 @@ export function ForwardFilterModal({
       onOpenChange={setIsSearchModalOpen}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1">筛选规则</ModalHeader>
+            <ModalHeader closable className="flex flex-col gap-1">
+              筛选规则
+            </ModalHeader>
             <ModalBody>
               <div className="flex flex-col gap-4 py-2">
                 {isAdmin && (
@@ -141,9 +143,6 @@ export function ForwardFilterModal({
             <ModalFooter>
               <Button variant="flat" onPress={resetSearchParams}>
                 重置
-              </Button>
-              <Button color="primary" onPress={onClose}>
-                完成
               </Button>
             </ModalFooter>
           </>

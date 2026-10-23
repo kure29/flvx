@@ -82,9 +82,9 @@ export function BatchActionResultModal({
       onOpenChange={onOpenChange}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
-            <ModalHeader>{title}</ModalHeader>
+            <ModalHeader closable>{title}</ModalHeader>
             <ModalBody className="space-y-4">
               <Alert
                 color="warning"
@@ -121,9 +121,6 @@ export function BatchActionResultModal({
             <ModalFooter>
               <Button variant="light" onPress={handleCopy}>
                 复制失败原因
-              </Button>
-              <Button color="primary" onPress={onClose}>
-                我知道了
               </Button>
             </ModalFooter>
           </>

@@ -67,9 +67,12 @@ export function DiagnosisModal({
       }}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1 border-b border-divider">
+            <ModalHeader
+              closable
+              className="flex flex-col gap-1 border-b border-divider"
+            >
               <h2 className="text-xl font-bold">规则诊断结果</h2>
               {currentDiagnosisForward && (
                 <div className="flex items-center gap-2 min-w-0">
@@ -611,9 +614,6 @@ export function DiagnosisModal({
               )}
             </ModalBody>
             <ModalFooter className="border-t border-divider">
-              <Button variant="light" onPress={onClose}>
-                关闭
-              </Button>
               {currentDiagnosisForward && (
                 <Button
                   color="primary"

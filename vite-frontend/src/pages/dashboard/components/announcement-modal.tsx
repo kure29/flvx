@@ -32,7 +32,9 @@ export const AnnouncementModal = ({
       onOpenChange={(open) => !open && onClose()}
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">平台公告</ModalHeader>
+        <ModalHeader closable className="flex flex-col gap-1">
+          平台公告
+        </ModalHeader>
         <ModalBody>
           <div className="prose prose-sm dark:prose-invert max-w-none max-h-[60vh] overflow-y-auto">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -43,9 +45,6 @@ export const AnnouncementModal = ({
         <ModalFooter>
           <Button variant="flat" onPress={onDontShowAgain}>
             不再提示
-          </Button>
-          <Button color="primary" onPress={onClose}>
-            关闭
           </Button>
         </ModalFooter>
       </ModalContent>

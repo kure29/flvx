@@ -313,20 +313,15 @@ export default function MySubscriptionsPage() {
         onOpenChange={(v) => !v && setQr(null)}
       >
         <ModalContent>
-          {(close) => (
+          {() => (
             <>
-              <ModalHeader>{qr?.name}</ModalHeader>
+              <ModalHeader closable>{qr?.name}</ModalHeader>
               <ModalBody className="items-center">
                 {qr && <QrImage text={link(qr)} />}
                 <p className="text-center text-xs text-default-500">
                   用客户端扫码导入（自动识别客户端格式）
                 </p>
               </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={close}>
-                  关闭
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>
@@ -354,7 +349,7 @@ export default function MySubscriptionsPage() {
                   取消
                 </Button>
                 <Button color="danger" isLoading={busy} onPress={reset}>
-                  确认重置
+                  重置
                 </Button>
               </ModalFooter>
             </>

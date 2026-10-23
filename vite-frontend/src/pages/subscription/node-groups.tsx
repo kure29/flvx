@@ -692,21 +692,12 @@ export function NodeGroupEditor({
           (confirmDelete ? (
             <>
               <span className="mr-auto self-center text-xs text-danger">
-                确认删除这个节点组？
+                删除这个节点组？
               </span>
-              <Button
-                size="sm"
-                variant="light"
-                onPress={() => setConfirmDelete(false)}
-              >
-                不删
+              <Button variant="light" onPress={() => setConfirmDelete(false)}>
+                取消
               </Button>
-              <Button
-                color="danger"
-                isLoading={saving}
-                size="sm"
-                onPress={remove}
-              >
+              <Button color="danger" isLoading={saving} onPress={remove}>
                 删除
               </Button>
             </>
@@ -715,7 +706,6 @@ export function NodeGroupEditor({
               className="mr-auto"
               color="danger"
               isDisabled={usedBy.length > 0}
-              size="sm"
               title={usedBy.length > 0 ? "有订阅在用，先在订阅里取消选择" : ""}
               variant="light"
               onPress={() => setConfirmDelete(true)}

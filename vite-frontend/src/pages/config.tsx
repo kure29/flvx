@@ -1918,7 +1918,7 @@ export default function ConfigPage() {
                   isLoading={exporting}
                   onPress={handleExport}
                 >
-                  {exporting ? "导出中..." : "确认导出"}
+                  {exporting ? "导出中..." : "导出"}
                 </Button>
               </ModalFooter>
             </>
@@ -2008,7 +2008,7 @@ export default function ConfigPage() {
                   isLoading={systemUpgradeExecuting}
                   onPress={handleConfirmSystemUpgrade}
                 >
-                  确认升级
+                  升级
                 </Button>
               </ModalFooter>
             </>

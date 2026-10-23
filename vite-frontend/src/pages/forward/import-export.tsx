@@ -55,7 +55,7 @@ export function ExportModal({
       }}
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
+        <ModalHeader closable className="flex flex-col gap-1">
           <h2 className="text-xl font-bold">导出规则数据</h2>
           <p className="text-small text-default-500">
             格式：目标地址|规则名称|入口端口
@@ -189,11 +189,6 @@ export function ExportModal({
             )}
           </div>
         </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={() => setExportModalOpen(false)}>
-            关闭
-          </Button>
-        </ModalFooter>
       </ModalContent>
     </Modal>
   );
@@ -443,7 +438,7 @@ export function ImportModal({
         </ModalBody>
         <ModalFooter>
           <Button variant="light" onPress={() => setImportModalOpen(false)}>
-            关闭
+            取消
           </Button>
           <Button
             color="warning"

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { X } from "lucide-react";
 
 import {
   Dialog,
@@ -251,8 +252,16 @@ export function ModalContent({
 
 export function ModalHeader({
   className,
+  closable,
+  children,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  /**
+   * Puts a × in the top right corner. Dialogs that only show something
+   * close with it; dialogs that edit something close with 取消 instead.
+   */
+  closable?: boolean;
+}) {
   const context = useModalContext();
 
   return (
@@ -260,12 +269,25 @@ export function ModalHeader({
       <div
         className={cn(
           "text-lg font-semibold",
+          closable && "relative pr-10",
           context?.classNames?.header,
           className,
         )}
         data-slot="modal-header"
         {...props}
-      />
+      >
+        {children}
+        {closable && (
+          <button
+            aria-label="关闭"
+            className="absolute -right-1.5 -top-1 rounded-full p-1.5 text-default-500 transition-colors hover:bg-default-100 hover:text-foreground"
+            type="button"
+            onClick={() => context?.onClose()}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </div>
     </DialogTitle>
   );
 }

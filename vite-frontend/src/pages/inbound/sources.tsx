@@ -4,7 +4,7 @@ import type {
   RemoteSyncResult,
 } from "@/api";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FileUp, RefreshCw } from "lucide-react";
 
@@ -144,6 +144,10 @@ export function RemoteSourcesSection({
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Deleting asks first, in the footer: with the nodes or keeping them.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => setConfirmDelete(false), [draft?.id]);
   // A file source being updated from the list's upload button.
   const reupload = useRef<RemoteSourceItem | null>(null);
   const reuploadInput = useRef<HTMLInputElement>(null);
@@ -493,42 +497,58 @@ export function RemoteSourcesSection({
                       当前 {editing.nodeCount} 个节点 · {ago(editing.lastFetch)}
                     </p>
                   )}
-                  {draft.id && (
-                    <div className="space-y-2 rounded-xl border border-danger/30 p-3">
-                      <p className="text-xs text-default-500">删除订阅源</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          color="danger"
-                          isLoading={deleting}
-                          size="sm"
-                          variant="flat"
-                          onPress={() => remove(false)}
-                        >
-                          连同节点一起删除
-                        </Button>
-                        <Button
-                          isDisabled={deleting}
-                          size="sm"
-                          variant="flat"
-                          onPress={() => remove(true)}
-                        >
-                          只删订阅源，节点留下
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </ModalBody>
-                <ModalFooter>
-                  <Button variant="light" onPress={onClose}>
-                    取消
-                  </Button>
-                  <Button color="primary" isLoading={saving} onPress={save}>
-                    {draft.id
-                      ? "保存"
-                      : draft.kind === "file"
-                        ? "添加"
-                        : "添加并更新"}
-                  </Button>
+                <ModalFooter className="flex-wrap">
+                  {confirmDelete ? (
+                    <>
+                      <p className="w-full text-sm text-danger">
+                        删除这个订阅源？它导入的节点可以保留，也可以一起删除
+                      </p>
+                      <Button
+                        variant="light"
+                        onPress={() => setConfirmDelete(false)}
+                      >
+                        取消
+                      </Button>
+                      <Button
+                        isDisabled={deleting}
+                        variant="flat"
+                        onPress={() => remove(true)}
+                      >
+                        保留节点
+                      </Button>
+                      <Button
+                        color="danger"
+                        isLoading={deleting}
+                        onPress={() => remove(false)}
+                      >
+                        一起删除
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {draft.id && (
+                        <Button
+                          className="mr-auto"
+                          color="danger"
+                          variant="light"
+                          onPress={() => setConfirmDelete(true)}
+                        >
+                          删除
+                        </Button>
+                      )}
+                      <Button variant="light" onPress={onClose}>
+                        取消
+                      </Button>
+                      <Button color="primary" isLoading={saving} onPress={save}>
+                        {draft.id
+                          ? "保存"
+                          : draft.kind === "file"
+                            ? "添加"
+                            : "添加并更新"}
+                      </Button>
+                    </>
+                  )}
                 </ModalFooter>
               </>
             )

@@ -14,7 +14,6 @@ import {
   Modal,
   ModalBody,
   ModalContent,
-  ModalFooter,
   ModalHeader,
 } from "@/shadcn-bridge/heroui/modal";
 
@@ -211,9 +210,9 @@ export function ShareModal({
       onOpenChange={(open) => !open && onClose()}
     >
       <ModalContent>
-        {(close) => (
+        {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1">
+            <ModalHeader closable className="flex flex-col gap-1">
               <h2 className="text-lg font-bold">分享 · {item?.name}</h2>
               <p className="text-small text-default-500">
                 复制链接或扫码导入 v2rayN、Shadowrocket、NekoBox 等客户端；Surge
@@ -236,11 +235,6 @@ export function ShareModal({
                 ))}
               </div>
             </ModalBody>
-            <ModalFooter>
-              <Button variant="light" onPress={close}>
-                关闭
-              </Button>
-            </ModalFooter>
           </>
         )}
       </ModalContent>

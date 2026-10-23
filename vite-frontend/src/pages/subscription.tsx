@@ -1514,15 +1514,7 @@ export default function SubscriptionPage() {
           {(onClose) =>
             detail && (
               <>
-                <ModalHeader className="relative flex flex-col gap-1 pr-12">
-                  <button
-                    aria-label="关闭"
-                    className="absolute right-4 top-4 rounded-full p-1.5 text-default-500 hover:bg-default-100 hover:text-foreground"
-                    type="button"
-                    onClick={onClose}
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                <ModalHeader closable className="flex flex-col gap-1">
                   <h2 className="text-lg font-bold break-all">{detail.name}</h2>
                   <p className="text-small font-normal text-default-500">
                     {detail.nodeCount} 个节点
@@ -1751,7 +1743,7 @@ export default function SubscriptionPage() {
                   isLoading={saving}
                   onPress={runConfirm}
                 >
-                  确认
+                  {confirm === "delete" ? "删除" : "重置"}
                 </Button>
               </ModalFooter>
             </>

@@ -85,7 +85,7 @@ export function InstallCommandModal({
       onClose={() => setInstallCommandModal(false)}
     >
       <ModalContent>
-        <ModalHeader>安装命令 - {currentNodeName}</ModalHeader>
+        <ModalHeader closable>安装命令 - {currentNodeName}</ModalHeader>
         <ModalBody>
           <div className="space-y-4">
             {installCommands.docker ? (
@@ -135,11 +135,6 @@ export function InstallCommandModal({
             </div>
           </div>
         </ModalBody>
-        <ModalFooter>
-          <Button variant="flat" onPress={() => setInstallCommandModal(false)}>
-            关闭
-          </Button>
-        </ModalFooter>
       </ModalContent>
     </Modal>
   );
@@ -254,7 +249,7 @@ export function UpgradeNodeModal({
                 isDisabled={releasesLoading}
                 onPress={handleConfirmUpgrade}
               >
-                确认升级
+                升级
               </Button>
             </ModalFooter>
           </>

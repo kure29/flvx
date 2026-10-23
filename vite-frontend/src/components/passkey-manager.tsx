@@ -116,7 +116,7 @@ export function PasskeyModal({
       onClose={onClose}
     >
       <ModalContent>
-        <ModalHeader>通行证密钥</ModalHeader>
+        <ModalHeader closable>通行证密钥</ModalHeader>
         <ModalBody>
           <p className="text-sm text-default-500">
             绑定后可用设备解锁（指纹、面容等）登录。绑定和删除都需要当前密码。
@@ -168,9 +168,6 @@ export function PasskeyModal({
           />
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            关闭
-          </Button>
           <Button
             color="primary"
             isLoading={busy}

@@ -1299,9 +1299,9 @@ export default function InboundPage() {
         onOpenChange={(open) => !open && setDetails(null)}
       >
         <ModalContent>
-          {(onClose) => (
+          {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader closable className="flex flex-col gap-1">
                 <h2 className="text-lg font-bold">{details?.name}</h2>
                 <p className="text-small text-default-500">
                   手动配置客户端时使用；一般直接用“分享”或订阅导入即可
@@ -1336,11 +1336,6 @@ export default function InboundPage() {
                     ))}
                 </div>
               </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  关闭
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>
@@ -1435,7 +1430,7 @@ export default function InboundPage() {
                     isLoading={batchDeleting}
                     onPress={runBatchDelete}
                   >
-                    确认删除
+                    删除
                   </Button>
                 </ModalFooter>
               </>

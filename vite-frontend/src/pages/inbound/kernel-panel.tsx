@@ -632,9 +632,9 @@ export function KernelPanel({
         onOpenChange={(open) => !open && setLogsFor(null)}
       >
         <ModalContent>
-          {(onClose) => (
+          {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader closable className="flex flex-col gap-1">
                 <h2 className="text-lg font-bold">
                   {logsFor?.nodeName} · {kernelName(logsFor?.kernelType ?? "")}{" "}
                   日志
@@ -661,9 +661,6 @@ export function KernelPanel({
                   onPress={() => logsFor && openLogs(logsFor)}
                 >
                   刷新
-                </Button>
-                <Button variant="light" onPress={onClose}>
-                  关闭
                 </Button>
               </ModalFooter>
             </>
@@ -720,7 +717,7 @@ export function KernelPanel({
                   isLoading={busy === `${removeTarget?.id}-remove`}
                   onPress={() => doRemove(false)}
                 >
-                  确认卸载
+                  卸载
                 </Button>
               </ModalFooter>
             </>

@@ -158,7 +158,7 @@ export function RouteModal({
       onOpenChange={(v) => !v && onClose()}
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-0.5">
+        <ModalHeader closable className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">回程路由</h2>
           <p className="text-xs font-normal text-default-500">
             {nodeName ? `${nodeName} → 各测试点` : "节点 → 各测试点"}
@@ -251,9 +251,6 @@ export function RouteModal({
           </p>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            关闭
-          </Button>
           <Button
             color="primary"
             isDisabled={probing || nodeId === null}

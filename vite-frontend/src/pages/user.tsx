@@ -1594,13 +1594,15 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
             />
           </ModalBody>
           <ModalFooter>
-            <Button onPress={onUserModalClose}>取消</Button>
+            <Button variant="light" onPress={onUserModalClose}>
+              取消
+            </Button>
             <Button
               color="primary"
               isLoading={userFormLoading}
               onPress={handleSubmitUser}
             >
-              确定
+              {isEdit ? "保存" : "创建"}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -1620,7 +1622,9 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
         onClose={onTunnelModalClose}
       >
         <ModalContent>
-          <ModalHeader>用户 {currentUser?.user} 的权限管理</ModalHeader>
+          <ModalHeader closable>
+            用户 {currentUser?.user} 的权限管理
+          </ModalHeader>
           <ModalBody>
             <div className="space-y-6">
               {/* 监控权限部分 */}
@@ -1899,9 +1903,6 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
               </div>
             </div>
           </ModalBody>
-          <ModalFooter>
-            <Button onPress={onTunnelModalClose}>关闭</Button>
-          </ModalFooter>
         </ModalContent>
       </Modal>
 
@@ -2067,13 +2068,15 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button onPress={onEditTunnelModalClose}>取消</Button>
+            <Button variant="light" onPress={onEditTunnelModalClose}>
+              取消
+            </Button>
             <Button
               color="primary"
               isLoading={editTunnelLoading}
               onPress={handleUpdateTunnel}
             >
-              确定
+              保存
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2119,7 +2122,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
               取消
             </Button>
             <Button color="danger" onPress={handleConfirmDelete}>
-              确认删除
+              删除
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2167,7 +2170,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
               取消
             </Button>
             <Button color="danger" onPress={handleConfirmRemoveTunnel}>
-              确认删除
+              删除
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2259,7 +2262,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
               isLoading={resetFlowLoading}
               onPress={handleConfirmResetFlow}
             >
-              确认重置
+              重置
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2353,7 +2356,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
               isLoading={resetTunnelFlowLoading}
               onPress={handleConfirmResetTunnelFlow}
             >
-              确认重置
+              重置
             </Button>
           </ModalFooter>
         </ModalContent>

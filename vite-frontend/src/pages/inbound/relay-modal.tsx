@@ -257,9 +257,9 @@ export function RelayModal({
         onOpenChange={(open) => !open && onClose()}
       >
         <ModalContent>
-          {(close) => (
+          {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader closable className="flex flex-col gap-1">
                 <h2 className="text-lg font-bold">中转 · {item?.name}</h2>
                 <p className="text-small text-default-500">
                   在中转机上创建一条指向该入站的转发，订阅会自动加入中转节点
@@ -492,11 +492,6 @@ export function RelayModal({
                   </div>
                 </div>
               </ModalBody>
-              <ModalFooter>
-                <Button variant="light" onPress={close}>
-                  关闭
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>
@@ -545,7 +540,7 @@ export function RelayModal({
                   isLoading={removeLoading}
                   onPress={() => remove(false)}
                 >
-                  确认删除
+                  删除
                 </Button>
               </ModalFooter>
             </>

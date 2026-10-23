@@ -13,12 +13,10 @@ import {
 } from "recharts";
 
 import { getNodeLatencyHistory } from "@/api";
-import { Button } from "@/shadcn-bridge/heroui/button";
 import {
   Modal,
   ModalBody,
   ModalContent,
-  ModalFooter,
   ModalHeader,
 } from "@/shadcn-bridge/heroui/modal";
 
@@ -109,7 +107,7 @@ export function LatencyTrendModal({
       onOpenChange={(v) => !v && onClose()}
     >
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-0.5">
+        <ModalHeader closable className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">延迟趋势</h2>
           <p className="text-xs font-normal text-default-500">
             {nodeName ? `${nodeName} → 各测试点` : "节点 → 各测试点"}
@@ -251,11 +249,6 @@ export function LatencyTrendModal({
             </div>
           )}
         </ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={onClose}>
-            关闭
-          </Button>
-        </ModalFooter>
       </ModalContent>
     </Modal>
   );

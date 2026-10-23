@@ -67,9 +67,12 @@ export function TunnelDiagnosisModal({
       }}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1 bg-content1 border-b border-divider">
+            <ModalHeader
+              closable
+              className="flex flex-col gap-1 bg-content1 border-b border-divider"
+            >
               <h2 className="text-xl font-bold">隧道诊断结果</h2>
               {currentDiagnosisTunnel && (
                 <div className="flex items-center gap-2">
@@ -615,9 +618,6 @@ export function TunnelDiagnosisModal({
               )}
             </ModalBody>
             <ModalFooter className="border-t border-divider">
-              <Button variant="light" onPress={onClose}>
-                关闭
-              </Button>
               {currentDiagnosisTunnel && (
                 <Button
                   color="primary"

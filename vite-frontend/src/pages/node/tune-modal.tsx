@@ -204,7 +204,7 @@ export function NodeTuneModal({
                 </Button>
               )}
               <Button variant="light" onPress={onClose}>
-                关闭
+                取消
               </Button>
               <Button
                 color="primary"

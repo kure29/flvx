@@ -744,9 +744,17 @@ function Editor({
       <ModalFooter>
         {saved &&
           (confirmDelete ? (
-            <Button color="danger" variant="flat" onPress={remove}>
-              确认删除
-            </Button>
+            <>
+              <span className="mr-auto self-center text-xs text-danger">
+                删除这个模板？
+              </span>
+              <Button variant="light" onPress={() => setConfirmDelete(false)}>
+                取消
+              </Button>
+              <Button color="danger" onPress={remove}>
+                删除
+              </Button>
+            </>
           ) : (
             <Button
               className="mr-auto"
@@ -757,22 +765,26 @@ function Editor({
               删除
             </Button>
           ))}
-        <Button variant="light" onPress={onBack}>
-          取消
-        </Button>
-        <Button
-          color="primary"
-          isDisabled={
-            checking ||
-            (building &&
-              draft.builder?.preset !== "custom" &&
-              !draft.builder?.rules.length)
-          }
-          isLoading={saving}
-          onPress={save}
-        >
-          保存
-        </Button>
+        {!confirmDelete && (
+          <>
+            <Button variant="light" onPress={onBack}>
+              取消
+            </Button>
+            <Button
+              color="primary"
+              isDisabled={
+                checking ||
+                (building &&
+                  draft.builder?.preset !== "custom" &&
+                  !draft.builder?.rules.length)
+              }
+              isLoading={saving}
+              onPress={save}
+            >
+              保存
+            </Button>
+          </>
+        )}
       </ModalFooter>
     </>
   );
@@ -843,7 +855,7 @@ export function TemplatesModal({
             />
           ) : (
             <>
-              <ModalHeader className="flex flex-col gap-0.5">
+              <ModalHeader closable className="flex flex-col gap-0.5">
                 <h2 className="text-lg font-bold">订阅模板</h2>
                 <p className="text-xs font-normal text-default-500">
                   用自己的配置当订阅骨架：规则、策略组、DNS
@@ -896,9 +908,6 @@ export function TemplatesModal({
                 )}
               </ModalBody>
               <ModalFooter>
-                <Button variant="light" onPress={onClose}>
-                  关闭
-                </Button>
                 <Button
                   color="primary"
                   startContent={<Plus className="h-4 w-4" />}
