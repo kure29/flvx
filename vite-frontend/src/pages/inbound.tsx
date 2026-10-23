@@ -8,7 +8,7 @@ import type {
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Copy } from "lucide-react";
+import { ChevronDown, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -962,19 +962,24 @@ export default function InboundPage() {
               onSearch={setSearchKeyword}
             >
               {nodeOptions.length > 1 && (
-                <select
-                  aria-label="按服务器筛选"
-                  className="h-9 max-w-[8rem] shrink-0 rounded-full bg-default-100 px-3 text-sm"
-                  value={nodeFilter}
-                  onChange={(e) => setNodeFilter(e.target.value)}
-                >
-                  <option value="">全部服务器</option>
-                  {nodeOptions.map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                // appearance-none: the browser's own arrow ignored the
+                // padding and stuck out of the pill.
+                <div className="relative max-w-[10rem] shrink-0">
+                  <select
+                    aria-label="按服务器筛选"
+                    className="h-9 w-full appearance-none truncate rounded-full bg-default-100 pl-3.5 pr-8 text-sm outline-none"
+                    value={nodeFilter}
+                    onChange={(e) => setNodeFilter(e.target.value)}
+                  >
+                    <option value="">全部服务器</option>
+                    {nodeOptions.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-500" />
+                </div>
               )}
             </PageToolbar>
           )}
