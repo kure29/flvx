@@ -63,6 +63,10 @@ type subPipeline struct {
 	// Templates picks a subscription template per kind (kernel.TemplateClash,
 	// ...): template ids; a kind without one renders the built-in profile.
 	Templates map[string]int64 `json:"templates,omitempty"`
+	// InfoNodes puts the expiry and traffic first in the node list, as
+	// placeholder nodes (kernel.InfoNotices), for clients that do not show
+	// the Subscription-Userinfo header.
+	InfoNodes bool `json:"infoNodes"`
 }
 
 // options are the subscription's own steps: the chain, region groups and
@@ -244,6 +248,21 @@ func newUUID() string {
 // whether its credentials must be on the kernels).
 func subActive(s *model.Subscription, now time.Time) bool {
 	return s.Enabled == 1 && (s.ExpireTime == 0 || s.ExpireTime > now.UnixMilli()) && !subOverQuota(s)
+}
+
+// subInactiveReason is why the link no longer works, as the name of the
+// placeholder node it serves instead (see openSubscription); "" while it
+// is active.
+func subInactiveReason(s *model.Subscription, now time.Time) string {
+	switch {
+	case subActive(s, now):
+		return ""
+	case s.Enabled != 1:
+		return "⚠️ 订阅已停用，请联系管理员"
+	case subOverQuota(s):
+		return "⚠️ 流量已用完，请联系管理员"
+	}
+	return "⚠️ 订阅已过期，请联系管理员"
 }
 
 func subUsed(s *model.Subscription) int64 { return s.UploadBytes + s.DownloadBytes }

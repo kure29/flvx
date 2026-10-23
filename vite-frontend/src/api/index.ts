@@ -764,6 +764,8 @@ export interface SubPipeline {
   script: string;
   /** Subscription template id per client kind; a kind without one gets the built-in profile. */
   templates?: Partial<Record<SubTemplateSlot, number>>;
+  /** Expiry and traffic shown as placeholder nodes at the top of the list. */
+  infoNodes?: boolean;
 }
 export interface SubTemplateServiceGroup {
   key: string;

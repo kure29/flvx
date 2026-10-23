@@ -106,6 +106,7 @@ const EMPTY_PIPELINE: SubPipeline = {
   chainDropUnused: false,
   script: "",
   templates: {},
+  infoNodes: false,
 };
 
 function toDateInput(ms: number): string {
@@ -579,6 +580,13 @@ function Editor({
               value={draft.remark}
               variant="bordered"
               onChange={(e) => set({ remark: e.target.value })}
+            />
+            <ToggleRow
+              hint="在节点列表最前面加两个占位节点，名字显示到期日期和剩余流量，给不显示订阅信息的客户端看；它们连不上，不要选。停用、到期或流量用完后，订阅只返回一个写明原因的占位节点（不受这个开关影响）"
+              id="sub-info-nodes"
+              label="在节点列表显示到期和流量"
+              value={!!o.infoNodes}
+              onChange={(infoNodes) => setOpts({ infoNodes })}
             />
           </div>
         )}

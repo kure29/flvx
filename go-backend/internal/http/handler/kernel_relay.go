@@ -552,10 +552,7 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !subActive(sub, time.Now()) {
-		http.Error(w, "订阅已过期或已停用", http.StatusForbidden)
-		return
-	}
+	now := time.Now()
 
 	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
 	if format == "" {
@@ -581,14 +578,6 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	endpoints := h.subNodes(c, sub)
-	opts := h.subOptions(parsePipeline(sub.Options))
-	opts.SingboxSnell = kernel.SingboxClientHasSnell(r.UserAgent())
-	body, contentType, err := kernel.Subscription(format, endpoints, opts)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	// A share subscription reports its own traffic and limit; the owner's
 	// reports the selected inbounds' traffic.
@@ -608,6 +597,27 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	// A link that stopped working still answers with a profile: one node
+	// named after the reason. An error would leave the client on its old
+	// profile with no hint why.
+	var body, contentType string
+	if reason := subInactiveReason(sub, now); reason != "" {
+		body, contentType, err = kernel.Subscription(format, nil, kernel.SubOptions{Notices: []string{reason}})
+	} else {
+		p := parsePipeline(sub.Options)
+		opts := h.subOptions(p)
+		opts.SingboxSnell = kernel.SingboxClientHasSnell(r.UserAgent())
+		if p.InfoNodes {
+			opts.Notices = kernel.InfoNotices(sub.ExpireTime, up+down, total)
+		}
+		body, contentType, err = kernel.Subscription(format, h.subNodes(c, sub), opts)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Subscription-Userinfo", fmt.Sprintf("upload=%d; download=%d; total=%d; expire=%d", up, down, total, expire))

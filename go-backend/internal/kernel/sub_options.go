@@ -74,6 +74,9 @@ type SubOptions struct {
 	// (TemplateClash, ...; see sub_template.go). A format with a template
 	// renders into it instead of the built-in profile and rules.
 	Templates map[string]string
+	// Notices are placeholder nodes put first, after the other steps (see
+	// sub_notice.go): info nodes, or why the subscription stopped working.
+	Notices []string
 }
 
 // RegionOther is the filter value for names without a recognized region.

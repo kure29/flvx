@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -114,6 +115,17 @@ func TestSubscriptionContract(t *testing.T) {
 			t.Fatalf("view: %v", view)
 		}
 		uuid := mustQueryString(t, r, `SELECT uuid FROM subscription WHERE id = ?`, id)
+		// A link that stopped working answers with one placeholder node
+		// named after the reason, so the client shows why.
+		stopped := func(what, reason string) {
+			t.Helper()
+			code, body, _ := sub(path)
+			name, _ := url.PathUnescape(body)
+			if code != 200 || strings.Count(body, "\n") != 0 || !strings.Contains(body, "@127.0.0.1:1") ||
+				!strings.Contains(name, reason) || strings.Contains(body, uuid) {
+				t.Fatalf("%s: %d %s", what, code, name)
+			}
+		}
 		code, body, hdr := sub(path)
 		if code != 200 || !strings.Contains(body, "vless://"+uuid+"@") || strings.Contains(body, ownerSettings.UUID) ||
 			!strings.Contains(hdr, "upload=0") {
@@ -126,15 +138,11 @@ func TestSubscriptionContract(t *testing.T) {
 		past := time.Now().Add(-time.Hour).UnixMilli()
 		kernelContractPost(t, router, admin, "/api/v1/subscription/save",
 			`{"id":`+jsonInt64(id)+`,"name":"小明","kind":"share",`+groupIDs+`,"expireTime":`+jsonInt64(past)+`}`)
-		if code, _, _ := sub(path); code != http.StatusForbidden {
-			t.Fatalf("expired: %d", code)
-		}
+		stopped("expired", "订阅已过期")
 		future := time.Now().Add(48 * time.Hour).UnixMilli()
 		kernelContractPost(t, router, admin, "/api/v1/subscription/save",
 			`{"id":`+jsonInt64(id)+`,"name":"小明","kind":"share",`+groupIDs+`,"expireTime":`+jsonInt64(future)+`,"enabled":false}`)
-		if code, _, _ := sub(path); code != http.StatusForbidden {
-			t.Fatalf("disabled: %d", code)
-		}
+		stopped("disabled", "订阅已停用")
 		kernelContractPost(t, router, admin, "/api/v1/subscription/save",
 			`{"id":`+jsonInt64(id)+`,"name":"小明","kind":"share",`+groupIDs+`,"expireTime":`+jsonInt64(future)+`,"enabled":true}`)
 		if code, _, hdr := sub(path); code != 200 || !strings.Contains(hdr, "expire="+jsonInt64(future/1000)) {
@@ -159,8 +167,21 @@ func TestSubscriptionContract(t *testing.T) {
 			t.Fatalf("share traffic header: %d %s", code, hdr)
 		}
 		_ = r.ApplySubscriptionCounterSamples(landing, "e", []repo.SubscriptionCounterSample{{SubscriptionID: id, Direction: "down", Bytes: 900}}, time.Now().UnixMilli())
-		if code, _, _ := sub(path); code != http.StatusForbidden {
-			t.Fatalf("over the limit: %d", code)
+		stopped("over the limit", "流量已用完")
+
+		// Info nodes: expiry and traffic first, as placeholder nodes.
+		out = kernelContractPost(t, router, admin, "/api/v1/subscription/save",
+			`{"id":`+jsonInt64(id)+`,"name":"小明","kind":"share",`+groupIDs+`,"expireTime":`+jsonInt64(future)+`,"trafficLimit":4000,"resetDay":5,"options":{"infoNodes":true}}`)
+		if out.Code != 0 || out.Data.(map[string]interface{})["options"].(map[string]interface{})["infoNodes"] != true {
+			t.Fatalf("info nodes save: %+v", out)
+		}
+		_, body, _ = sub(path)
+		lines := strings.Split(body, "\n")
+		first, _ := url.PathUnescape(lines[0])
+		second, _ := url.PathUnescape(lines[1])
+		if len(lines) != 4 || !strings.Contains(first, "⏳ 到期 "+time.UnixMilli(future).Format("2006-01-02")) ||
+			!strings.HasSuffix(second, "KB / 3.91KB") || !strings.Contains(second, "📊 剩余 ") || !strings.Contains(lines[2], uuid) {
+			t.Fatalf("info nodes: %q %q %v", first, second, lines)
 		}
 		out = kernelContractPost(t, router, admin, "/api/v1/subscription/reset-traffic", `{"id":`+jsonInt64(id)+`}`)
 		if v := out.Data.(map[string]interface{}); out.Code != 0 || valueAsInt(v["downloadBytes"]) != 0 || v["active"] != true {

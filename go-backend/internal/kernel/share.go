@@ -650,7 +650,7 @@ func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string,
 	}
 	if slot := templateFor(format); slot != "" && strings.TrimSpace(opts.Templates[slot]) != "" {
 		tpl, kind := opts.Templates[slot], TemplateKindOf(slot)
-		endpoints = uniqueNamesExcept(ApplySubOptions(endpoints, opts), templateGroupNames(kind, tpl))
+		endpoints = uniqueNamesExcept(withNotices(ApplySubOptions(endpoints, opts), opts), templateGroupNames(kind, tpl))
 		body, err := templateProfile(slot, tpl, endpoints, opts)
 		if err != nil {
 			return "", "", fmt.Errorf("订阅模板出错：%v", err)
@@ -659,7 +659,7 @@ func Subscription(format string, endpoints []Endpoint, opts SubOptions) (string,
 			TemplateSingbox: "application/json; charset=utf-8", TemplateSurge: "text/plain; charset=utf-8"}[kind]
 		return body, contentType, nil
 	}
-	endpoints = uniqueNames(ApplySubOptions(endpoints, opts), opts.Rules)
+	endpoints = uniqueNames(withNotices(ApplySubOptions(endpoints, opts), opts), opts.Rules)
 	groups := opts.RegionGroups || opts.Rules
 	switch format {
 	case FormatBase64:
