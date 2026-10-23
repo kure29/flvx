@@ -35,6 +35,11 @@ import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
 import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
 import { useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { LatencyCell } from "@/components/latency-cell";
@@ -211,12 +216,27 @@ function groupRank(key: string): number {
   return key.startsWith("source:") ? 2 : key === "external" ? 1 : 0;
 }
 
+const PAGE = "inbound";
+
 export default function InboundPage() {
-  const [loading, setLoading] = useState(true);
-  const [caps, setCaps] = useState<KernelCapabilitiesApiData | null>(null);
-  const [nodes, setNodes] = useState<NodeApiItem[]>([]);
-  const [kernels, setKernels] = useState<KernelApiItem[]>([]);
-  const [inbounds, setInbounds] = useState<InboundApiItem[]>([]);
+  // A revisit shows the last data at once and reloads in the background.
+  const [loading, setLoading] = useState(() => !pageCached(PAGE));
+  const [caps, setCaps] = useCachedState<KernelCapabilitiesApiData | null>(
+    PAGE,
+    "caps",
+    null,
+  );
+  const [nodes, setNodes] = useCachedState<NodeApiItem[]>(PAGE, "nodes", []);
+  const [kernels, setKernels] = useCachedState<KernelApiItem[]>(
+    PAGE,
+    "kernels",
+    [],
+  );
+  const [inbounds, setInbounds] = useCachedState<InboundApiItem[]>(
+    PAGE,
+    "inbounds",
+    [],
+  );
   const [isCollapsed, toggleCollapsed] = useCollapsed();
   const [searchKeyword, setSearchKeyword] = useLocalStorageState(
     "inbound-search-keyword",
@@ -260,7 +280,11 @@ export default function InboundPage() {
     id: number;
     name: string;
   } | null>(null);
-  const [sources, setSources] = useState<RemoteSourceItem[]>([]);
+  const [sources, setSources] = useCachedState<RemoteSourceItem[]>(
+    PAGE,
+    "sources",
+    [],
+  );
   const loadingRef = useRef(false);
   const reloadPendingRef = useRef(false);
   const metadataLoadedAtRef = useRef(0);
@@ -306,6 +330,7 @@ export default function InboundPage() {
               probe: latestProbe(i.probe, previous.get(i.id)?.probe),
             }));
           });
+          markPageCached(PAGE);
           setSelectedIds((prev) => {
             if (prev.size === 0) return prev;
             const alive = new Set(rows.map((i) => i.id));
@@ -330,7 +355,8 @@ export default function InboundPage() {
   );
 
   useEffect(() => {
-    loadData(true);
+    // With cached data on screen, reload without the loading state.
+    loadData(!pageCached(PAGE));
   }, [loadData]);
   useVisiblePolling(
     useCallback(() => loadData(false, { silent: true }), [loadData]),

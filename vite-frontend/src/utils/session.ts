@@ -1,3 +1,5 @@
+import { clearPageCache } from "@/hooks/use-cached-state";
+
 export const SESSION_STORAGE_KEYS = {
   token: "token",
   roleId: "role_id",
@@ -69,6 +71,7 @@ export const readSession = (): SessionData => {
 };
 
 export const writeLoginSession = (payload: LoginSessionPayload): void => {
+  clearPageCache();
   localStorage.setItem(SESSION_STORAGE_KEYS.token, payload.token);
   localStorage.setItem(SESSION_STORAGE_KEYS.roleId, String(payload.role_id));
   localStorage.setItem(SESSION_STORAGE_KEYS.name, payload.name);
@@ -80,6 +83,7 @@ export const writeLoginSession = (payload: LoginSessionPayload): void => {
 };
 
 export const clearSession = (): void => {
+  clearPageCache();
   localStorage.removeItem(SESSION_STORAGE_KEYS.token);
   localStorage.removeItem(SESSION_STORAGE_KEYS.roleId);
   localStorage.removeItem(SESSION_STORAGE_KEYS.name);

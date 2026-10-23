@@ -73,6 +73,11 @@ import {
 import { buildNodeSystemInfo } from "@/pages/node/system-info";
 import { useNodeOfflineTimers } from "@/pages/node/use-node-offline-timers";
 import { useNodeRealtime } from "@/pages/node/use-node-realtime";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { latestProbe } from "@/utils/latest-probe";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
@@ -104,6 +109,8 @@ import {
 import { NodeFilterModal } from "@/pages/node/filter-modal";
 import { NodeLiveStats } from "@/pages/node/node-live-stats";
 
+const PAGE = "node";
+
 export default function NodePage({
   embedded = false,
   addRequest = 0,
@@ -115,9 +122,11 @@ export default function NodePage({
   /** Opens a node's history charts and service monitors. */
   onOpenMonitor?: (nodeId: number) => void;
 }) {
-  const [nodeList, setNodeList] = useState<Node[]>([]);
-  const [nodeOrder, setNodeOrder] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
+  // A revisit shows the last data at once and reloads in the background;
+  // live metrics then arrive over the WebSocket as usual.
+  const [nodeList, setNodeList] = useCachedState<Node[]>(PAGE, "nodes", []);
+  const [nodeOrder, setNodeOrder] = useCachedState<number[]>(PAGE, "order", []);
+  const [loading, setLoading] = useState(() => !pageCached(PAGE));
   const [localSearchKeyword, setLocalSearchKeyword] = useLocalStorageState(
     "node-search-keyword-local",
     "",
@@ -364,6 +373,7 @@ export default function NodePage({
           copyLoading: false,
         }));
 
+        markPageCached(PAGE);
         setNodeList((prev) => {
           const previousById = new Map(prev.map((node) => [node.id, node]));
 
@@ -525,7 +535,8 @@ export default function NodePage({
   });
 
   useEffect(() => {
-    loadNodes();
+    // With cached data on screen, reload without the loading state.
+    loadNodes({ silent: pageCached(PAGE) });
     loadRemoteUsage();
   }, [loadNodes, loadRemoteUsage]);
 

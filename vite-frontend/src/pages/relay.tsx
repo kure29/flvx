@@ -3,6 +3,11 @@ import type { InboundApiItem, InboundRelayApiItem } from "@/api/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { latestProbe } from "@/utils/latest-probe";
 import { getInboundList, getInboundRelays, probeInboundRelays } from "@/api";
@@ -116,11 +121,22 @@ function QualityView() {
   );
 }
 
+const LINES_PAGE = "relay-lines";
+
 /** Relay lines grouped by the landing they lead to. */
 function LinesView() {
-  const [loading, setLoading] = useState(true);
-  const [inbounds, setInbounds] = useState<InboundApiItem[]>([]);
-  const [relays, setRelays] = useState<InboundRelayApiItem[]>([]);
+  // A revisit shows the last data at once and reloads in the background.
+  const [loading, setLoading] = useState(() => !pageCached(LINES_PAGE));
+  const [inbounds, setInbounds] = useCachedState<InboundApiItem[]>(
+    LINES_PAGE,
+    "inbounds",
+    [],
+  );
+  const [relays, setRelays] = useCachedState<InboundRelayApiItem[]>(
+    LINES_PAGE,
+    "relays",
+    [],
+  );
   const [editing, setEditing] = useState<InboundApiItem | null>(null);
   const [onlyWithRelays, setOnlyWithRelays] = useState(false);
   const [query, setQuery] = useState("");
@@ -155,6 +171,7 @@ function LinesView() {
           }));
         });
       }
+      if (inRes.code === 0 && relRes.code === 0) markPageCached(LINES_PAGE);
       if (!silent && (inRes.code !== 0 || relRes.code !== 0))
         toast.error(inRes.msg || relRes.msg || "加载失败");
     } catch {

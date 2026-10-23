@@ -40,6 +40,11 @@ import {
 import { CARD_GRID, InfoCard } from "@/components/info-card";
 import { useViewMode } from "@/components/view-mode";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { copyText, panelOrigin } from "@/pages/inbound/share";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
@@ -1102,15 +1107,34 @@ function Editor({
   );
 }
 
+const PAGE = "subscription";
+
 export default function SubscriptionPage() {
-  const [loading, setLoading] = useState(true);
+  // A revisit shows the last data at once and reloads in the background.
+  const [loading, setLoading] = useState(() => !pageCached(PAGE));
   const [viewMode, setViewMode] = useViewMode("subscription");
-  const [subs, setSubs] = useState<SubscriptionItem[]>([]);
-  const [regions, setRegions] = useState<string[]>([]);
-  const [ruleGroups, setRuleGroups] = useState<SubRuleGroup[]>([]);
-  const [inbounds, setInbounds] = useState<InboundApiItem[]>([]);
-  const [sources, setSources] = useState<RemoteSourceItem[]>([]);
-  const [groups, setGroups] = useState<NodeGroupItem[]>([]);
+  const [subs, setSubs] = useCachedState<SubscriptionItem[]>(PAGE, "subs", []);
+  const [regions, setRegions] = useCachedState<string[]>(PAGE, "regions", []);
+  const [ruleGroups, setRuleGroups] = useCachedState<SubRuleGroup[]>(
+    PAGE,
+    "ruleGroups",
+    [],
+  );
+  const [inbounds, setInbounds] = useCachedState<InboundApiItem[]>(
+    PAGE,
+    "inbounds",
+    [],
+  );
+  const [sources, setSources] = useCachedState<RemoteSourceItem[]>(
+    PAGE,
+    "sources",
+    [],
+  );
+  const [groups, setGroups] = useCachedState<NodeGroupItem[]>(
+    PAGE,
+    "groups",
+    [],
+  );
   const [groupDraft, setGroupDraft] = useState<NodeGroupDraft | null>(null);
   const [tab, setTab] = useState<"subs" | "groups">("subs");
   const [query, setQuery] = useState("");
@@ -1125,7 +1149,11 @@ export default function SubscriptionPage() {
   const [confirm, setConfirm] = useState<"reset" | "delete" | null>(null);
   const [toggling, setToggling] = useState<number | null>(null);
   const [resettingTraffic, setResettingTraffic] = useState(false);
-  const [templates, setTemplates] = useState<SubTemplate[]>([]);
+  const [templates, setTemplates] = useCachedState<SubTemplate[]>(
+    PAGE,
+    "templates",
+    [],
+  );
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const loadTemplates = useCallback(async () => {
     try {
@@ -1150,6 +1178,7 @@ export default function SubscriptionPage() {
         setSubs(subRes.data.items ?? []);
         setRegions(subRes.data.regions ?? []);
         setRuleGroups(subRes.data.ruleGroups ?? []);
+        markPageCached(PAGE);
       } else {
         toast.error(subRes.msg || "加载订阅失败");
       }

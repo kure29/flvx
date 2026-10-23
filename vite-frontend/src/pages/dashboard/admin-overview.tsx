@@ -27,6 +27,11 @@ import {
 } from "@/api";
 import { AnimatedPage } from "@/components/animated-page";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { formatTraffic } from "@/utils/traffic";
 
 const DAY = 86400000;
@@ -226,15 +231,30 @@ function Panel({
   );
 }
 
+const PAGE = "admin-overview";
+
 /** The admin's overview: health of nodes → landings → relays → subscriptions. */
 export function AdminOverview() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [nodes, setNodes] = useState<NodeApiItem[]>([]);
-  const [kernels, setKernels] = useState<KernelApiItem[]>([]);
-  const [inbounds, setInbounds] = useState<InboundApiItem[]>([]);
-  const [relays, setRelays] = useState<InboundRelayApiItem[]>([]);
-  const [subs, setSubs] = useState<SubscriptionItem[]>([]);
+  // A revisit shows the last data at once and reloads in the background.
+  const [loading, setLoading] = useState(() => !pageCached(PAGE));
+  const [nodes, setNodes] = useCachedState<NodeApiItem[]>(PAGE, "nodes", []);
+  const [kernels, setKernels] = useCachedState<KernelApiItem[]>(
+    PAGE,
+    "kernels",
+    [],
+  );
+  const [inbounds, setInbounds] = useCachedState<InboundApiItem[]>(
+    PAGE,
+    "inbounds",
+    [],
+  );
+  const [relays, setRelays] = useCachedState<InboundRelayApiItem[]>(
+    PAGE,
+    "relays",
+    [],
+  );
+  const [subs, setSubs] = useCachedState<SubscriptionItem[]>(PAGE, "subs", []);
 
   const load = useCallback(async () => {
     try {
@@ -251,6 +271,7 @@ export function AdminOverview() {
       if (i.code === 0) setInbounds(i.data ?? []);
       if (r.code === 0) setRelays(r.data ?? []);
       if (s.code === 0) setSubs(s.data?.items ?? []);
+      markPageCached(PAGE);
     } finally {
       setLoading(false);
     }
