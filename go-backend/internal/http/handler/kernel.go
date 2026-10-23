@@ -1356,8 +1356,8 @@ func kernelReleaseVersions(info kernel.Info) ([]kernelVersionItem, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("获取版本列表失败: GitHub 返回 %d", resp.StatusCode)
 	}
-	var releases []githubRelease
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&releases); err != nil {
+	releases, err := decodeReleases(io.LimitReader(resp.Body, 16<<20))
+	if err != nil {
 		return nil, fmt.Errorf("解析版本列表失败: %v", err)
 	}
 	out := make([]kernelVersionItem, 0, len(releases))
@@ -1373,6 +1373,30 @@ func kernelReleaseVersions(info kernel.Info) ([]kernelVersionItem, error) {
 	}
 	kernelVersionCache.at[info.Type] = time.Now()
 	kernelVersionCache.items[info.Type] = out
+	return out, nil
+}
+
+// decodeReleases reads GitHub's release list one release at a time. Releases
+// with many assets (sing-box ships dozens per release) can exceed the size
+// limit; the releases read before the cut are kept, newest first.
+func decodeReleases(r io.Reader) ([]githubRelease, error) {
+	dec := json.NewDecoder(r)
+	if tok, err := dec.Token(); err != nil {
+		return nil, err
+	} else if tok != json.Delim('[') {
+		return nil, fmt.Errorf("不是版本列表")
+	}
+	var out []githubRelease
+	for dec.More() {
+		var rel githubRelease
+		if err := dec.Decode(&rel); err != nil {
+			if len(out) > 0 {
+				return out, nil
+			}
+			return nil, err
+		}
+		out = append(out, rel)
+	}
 	return out, nil
 }
 
