@@ -7,7 +7,7 @@ import type {
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 
 import { groupItems } from "./group";
 import { eligibleNodes } from "./inbound-form-modal";
@@ -49,6 +49,14 @@ interface Props {
   onInstallRequestHandled: () => void;
   onChanged: () => void;
 }
+
+/** Dot and text colour per kernel status colour. */
+const STATUS_TONE: Record<string, [dot: string, text: string]> = {
+  success: ["bg-success", "text-success-600 dark:text-success"],
+  warning: ["bg-warning", "text-warning-600 dark:text-warning"],
+  danger: ["bg-danger", "text-danger"],
+  default: ["bg-default-400", "text-default-500"],
+};
 
 function shortVersion(v: string): string {
   const m = v.match(/\d+\.\d+\.\d+/);
@@ -240,11 +248,12 @@ export function KernelPanel({
       label: k.status,
       color: "default" as const,
     };
+    const tone = STATUS_TONE[st.color] ?? STATUS_TONE.default;
 
     return (
       <div
         key={k.id}
-        className="flex w-full cursor-pointer items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-default-100"
+        className="w-full cursor-pointer px-3 py-2.5 text-left transition-colors hover:bg-default-100"
         role="button"
         tabIndex={0}
         onClick={() => setSheetFor(k.id)}
@@ -255,35 +264,40 @@ export function KernelPanel({
           }
         }}
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="shrink-0 font-medium">
-              {kernelName(k.kernelType)}
-            </span>
-            <span className="truncate text-xs text-default-500 font-mono">
-              {k.installedVersion
-                ? shortVersion(k.installedVersion)
-                : k.version}
-            </span>
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="shrink-0 font-medium">
+                {kernelName(k.kernelType)}
+              </span>
+              <span className="truncate font-mono text-xs text-default-500">
+                {k.installedVersion
+                  ? shortVersion(k.installedVersion)
+                  : k.version}
+              </span>
+            </div>
+            <div className="text-xs text-default-500">
+              {k.inboundCount} 个入站
+            </div>
           </div>
-          <div className="text-xs text-default-500">
-            {k.inboundCount} 个入站
-          </div>
-          {k.lastError && (
-            <p className="mt-1 text-xs text-danger break-all line-clamp-2">
-              {k.lastError}
-            </p>
-          )}
-          {!k.synced && !k.lastError && (
-            <p className="mt-1 text-xs text-warning">
-              配置尚未同步，节点上线后自动下发
-            </p>
-          )}
+          <span
+            className={`flex shrink-0 items-center gap-1.5 text-xs ${tone[1]}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${tone[0]}`} />
+            {st.label}
+          </span>
+          <MoreHorizontal className="h-4 w-4 shrink-0 text-default-400" />
         </div>
-        <Chip color={st.color} size="sm" variant="flat">
-          {st.label}
-        </Chip>
-        <MoreHorizontal className="mt-0.5 h-4 w-4 shrink-0 text-default-400" />
+        {k.lastError && (
+          <p className="mt-1 line-clamp-2 break-all text-xs text-danger">
+            {k.lastError}
+          </p>
+        )}
+        {!k.synced && !k.lastError && (
+          <p className="mt-1 text-xs text-warning">
+            配置尚未同步，节点上线后自动下发
+          </p>
+        )}
       </div>
     );
   };
@@ -318,13 +332,13 @@ export function KernelPanel({
 
             return (
               <Card key={g.key} className="shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+                <div className="flex items-center gap-2 bg-default-50 py-1.5 pl-3 pr-1.5 dark:bg-default-100/40">
                   <span
                     className={`h-2 w-2 shrink-0 rounded-full ${
                       online ? "bg-success" : "bg-default-300"
                     }`}
                   />
-                  <span className="min-w-0 flex-1 truncate font-semibold">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                     {g.title}
                   </span>
                   {!online && (
@@ -333,11 +347,13 @@ export function KernelPanel({
                     </Chip>
                   )}
                   <Button
+                    className="h-7 min-w-0 gap-1 px-2 text-xs text-primary dark:text-primary"
                     size="sm"
+                    startContent={<Plus className="h-3.5 w-3.5" />}
                     variant="light"
                     onPress={() => openInstall(g.items[0].nodeId)}
                   >
-                    + 内核
+                    内核
                   </Button>
                 </div>
                 <div className="divide-y divide-divider border-t border-divider">
