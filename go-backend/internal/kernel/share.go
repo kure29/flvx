@@ -113,10 +113,10 @@ func ShareURI(e Endpoint) (string, bool) {
 		b, _ := json.Marshal(v)
 		return "vmess://" + base64.StdEncoding.EncodeToString(b), true
 	case ProtocolShadowsocks:
-		userinfo := base64.RawURLEncoding.EncodeToString([]byte(in.Settings.Method + ":" + in.ssClientPassword()))
+		userinfo := base64.RawURLEncoding.EncodeToString([]byte(in.Settings.Method + ":" + in.Settings.Password))
 		if SS2022KeyLen(in.Settings.Method) > 0 {
 			// SIP022: 2022 ciphers use percent-encoded plain userinfo.
-			userinfo = url.QueryEscape(in.Settings.Method) + ":" + url.QueryEscape(in.ssClientPassword())
+			userinfo = url.QueryEscape(in.Settings.Method) + ":" + url.QueryEscape(in.Settings.Password)
 		}
 		query := ""
 		if in.Security.Type == SecurityShadowTLS {
@@ -292,7 +292,7 @@ func ClashProxy(e Endpoint) (yamlNode, bool) {
 	case ProtocolTrojan:
 		p = append(p, yamlField{"password", in.Settings.Password})
 	case ProtocolShadowsocks:
-		p = append(p, yamlField{"cipher", in.Settings.Method}, yamlField{"password", in.ssClientPassword()})
+		p = append(p, yamlField{"cipher", in.Settings.Method}, yamlField{"password", in.Settings.Password})
 		if in.Security.Type == SecurityShadowTLS {
 			p[4].Value = false // UDP is not carried through ShadowTLS
 			p = append(p,
@@ -441,7 +441,7 @@ func singboxOutbound(e Endpoint) (map[string]interface{}, bool) {
 	case ProtocolShadowsocks:
 		o["type"] = "shadowsocks"
 		o["method"] = in.Settings.Method
-		o["password"] = in.ssClientPassword()
+		o["password"] = in.Settings.Password
 		if in.Security.Type == SecurityShadowTLS {
 			// The shadowtls outbound dials the server; this one has no address.
 			delete(o, "server")
@@ -549,7 +549,7 @@ func SurgeLine(e Endpoint) (string, bool) {
 	switch in.Protocol {
 	case ProtocolShadowsocks:
 		parts = append(parts, "ss", host, strconv.Itoa(e.Port),
-			"encrypt-method="+in.Settings.Method, "password="+in.ssClientPassword())
+			"encrypt-method="+in.Settings.Method, "password="+in.Settings.Password)
 		if in.Security.Type == SecurityShadowTLS {
 			parts = append(parts, shadowTLS()...)
 		} else {

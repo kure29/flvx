@@ -712,9 +712,6 @@ export interface InboundSettings {
   flow?: string;
   password?: string;
   method?: string;
-  /** Shadowsocks 2022 (AES) multi-user mode; userKey is the owner's key. */
-  multiUser?: boolean;
-  userKey?: string;
   snellVersion?: number;
   /** Snell v6 traffic shaping: unset (default) or "unshaped". */
   snellMode?: string;

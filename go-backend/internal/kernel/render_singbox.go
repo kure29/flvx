@@ -158,11 +158,6 @@ func singboxInbounds(in Inbound, acme *acmeProviders) ([]interface{}, error) {
 		item["type"] = "shadowsocks"
 		item["method"] = s.Method
 		item["password"] = s.Password
-		if in.ssMultiUser() {
-			// Multi-user mode: the password is the server key, the owner
-			// connects as a user too.
-			item["users"] = []interface{}{obj{"name": "owner", "password": s.UserKey}}
-		}
 	case ProtocolSnell:
 		// Server version 5 also serves v4 clients (the same wire protocol
 		// without QUIC proxy mode, which sing-box does not offer).

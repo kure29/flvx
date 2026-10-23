@@ -1,11 +1,8 @@
 package kernel
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // User is an extra client of an inbound (a subscription user). Each user
@@ -31,39 +28,16 @@ func xrayUserMatch(id int64) []string {
 }
 
 // SupportsUsers reports whether the inbound can carry per-user credentials.
-// Snell has a single PSK. Shadowsocks only in 2022 multi-user mode, which
-// the owner turns on per inbound: every client, the owner's included, must
-// then send a user key, so existing links change.
+// Snell has a single PSK. Shadowsocks stays shared too: 2022 multi-user
+// mode would require every client, the owner's included, to send a user
+// identity, breaking existing links.
 func (in Inbound) SupportsUsers() bool {
 	switch in.Protocol {
 	case ProtocolVLESS, ProtocolVMess, ProtocolTrojan, ProtocolHysteria2, ProtocolTUIC, ProtocolAnyTLS, ProtocolNaive,
 		ProtocolSOCKS, ProtocolHTTP:
 		return true
-	case ProtocolShadowsocks:
-		return in.ssMultiUser()
 	}
 	return false
-}
-
-func (in Inbound) ssMultiUser() bool {
-	return in.Protocol == ProtocolShadowsocks && in.Settings.MultiUser && SSMultiUserMethod(in.Settings.Method) &&
-		in.Security.Type != SecurityShadowTLS
-}
-
-// ssUserKey is a user's Shadowsocks 2022 key, derived from its password so
-// it changes when the subscription's credentials are reset.
-func ssUserKey(u User, method string) string {
-	sum := sha256.Sum256([]byte("flyx-ss2022-user:" + u.Password))
-	return base64.StdEncoding.EncodeToString(sum[:SS2022KeyLen(method)])
-}
-
-// ssClientPassword is the password clients send: in multi-user mode the
-// server key and the owner's (or, after ForUser, the user's) key.
-func (in Inbound) ssClientPassword() string {
-	if in.ssMultiUser() && !strings.Contains(in.Settings.Password, ":") {
-		return in.Settings.Password + ":" + in.Settings.UserKey
-	}
-	return in.Settings.Password
 }
 
 // ForUser returns the inbound as the given user connects to it: the same
@@ -84,9 +58,6 @@ func (in Inbound) ForUser(u User) Inbound {
 	case ProtocolNaive, ProtocolSOCKS, ProtocolHTTP:
 		out.Settings.Username = u.Name()
 		out.Settings.Password = u.Password
-	case ProtocolShadowsocks:
-		server, _, _ := strings.Cut(in.Settings.Password, ":")
-		out.Settings.Password = server + ":" + ssUserKey(u, in.Settings.Method)
 	default:
 		out.Settings.Password = u.Password
 	}
@@ -111,8 +82,6 @@ func xrayUserClients(in Inbound) []interface{} {
 			c = obj{"id": u.UUID}
 		case ProtocolTrojan:
 			c = obj{"password": u.Password}
-		case ProtocolShadowsocks:
-			c = obj{"password": ssUserKey(u, in.Settings.Method)}
 		case ProtocolSOCKS, ProtocolHTTP:
 			// Xray reports the username as the user's email.
 			out = append(out, obj{"user": u.Name(), "pass": u.Password})
@@ -146,8 +115,6 @@ func singboxUsers(in Inbound) []interface{} {
 			item = obj{"password": u.Password}
 		case ProtocolTUIC:
 			item = obj{"uuid": u.UUID, "password": u.Password}
-		case ProtocolShadowsocks:
-			item = obj{"password": ssUserKey(u, in.Settings.Method)}
 		case ProtocolNaive, ProtocolSOCKS, ProtocolHTTP:
 			out = append(out, obj{"username": u.Name(), "password": u.Password})
 			continue

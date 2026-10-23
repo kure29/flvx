@@ -97,13 +97,7 @@ func xraySettings(in Inbound) (obj, error) {
 	case ProtocolTrojan:
 		return obj{"clients": append([]interface{}{obj{"password": s.Password}}, xrayUserClients(in)...)}, nil
 	case ProtocolShadowsocks:
-		settings := obj{"method": s.Method, "password": s.Password, "network": "tcp,udp"}
-		if in.ssMultiUser() {
-			// Multi-user mode: the password is the server key, the owner
-			// connects as a client too.
-			settings["clients"] = append([]interface{}{obj{"password": s.UserKey}}, xrayUserClients(in)...)
-		}
-		return settings, nil
+		return obj{"method": s.Method, "password": s.Password, "network": "tcp,udp"}, nil
 	case ProtocolSOCKS:
 		accounts := append([]interface{}{obj{"user": s.Username, "pass": s.Password}}, xrayUserClients(in)...)
 		return obj{"auth": "password", "accounts": accounts, "udp": true}, nil
