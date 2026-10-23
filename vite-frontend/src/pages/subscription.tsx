@@ -15,7 +15,7 @@ import type { InboundApiItem } from "@/api/types";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowDown, ArrowUp, Copy, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, LayoutTemplate, X } from "lucide-react";
 
 import {
   deleteSubscription,
@@ -1420,6 +1420,7 @@ export default function SubscriptionPage() {
         secondary={{
           key: "templates",
           label: templates.length > 0 ? `模板 ${templates.length}` : "模板",
+          icon: <LayoutTemplate className="h-3.5 w-3.5" />,
           onPress: () => setTemplatesOpen(true),
         }}
         title="订阅"

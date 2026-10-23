@@ -27,6 +27,7 @@ export interface PageAction {
   onPress: () => void;
   disabled?: boolean;
   danger?: boolean;
+  icon?: React.ReactNode;
 }
 
 export function PageHeader({
@@ -53,9 +54,11 @@ export function PageHeader({
         <div className="flex shrink-0 gap-2">
           {secondary && (
             <Button
+              className="gap-1.5 border-default-300 text-foreground dark:text-foreground"
               isDisabled={secondary.disabled}
               size="sm"
-              variant="flat"
+              startContent={secondary.icon}
+              variant="bordered"
               onPress={secondary.onPress}
             >
               {secondary.label}
