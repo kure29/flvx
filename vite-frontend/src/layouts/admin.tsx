@@ -2,21 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogOut, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 
 import { Button } from "@/shadcn-bridge/heroui/button";
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-} from "@/shadcn-bridge/heroui/modal";
-import { Input } from "@/shadcn-bridge/heroui/input";
 import { BrandLogo } from "@/components/brand-logo";
 import { VersionFooter } from "@/components/version-footer";
-import { getMonitorAccess, updatePassword } from "@/api";
+import { getMonitorAccess } from "@/api";
 import { safeLogout } from "@/utils/logout";
 import { siteConfig } from "@/config/site";
 import { useMobileBreakpoint } from "@/hooks/useMobileBreakpoint";
@@ -35,13 +26,6 @@ interface MenuItem {
   section?: string;
 }
 
-interface PasswordForm {
-  newUsername: string;
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
 export default function AdminLayout({
   children,
 }: {
@@ -49,7 +33,6 @@ export default function AdminLayout({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(
     () => localStorage.getItem("sidebar_collapsed") === "true",
@@ -60,13 +43,6 @@ export default function AdminLayout({
   const [monitorAccessReason, setMonitorAccessReason] = useState<string | null>(
     null,
   );
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordForm, setPasswordForm] = useState<PasswordForm>({
-    newUsername: "",
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
   const isMobile = useMobileBreakpoint();
 
   // 菜单项配置：管理员按 线路 / 分发 / 系统 分组（用户页含分组和限速），普通用户保持原样
@@ -314,74 +290,6 @@ export default function AdminLayout({
     }
   };
 
-  // 密码表单验证
-  const validatePasswordForm = (): boolean => {
-    if (!passwordForm.newUsername.trim()) {
-      toast.error("请输入新用户名");
-
-      return false;
-    }
-    if (passwordForm.newUsername.length < 3) {
-      toast.error("用户名长度至少3位");
-
-      return false;
-    }
-    if (!passwordForm.currentPassword) {
-      toast.error("请输入当前密码");
-
-      return false;
-    }
-    if (!passwordForm.newPassword) {
-      toast.error("请输入新密码");
-
-      return false;
-    }
-    if (passwordForm.newPassword.length < 6) {
-      toast.error("新密码长度不能少于6位");
-
-      return false;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("两次输入密码不一致");
-
-      return false;
-    }
-
-    return true;
-  };
-
-  // 提交密码修改
-  const handlePasswordSubmit = async () => {
-    if (!validatePasswordForm()) return;
-
-    setPasswordLoading(true);
-    try {
-      const response = await updatePassword(passwordForm);
-
-      if (response.code === 0) {
-        toast.success("密码修改成功，请重新登录");
-        onOpenChange();
-        handleLogout();
-      } else {
-        toast.error(response.msg || "密码修改失败");
-      }
-    } catch {
-      toast.error("修改密码时发生错误");
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
-
-  // 重置密码表单
-  const resetPasswordForm = () => {
-    setPasswordForm({
-      newUsername: "",
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-  };
-
   // 过滤菜单项（根据权限）
   const filteredMenuItems = menuItems
     .filter((item) => (isAdmin ? !item.userOnly : !item.adminOnly))
@@ -518,18 +426,12 @@ export default function AdminLayout({
           {!isMobile && (
             <div className="flex flex-col gap-1">
               {[
-                // Login methods (passkey, GitHub) live on the account page.
+                // Password, passkeys and GitHub live on the account page.
                 {
                   key: "account",
                   label: "账户与登录",
                   icon: UserRound,
                   onPress: () => navigate("/profile"),
-                },
-                {
-                  key: "password",
-                  label: "修改密码",
-                  icon: KeyRound,
-                  onPress: onOpen,
                 },
                 {
                   key: "logout",
@@ -649,99 +551,6 @@ export default function AdminLayout({
           </AnimatePresence>
         </main>
       </div>
-
-      {/* 修改密码弹窗 */}
-      <Modal
-        backdrop="blur"
-        classNames={{
-          base: "!w-[calc(100%-32px)] !mx-auto sm:!w-full rounded-2xl overflow-hidden",
-        }}
-        isOpen={isOpen}
-        placement="center"
-        scrollBehavior="inside"
-        size="2xl"
-        onOpenChange={() => {
-          onOpenChange();
-          resetPasswordForm();
-        }}
-      >
-        <ModalContent>
-          {(onClose: () => void) => (
-            <>
-              <ModalHeader className="flex flex-col gap-1">
-                修改密码
-              </ModalHeader>
-              <ModalBody>
-                <div className="space-y-4">
-                  <Input
-                    label="新用户名"
-                    placeholder="请输入新用户名（至少3位）"
-                    value={passwordForm.newUsername}
-                    variant="bordered"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        newUsername: e.target.value,
-                      }))
-                    }
-                  />
-                  <Input
-                    label="当前密码"
-                    placeholder="请输入当前密码"
-                    type="password"
-                    value={passwordForm.currentPassword}
-                    variant="bordered"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        currentPassword: e.target.value,
-                      }))
-                    }
-                  />
-                  <Input
-                    label="新密码"
-                    placeholder="请输入新密码（至少6位）"
-                    type="password"
-                    value={passwordForm.newPassword}
-                    variant="bordered"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        newPassword: e.target.value,
-                      }))
-                    }
-                  />
-                  <Input
-                    label="确认密码"
-                    placeholder="请再次输入新密码"
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    variant="bordered"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setPasswordForm((prev) => ({
-                        ...prev,
-                        confirmPassword: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </ModalBody>
-              <ModalFooter>
-                <Button color="default" variant="light" onPress={onClose}>
-                  取消
-                </Button>
-                <Button
-                  color="primary"
-                  isLoading={passwordLoading}
-                  onPress={handlePasswordSubmit}
-                >
-                  确定
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
     </div>
   );
 }

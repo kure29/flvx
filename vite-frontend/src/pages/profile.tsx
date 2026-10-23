@@ -3,12 +3,14 @@ import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
+  CircleCheck,
   Fingerprint,
   Github,
   KeyRound,
   LogOut,
   Settings,
   Share2,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -39,6 +41,7 @@ import { getAdminFlag, getSessionName } from "@/utils/session";
 import { PasskeyModal } from "@/components/passkey-manager";
 import { GithubBindingModal } from "@/components/github-binding";
 import { PageHeader } from "@/components/page-kit";
+import { useH5Mode } from "@/hooks/useH5Mode";
 
 interface PasswordForm {
   newUsername: string;
@@ -47,60 +50,144 @@ interface PasswordForm {
   confirmPassword: string;
 }
 
-interface MenuItem {
+type Tone = "primary" | "success" | "warning" | "secondary" | "danger";
+
+const TONE: Record<Tone, string> = {
+  primary: "bg-primary/10 text-primary",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  secondary: "bg-secondary/10 text-secondary",
+  danger: "bg-danger/10 text-danger",
+};
+
+function IconTile({
+  icon: Icon,
+  tone,
+  size = "md",
+}: {
+  icon: LucideIcon;
+  tone: Tone;
+  size?: "md" | "lg";
+}) {
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-xl ${TONE[tone]} ${size === "lg" ? "h-11 w-11" : "h-8 w-8"}`}
+    >
+      <Icon className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
+    </span>
+  );
+}
+
+interface SecurityItem {
   key: string;
   label: string;
-  description?: string;
-  /** Shown on the right, e.g. a binding's state. */
-  value?: string;
+  description: string;
+  /** The current state, e.g. "已绑定 kure29". */
+  status: string;
+  /** Whether the status is a good one (bound, set up). */
+  active?: boolean;
+  /** The desktop button. */
+  action: string;
   icon: LucideIcon;
-  danger?: boolean;
+  tone: Tone;
   onPress: () => void;
 }
 
-function MenuGroup({ title, items }: { title?: string; items: MenuItem[] }) {
-  return (
-    <section className="space-y-1.5">
-      {title && (
-        <h2 className="px-1 text-xs font-medium text-default-500">{title}</h2>
-      )}
-      <div className="divide-y divide-divider overflow-hidden rounded-xl border border-divider bg-content1">
-        {items.map((item) => {
-          const Icon = item.icon;
+interface ShortcutItem {
+  key: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  tone: Tone;
+  onPress: () => void;
+}
 
-          return (
-            <button
-              key={item.key}
-              className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-default-100"
-              type="button"
-              onClick={item.onPress}
-            >
-              <Icon
-                className={`h-4 w-4 shrink-0 ${item.danger ? "text-danger" : "text-default-500"}`}
-              />
-              <div className="min-w-0 flex-1">
-                <div
-                  className={`truncate text-sm ${item.danger ? "text-danger" : ""}`}
+function Avatar({ name, large }: { name: string; large?: boolean }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary font-semibold text-white shadow-sm ${large ? "h-16 w-16 text-2xl" : "h-12 w-12 text-lg"}`}
+    >
+      {(name || "?").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+function RoleChip({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${isAdmin ? "bg-primary/10 text-primary" : "bg-default-100 text-default-600"}`}
+    >
+      {isAdmin && <ShieldCheck className="h-3 w-3" />}
+      {isAdmin ? "管理员" : "普通用户"}
+    </span>
+  );
+}
+
+/** Phone: iOS-settings style rows, the status on the right. */
+function SecurityList({ items }: { items: SecurityItem[] }) {
+  return (
+    <div className="divide-y divide-divider overflow-hidden rounded-2xl bg-content1 shadow-sm">
+      {items.map((item) => (
+        <button
+          key={item.key}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-default-100"
+          type="button"
+          onClick={item.onPress}
+        >
+          <IconTile icon={item.icon} tone={item.tone} />
+          <span className="min-w-0 flex-1 truncate text-[15px]">
+            {item.label}
+          </span>
+          <span
+            className={`max-w-[45%] truncate text-sm ${item.active ? "text-default-600" : "text-default-400"}`}
+          >
+            {item.status}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-default-300" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Desktop: one row per method with what it is, its state and a button. */
+function SecurityPanel({ items }: { items: SecurityItem[] }) {
+  return (
+    <section className="rounded-2xl border border-divider bg-content1 shadow-sm">
+      <div className="border-b border-divider px-6 py-4">
+        <h2 className="text-base font-semibold">登录与安全</h2>
+        <p className="mt-0.5 text-sm text-default-500">
+          管理登录这个面板的方式。绑定、解绑和修改都需要当前密码
+        </p>
+      </div>
+      <div className="divide-y divide-divider">
+        {items.map((item) => (
+          <div key={item.key} className="flex items-center gap-4 px-6 py-4">
+            <IconTile icon={item.icon} size="lg" tone={item.tone} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{item.label}</span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${item.active ? "bg-success/10 text-success" : "bg-default-100 text-default-500"}`}
                 >
-                  {item.label}
-                </div>
-                {item.description && (
-                  <div className="truncate text-xs text-default-400">
-                    {item.description}
-                  </div>
-                )}
-              </div>
-              {item.value && (
-                <span className="max-w-[45%] shrink-0 truncate text-xs text-default-500">
-                  {item.value}
+                  {item.active && <CircleCheck className="h-3 w-3" />}
+                  {item.status}
                 </span>
-              )}
-              {!item.danger && (
-                <ChevronRight className="h-4 w-4 shrink-0 text-default-300" />
-              )}
-            </button>
-          );
-        })}
+              </div>
+              <p className="mt-0.5 text-sm text-default-500">
+                {item.description}
+              </p>
+            </div>
+            <Button
+              className="min-w-16"
+              size="sm"
+              variant="bordered"
+              onPress={item.onPress}
+            >
+              {item.action}
+            </Button>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -108,6 +195,7 @@ function MenuGroup({ title, items }: { title?: string; items: MenuItem[] }) {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const isH5 = useH5Mode();
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   const [username, setUsername] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -161,27 +249,30 @@ export default function ProfilePage() {
 
   const go = (path: string) => () => navigate(path);
 
-  // 管理员菜单项
-  const adminMenuItems: MenuItem[] = [
-    {
-      key: "/panel-sharing",
-      label: "面板共享",
-      description: "与其他面板进行联邦共享",
-      icon: Share2,
-      onPress: go("/panel-sharing"),
-    },
+  // On phones the sidebar is gone; these are its admin pages.
+  const shortcuts: ShortcutItem[] = [
     {
       key: "/user",
       label: "用户管理",
       description: "用户、分组和限速",
       icon: Users,
+      tone: "primary",
       onPress: go("/user"),
+    },
+    {
+      key: "/panel-sharing",
+      label: "面板共享",
+      description: "与其他面板联邦共享",
+      icon: Share2,
+      tone: "success",
+      onPress: go("/panel-sharing"),
     },
     {
       key: "/config",
       label: "网站配置",
-      description: "配置网站设置",
+      description: "站点、登录与备份",
       icon: Settings,
+      tone: "warning",
       onPress: go("/config"),
     },
   ];
@@ -259,15 +350,28 @@ export default function ProfilePage() {
     });
   };
 
-  const accountMenuItems: MenuItem[] = [
-    { key: "password", label: "修改密码", icon: KeyRound, onPress: onOpen },
+  const securityItems: SecurityItem[] = [
+    {
+      key: "password",
+      label: "用户名与密码",
+      description: "修改登录用的用户名和密码，改完需要重新登录",
+      status: username,
+      action: "修改",
+      icon: KeyRound,
+      tone: "primary",
+      onPress: onOpen,
+    },
     ...(passkeyEnabled && !webView
       ? [
           {
             key: "passkey",
             label: "通行证密钥",
-            value: passkeys.length > 0 ? `${passkeys.length} 个` : "未绑定",
+            description: "用指纹、面容或设备密码登录，不用输入密码",
+            status: passkeys.length > 0 ? `${passkeys.length} 个` : "未设置",
+            active: passkeys.length > 0,
+            action: "管理",
             icon: Fingerprint,
+            tone: "success" as Tone,
             onPress: () => setOpenLogin("passkey"),
           },
         ]
@@ -279,54 +383,107 @@ export default function ProfilePage() {
           {
             key: "github",
             label: "GitHub 登录",
-            value: github.bound ? `已绑定 ${github.login}` : "未绑定",
+            description: "在登录页用 GitHub 账号一键登录",
+            status: github.bound ? `已绑定 ${github.login}` : "未绑定",
+            active: github.bound,
+            action: github.bound ? "解绑" : "绑定",
             icon: Github,
+            tone: "secondary" as Tone,
             onPress: () => setOpenLogin("github"),
           },
         ]
       : []),
   ];
-  const logoutMenuItems: MenuItem[] = [
-    {
-      key: "logout",
-      label: "退出登录",
-      icon: LogOut,
-      danger: true,
-      onPress: handleLogout,
-    },
-  ];
+
+  const logoutButton = (
+    <Button
+      className="w-full gap-2"
+      color="danger"
+      startContent={<LogOut className="h-4 w-4" />}
+      variant="flat"
+      onPress={handleLogout}
+    >
+      退出登录
+    </Button>
+  );
 
   return (
     <div className="flex min-h-full flex-col px-3 py-6 lg:px-6">
-      <div className="w-full max-w-2xl flex-1">
-        <PageHeader description="账户与管理功能" title="更多" />
-        <div className="space-y-5">
-          {/* 账户 */}
-          <div className="flex items-center gap-3 rounded-xl border border-divider bg-content1 px-3 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-default-100 text-sm font-semibold text-default-600">
-              {(username || "?").slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{username}</div>
-              <div className="text-xs text-default-500">
-                {isAdmin ? "管理员" : "普通用户"}
-              </div>
+      {isH5 ? (
+        <div className="w-full flex-1 space-y-6">
+          <PageHeader title="更多" />
+
+          <div className="flex items-center gap-4 rounded-2xl bg-content1 px-4 py-4 shadow-sm">
+            <Avatar name={username} />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="truncate text-lg font-semibold">{username}</div>
+              <RoleChip isAdmin={isAdmin} />
             </div>
           </div>
 
-          {isAdmin && <MenuGroup items={adminMenuItems} title="管理" />}
-          <MenuGroup items={accountMenuItems} title="账户" />
-          <MenuGroup items={logoutMenuItems} />
-        </div>
-      </div>
+          {isAdmin && (
+            <section className="space-y-2">
+              <h2 className="px-1 text-xs font-medium text-default-500">
+                管理
+              </h2>
+              <div className="grid grid-cols-3 gap-3">
+                {shortcuts.map((item) => (
+                  <button
+                    key={item.key}
+                    className="flex flex-col items-center gap-2 rounded-2xl bg-content1 px-2 py-4 shadow-sm transition-transform active:scale-[0.97]"
+                    type="button"
+                    onClick={item.onPress}
+                  >
+                    <IconTile icon={item.icon} size="lg" tone={item.tone} />
+                    <span className="text-sm">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
-      <VersionFooter
-        containerClassName="mt-8 max-w-2xl text-center"
-        poweredClassName="text-xs text-default-400"
-        updateBadgeClassName="ml-2 inline-flex items-center rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white"
-        version={isWebViewFunc() ? siteConfig.app_version : siteConfig.version}
-        versionClassName="mt-1 text-xs text-default-400"
-      />
+          <section className="space-y-2">
+            <h2 className="px-1 text-xs font-medium text-default-500">
+              登录与安全
+            </h2>
+            <SecurityList items={securityItems} />
+          </section>
+
+          {logoutButton}
+        </div>
+      ) : (
+        <div className="w-full max-w-5xl flex-1">
+          <PageHeader description="你的账户和登录方式" title="账户与登录" />
+          <div className="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="space-y-4 rounded-2xl border border-divider bg-content1 p-6 shadow-sm">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Avatar large name={username} />
+                <div className="min-w-0 space-y-1.5">
+                  <div className="truncate text-lg font-semibold">
+                    {username}
+                  </div>
+                  <RoleChip isAdmin={isAdmin} />
+                </div>
+              </div>
+              <div className="border-t border-divider pt-4">{logoutButton}</div>
+            </aside>
+            <SecurityPanel items={securityItems} />
+          </div>
+        </div>
+      )}
+
+      {/* The desktop sidebar already shows the version. */}
+      {isH5 && (
+        <VersionFooter
+          containerClassName="mt-8 text-center"
+          poweredClassName="text-xs text-default-400"
+          updateBadgeClassName="ml-2 inline-flex items-center rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white"
+          version={
+            isWebViewFunc() ? siteConfig.app_version : siteConfig.version
+          }
+          versionClassName="mt-1 text-xs text-default-400"
+        />
+      )}
 
       <PasskeyModal
         isOpen={openLogin === "passkey"}
