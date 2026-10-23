@@ -182,6 +182,8 @@ build/
 your_app.exe
 go-backend/paneld
 go-gost/gost
+# Release binaries copied in to build the node agent image
+go-gost/docker/gost-*
 
 # Go 测试二进制文件
 *.test
