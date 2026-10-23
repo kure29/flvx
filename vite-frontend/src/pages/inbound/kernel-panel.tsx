@@ -255,7 +255,7 @@ export function KernelPanel({
     return (
       <button
         key={k.id}
-        className={`flex min-w-0 flex-col items-start overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-opacity hover:opacity-80 ${pill}`}
+        className={`flex min-w-0 flex-col items-start overflow-hidden rounded-lg px-2 py-1.5 text-left transition-opacity hover:opacity-80 ${pill}`}
         type="button"
         onClick={() => setSheetFor(k.id)}
       >
@@ -272,8 +272,9 @@ export function KernelPanel({
         </span>
         <span className="w-full truncate font-mono text-[11px] text-default-500">
           {k.installedVersion ? shortVersion(k.installedVersion) : k.version}
-          {" · "}
-          <span className="font-sans">{k.inboundCount} 个入站</span>
+        </span>
+        <span className="w-full truncate text-[11px] text-default-500">
+          {k.inboundCount} 个入站
         </span>
       </button>
     );
@@ -333,7 +334,7 @@ export function KernelPanel({
                     内核
                   </Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 p-3">
+                <div className="grid grid-cols-3 gap-2 p-3">
                   {g.items.map(renderKernel)}
                 </div>
                 {g.items.some((k) => k.lastError) && (
