@@ -7,12 +7,13 @@ import type {
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { groupItems } from "./group";
 import { eligibleNodes } from "./inbound-form-modal";
 import { KERNEL_STATUS } from "./presets";
 
+import { TONE } from "@/components/latency-cell";
 import { ActionSheet } from "@/components/action-sheet";
 import {
   controlKernel,
@@ -50,12 +51,12 @@ interface Props {
   onChanged: () => void;
 }
 
-/** Dot and text colour per kernel status colour. */
-const STATUS_TONE: Record<string, [dot: string, text: string]> = {
-  success: ["bg-success", "text-success-600 dark:text-success"],
-  warning: ["bg-warning", "text-warning-600 dark:text-warning"],
-  danger: ["bg-danger", "text-danger"],
-  default: ["bg-default-400", "text-default-500"],
+/** The latency tiles' status colours are too dark on a dark page. */
+const DARK_LABEL: Record<string, string> = {
+  success: "dark:text-emerald-400",
+  warning: "dark:text-amber-400",
+  danger: "dark:text-rose-400",
+  default: "dark:text-default-500",
 };
 
 function shortVersion(v: string): string {
@@ -243,62 +244,38 @@ export function KernelPanel({
   );
   const sheetKernel = kernels.find((k) => k.id === sheetFor) ?? null;
 
+  // One tile per kernel, tinted by its status like the latency tiles.
   const renderKernel = (k: KernelApiItem) => {
     const st = KERNEL_STATUS[k.status] ?? {
       label: k.status,
       color: "default" as const,
     };
-    const tone = STATUS_TONE[st.color] ?? STATUS_TONE.default;
+    const [pill, dot] = TONE[st.color] ?? TONE.default;
 
     return (
-      <div
+      <button
         key={k.id}
-        className="w-full cursor-pointer px-3 py-2.5 text-left transition-colors hover:bg-default-100"
-        role="button"
-        tabIndex={0}
+        className={`flex min-w-0 flex-col items-start overflow-hidden rounded-lg px-2.5 py-1.5 text-left transition-opacity hover:opacity-80 ${pill}`}
+        type="button"
         onClick={() => setSheetFor(k.id)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setSheetFor(k.id);
-          }
-        }}
       >
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="shrink-0 font-medium">
-                {kernelName(k.kernelType)}
-              </span>
-              <span className="truncate font-mono text-xs text-default-500">
-                {k.installedVersion
-                  ? shortVersion(k.installedVersion)
-                  : k.version}
-              </span>
-            </div>
-            <div className="text-xs text-default-500">
-              {k.inboundCount} 个入站
-            </div>
-          </div>
-          <span
-            className={`flex shrink-0 items-center gap-1.5 text-xs ${tone[1]}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${tone[0]}`} />
-            {st.label}
+        <span
+          className={`flex w-full min-w-0 items-center gap-1 text-[11px] ${DARK_LABEL[st.color] ?? ""}`}
+        >
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+          <span className="truncate">
+            {!k.synced && !k.lastError ? "待同步" : st.label}
           </span>
-          <MoreHorizontal className="h-4 w-4 shrink-0 text-default-400" />
-        </div>
-        {k.lastError && (
-          <p className="mt-1 line-clamp-2 break-all text-xs text-danger">
-            {k.lastError}
-          </p>
-        )}
-        {!k.synced && !k.lastError && (
-          <p className="mt-1 text-xs text-warning">
-            配置尚未同步，节点上线后自动下发
-          </p>
-        )}
-      </div>
+        </span>
+        <span className="w-full truncate text-sm font-semibold text-foreground">
+          {kernelName(k.kernelType)}
+        </span>
+        <span className="w-full truncate font-mono text-[11px] text-default-500">
+          {k.installedVersion ? shortVersion(k.installedVersion) : k.version}
+          {" · "}
+          <span className="font-sans">{k.inboundCount} 个入站</span>
+        </span>
+      </button>
     );
   };
 
@@ -332,7 +309,7 @@ export function KernelPanel({
 
             return (
               <Card key={g.key} className="shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 bg-default-50 py-1.5 pl-3 pr-1.5 dark:bg-default-100/40">
+                <div className="flex items-center gap-2 pb-0 pl-3 pr-1.5 pt-2">
                   <span
                     className={`h-2 w-2 shrink-0 rounded-full ${
                       online ? "bg-success" : "bg-default-300"
@@ -356,9 +333,23 @@ export function KernelPanel({
                     内核
                   </Button>
                 </div>
-                <div className="divide-y divide-divider border-t border-divider">
+                <div className="grid grid-cols-2 gap-2 p-3">
                   {g.items.map(renderKernel)}
                 </div>
+                {g.items.some((k) => k.lastError) && (
+                  <div className="space-y-1 px-3 pb-3">
+                    {g.items
+                      .filter((k) => k.lastError)
+                      .map((k) => (
+                        <p
+                          key={k.id}
+                          className="line-clamp-2 break-all text-xs text-danger"
+                        >
+                          {kernelName(k.kernelType)}：{k.lastError}
+                        </p>
+                      ))}
+                  </div>
+                )}
               </Card>
             );
           })}
