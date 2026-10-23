@@ -51,21 +51,25 @@ function RelayPath({ latency }: { latency: RelayLatency }) {
 export function RelayLatencyCell({
   latency,
   probing,
+  variant = "list",
   onProbe,
 }: {
   latency?: RelayLatency;
   probing?: boolean;
+  variant?: "list" | "summary";
   onProbe: () => void;
 }) {
   const pathOnly = latency?.points?.[0]?.name === PATH_POINT;
 
   return (
     <LatencyCell
+      estimated={!pathOnly}
       footer={latency && <RelayPath latency={latency} />}
+      note={variant === "summary" && !pathOnly ? "测试点" : undefined}
       probe={latency}
       probing={probing}
       title={pathOnly ? "中转路径延迟" : "经中转到各测试点（估算）"}
-      variant="list"
+      variant={variant}
       onProbe={onProbe}
     />
   );

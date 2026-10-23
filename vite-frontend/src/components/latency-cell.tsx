@@ -1,6 +1,13 @@
 import type { InboundProbe, InboundProbePoint } from "@/api/types";
 
-import { ChartLine, ListChecks, Loader2, RefreshCw, Route } from "lucide-react";
+import {
+  ChartLine,
+  ChevronRight,
+  ListChecks,
+  Loader2,
+  RefreshCw,
+  Route,
+} from "lucide-react";
 
 import {
   Dropdown,
@@ -224,12 +231,13 @@ export function LatencyCell({
   onShowTrend,
   onEditTargets,
   note,
+  estimated,
   title = "到各测试点的延迟",
   footer,
 }: {
   probe?: InboundProbe;
   probing?: boolean;
-  variant: "card" | "list";
+  variant: "card" | "list" | "summary";
   onProbe: () => void;
   /** Opens the node's return routes; omitted where there is no node. */
   onShowRoute?: () => void;
@@ -237,8 +245,10 @@ export function LatencyCell({
   onShowTrend?: () => void;
   /** Opens the node's reference point choice. */
   onEditTargets?: () => void;
-  /** Shown before the time on cards, e.g. "自定义". */
+  /** Card timing note, or the point label in a summary. */
   note?: string;
+  /** Summary results through a relay are estimates, unlike path-only probes. */
+  estimated?: boolean;
   /** Heading of the details. */
   title?: string;
   /** Shown under the points in the details, e.g. a relay line's legs. */
@@ -249,7 +259,7 @@ export function LatencyCell({
   if (points.length === 0) {
     return (
       <button
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${TONE.default[0]}`}
+        className={`inline-flex items-center gap-1 text-xs font-medium ${variant === "summary" ? "rounded-md py-1 text-default-500 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60" : `rounded-full px-2 py-0.5 ${TONE.default[0]}`}`}
         disabled={probing}
         type="button"
         onClick={(e) => {
@@ -262,7 +272,7 @@ export function LatencyCell({
         ) : (
           <RefreshCw className="h-3 w-3" />
         )}
-        检测
+        {variant === "summary" ? (probing ? "检测中" : "检测延迟") : "检测"}
       </button>
     );
   }
@@ -306,6 +316,37 @@ export function LatencyCell({
               {shown.map((p, i) => (
                 <Tile key={p.name} point={p} spinning={probing && i === 0} />
               ))}
+            </span>
+          </button>
+        ) : variant === "summary" ? (
+          <button
+            className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md py-0.5 text-left text-sm text-default-500 transition-colors hover:text-default-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            type="button"
+            onClick={stop}
+            onKeyDown={stop}
+          >
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <span className="min-w-0 break-all">
+                {note ? `${note} ` : ""}
+                {worst.name}
+              </span>
+              <span aria-hidden="true">·</span>
+              {estimated && worst.ok && <span>估算</span>}
+              <span
+                className={`break-all font-mono font-medium ${TONE[pointTone(worst)][0].split(" ")[1]}`}
+              >
+                {valueText(worst)}
+                {worst.ok && (worst.lossPct ?? 0) > 0 && (
+                  <span className="ml-1">丢包 {worst.lossPct}%</span>
+                )}
+              </span>
+              {probing && (
+                <Loader2 className="h-3 w-3 animate-spin self-center" />
+              )}
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1">
+              查看 {points.length} 个{estimated ? "测试点" : "结果"}
+              <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
             </span>
           </button>
         ) : (
