@@ -55,10 +55,11 @@ import {
   PageShell,
   PageTabs,
   PageToolbar,
+  ToolbarButton,
   SelectionBar,
 } from "@/components/page-kit";
 import { CARD_GRID } from "@/components/info-card";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
+import { useViewMode } from "@/components/view-mode";
 import {
   getConnectionStatusMeta,
   getRemoteSyncErrorMessage,
@@ -1577,20 +1578,17 @@ export default function NodePage({
             activeTab === "remote" ? "搜索远程节点名称或 IP" : "搜索名称或 IP"
           }
           search={currentSearchKeyword}
+          view={{ value: viewMode, onChange: setViewMode }}
           onSearch={setCurrentSearchKeyword}
         >
           {canUseExpiryFilter && (
-            <Button
-              className="shrink-0"
-              color={nodeFilterMode !== "all" ? "primary" : "default"}
-              size="sm"
-              variant="flat"
+            <ToolbarButton
+              active={nodeFilterMode !== "all"}
               onPress={() => setIsFilterModalOpen(true)}
             >
               {nodeFilterMode !== "all" ? "已筛选" : "筛选"}
-            </Button>
+            </ToolbarButton>
           )}
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </PageToolbar>
       )}
 

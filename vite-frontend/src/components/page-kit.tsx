@@ -1,8 +1,10 @@
 import type * as React from "react";
+import type { ViewMode } from "@/components/view-mode";
 
 import { MoreHorizontal, Search, X } from "lucide-react";
 
 import { AnimatedPage } from "@/components/animated-page";
+import { ViewModeToggle } from "@/components/view-mode";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import {
@@ -97,7 +99,7 @@ export function PageTabs<T extends string>({
 }) {
   return (
     <div
-      className="mb-4 grid gap-1 rounded-xl bg-default-100 p-1 sm:max-w-md"
+      className="mb-4 grid gap-1 rounded-full bg-default-100 p-1 sm:max-w-md"
       role="tablist"
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
@@ -105,18 +107,26 @@ export function PageTabs<T extends string>({
         <button
           key={t.key}
           aria-selected={value === t.key}
-          className={`truncate rounded-lg px-3 py-1.5 text-sm transition-colors ${
+          className={`flex min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
             value === t.key
-              ? "bg-background font-medium shadow-sm"
-              : "text-default-500"
+              ? "bg-background font-medium text-foreground shadow-sm"
+              : "text-default-500 hover:text-default-700"
           }`}
           role="tab"
           type="button"
           onClick={() => onChange(t.key)}
         >
-          {t.label}
+          <span className="truncate">{t.label}</span>
           {t.badge !== undefined && t.badge !== null && (
-            <span className="ml-1 text-xs text-default-400">{t.badge}</span>
+            <span
+              className={`shrink-0 rounded-full px-1.5 text-[11px] leading-4 ${
+                value === t.key
+                  ? "bg-primary/10 text-primary"
+                  : "bg-default-200 text-default-500"
+              }`}
+            >
+              {t.badge}
+            </span>
           )}
         </button>
       ))}
@@ -131,6 +141,7 @@ export function PageToolbar({
   children,
   more,
   primary,
+  view,
 }: {
   search?: string;
   onSearch?: (v: string) => void;
@@ -144,13 +155,19 @@ export function PageToolbar({
    * action of its own.
    */
   primary?: PageAction;
+  /** The list / card switch, kept at the right end. */
+  view?: { value: ViewMode; onChange: (m: ViewMode) => void };
 }) {
   const actions = (more ?? []).filter(Boolean);
 
   return (
-    <div className="mb-3 flex items-center gap-2">
+    <div className="mb-3 flex flex-wrap items-center gap-2 sm:flex-nowrap">
       {onSearch && (
-        <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-xl bg-default-100 px-3 sm:max-w-xs">
+        // With a main action too, the search gets a row of its own on a
+        // phone instead of shrinking to its icon.
+        <label
+          className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-default-100 px-3.5 sm:max-w-xs ${primary ? "basis-full sm:basis-auto" : ""}`}
+        >
           <Search className="h-4 w-4 shrink-0 text-default-400" />
           <input
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-default-400"
@@ -173,17 +190,19 @@ export function PageToolbar({
         </label>
       )}
       {children}
-      {actions.length > 0 && (
-        <div className="ml-auto shrink-0">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {view && <ViewModeToggle value={view.value} onChange={view.onChange} />}
+        {actions.length > 0 && (
           <Dropdown placement="bottom-end">
             <DropdownTrigger>
-              <Button
-                size="sm"
-                startContent={<MoreHorizontal className="h-4 w-4" />}
-                variant="flat"
+              <button
+                aria-label="更多操作"
+                className="flex h-9 items-center gap-1 rounded-full bg-default-100 px-3 text-sm text-default-600 transition-colors hover:bg-default-200"
+                type="button"
               >
-                更多
-              </Button>
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">更多</span>
+              </button>
             </DropdownTrigger>
             <DropdownMenu aria-label="更多操作">
               {actions.map((a) => (
@@ -198,20 +217,45 @@ export function PageToolbar({
               ))}
             </DropdownMenu>
           </Dropdown>
-        </div>
-      )}
-      {primary && (
-        <Button
-          className={actions.length > 0 ? "shrink-0" : "ml-auto shrink-0"}
-          color="primary"
-          isDisabled={primary.disabled}
-          size="sm"
-          onPress={primary.onPress}
-        >
-          {primary.label}
-        </Button>
-      )}
+        )}
+        {primary && (
+          <Button
+            className="shrink-0 rounded-full"
+            color="primary"
+            isDisabled={primary.disabled}
+            size="sm"
+            onPress={primary.onPress}
+          >
+            {primary.label}
+          </Button>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** A filter button for the toolbar; highlighted while a filter is on. */
+export function ToolbarButton({
+  active,
+  children,
+  onPress,
+}: {
+  active?: boolean;
+  children: React.ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <button
+      className={`flex h-9 shrink-0 items-center gap-1 rounded-full px-3.5 text-sm transition-colors ${
+        active
+          ? "bg-primary/10 font-medium text-primary"
+          : "bg-default-100 text-default-600 hover:bg-default-200"
+      }`}
+      type="button"
+      onClick={onPress}
+    >
+      {children}
+    </button>
   );
 }
 

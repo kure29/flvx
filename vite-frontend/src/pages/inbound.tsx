@@ -33,7 +33,7 @@ import {
 import { PageLoadingState } from "@/components/page-state";
 import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
 import { CARD_GRID, type CardTone, InfoCard } from "@/components/info-card";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
+import { useViewMode } from "@/components/view-mode";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
@@ -958,12 +958,13 @@ export default function InboundPage() {
                 onPress: openCreate,
               }}
               search={searchKeyword}
+              view={{ value: viewMode, onChange: setViewMode }}
               onSearch={setSearchKeyword}
             >
               {nodeOptions.length > 1 && (
                 <select
                   aria-label="按节点筛选"
-                  className="h-9 max-w-[8rem] shrink-0 rounded-xl bg-default-100 px-2 text-sm"
+                  className="h-9 max-w-[8rem] shrink-0 rounded-full bg-default-100 px-3 text-sm"
                   value={nodeFilter}
                   onChange={(e) => setNodeFilter(e.target.value)}
                 >
@@ -975,7 +976,6 @@ export default function InboundPage() {
                   ))}
                 </select>
               )}
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
             </PageToolbar>
           )}
 

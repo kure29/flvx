@@ -31,9 +31,14 @@ import {
   saveSubscription,
 } from "@/api";
 import { AnimatedPage } from "@/components/animated-page";
-import { EmptyHint, PageHeader } from "@/components/page-kit";
+import {
+  EmptyHint,
+  PageHeader,
+  PageTabs,
+  PageToolbar,
+} from "@/components/page-kit";
 import { CARD_GRID, InfoCard } from "@/components/info-card";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
+import { useViewMode } from "@/components/view-mode";
 import { PageLoadingState } from "@/components/page-state";
 import { copyText, panelOrigin } from "@/pages/inbound/share";
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -1100,6 +1105,7 @@ export default function SubscriptionPage() {
   const [groups, setGroups] = useState<NodeGroupItem[]>([]);
   const [groupDraft, setGroupDraft] = useState<NodeGroupDraft | null>(null);
   const [tab, setTab] = useState<"subs" | "groups">("subs");
+  const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState<SubscriptionItem | null>(null);
@@ -1195,10 +1201,14 @@ export default function SubscriptionPage() {
     }
   };
 
-  const moveGroup = async (i: number, delta: -1 | 1) => {
+  /** Swaps two groups by id, so it works on a search-filtered list too. */
+  const moveGroup = async (a: number, b: number) => {
     const next = [...groups];
+    const i = next.findIndex((g) => g.id === a);
+    const j = next.findIndex((g) => g.id === b);
 
-    [next[i], next[i + delta]] = [next[i + delta], next[i]];
+    if (i < 0 || j < 0) return;
+    [next[i], next[j]] = [next[j], next[i]];
     setGroups(next);
     const res = await orderNodeGroups(next.map((g) => g.id));
 
@@ -1256,6 +1266,13 @@ export default function SubscriptionPage() {
   if (loading) return <PageLoadingState message="正在加载..." />;
 
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
+  const q = query.trim().toLowerCase();
+  const shownSubs = q
+    ? subs.filter((s) => `${s.name} ${s.remark}`.toLowerCase().includes(q))
+    : subs;
+  const shownGroups = q
+    ? groups.filter((g) => g.name.toLowerCase().includes(q))
+    : groups;
   const sourceText = (s: SubscriptionItem) =>
     (s.groupIds ?? [])
       .map((id) => groupName.get(id))
@@ -1434,22 +1451,32 @@ export default function SubscriptionPage() {
         onClose={() => setTemplatesOpen(false)}
       />
 
-      <div className="max-w-xs">
-        <Segmented
-          options={[
-            ["subs", `订阅 ${subs.length}`],
-            ["groups", `节点组 ${groups.length}`],
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </div>
+      <PageTabs
+        tabs={[
+          { key: "subs", label: "订阅", badge: subs.length },
+          { key: "groups", label: "节点组", badge: groups.length },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+      <PageToolbar
+        placeholder={tab === "subs" ? "搜索订阅名称或备注" : "搜索节点组名称"}
+        search={query}
+        view={
+          tab === "subs"
+            ? { value: viewMode, onChange: setViewMode }
+            : undefined
+        }
+        onSearch={setQuery}
+      />
 
       {tab === "groups" ? (
         <NodeGroupList
-          groups={groups}
+          groups={shownGroups}
           onEdit={(g) => setGroupDraft(groupDraftFrom(g))}
-          onMove={(i, d) => void moveGroup(i, d)}
+          onMove={(i, d) =>
+            void moveGroup(shownGroups[i].id, shownGroups[i + d].id)
+          }
         />
       ) : subs.length === 0 ? (
         <EmptyHint
@@ -1461,9 +1488,6 @@ export default function SubscriptionPage() {
         />
       ) : (
         <>
-          <div className="flex justify-end">
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          </div>
           <div
             className={
               viewMode === "card"
@@ -1471,7 +1495,7 @@ export default function SubscriptionPage() {
                 : "grid grid-cols-1 gap-2 2xl:grid-cols-2"
             }
           >
-            {subs.map(viewMode === "card" ? subCard : row)}
+            {shownSubs.map(viewMode === "card" ? subCard : row)}
           </div>
         </>
       )}

@@ -5,8 +5,8 @@ import { Navigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { AnimatedPage } from "@/components/animated-page";
-import { PageHeader, PageTabs } from "@/components/page-kit";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
+import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
+import { useViewMode } from "@/components/view-mode";
 import { getMonitorNodes } from "@/api";
 import { MonitorView } from "@/pages/node/monitor-view";
 import { TunnelMonitorView } from "@/pages/node/tunnel-monitor-view";
@@ -227,19 +227,15 @@ function MonitorOverview() {
         ))}
       </div>
 
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <PageTabs
-            tabs={[
-              { key: "nodes", label: "节点" },
-              { key: "tunnels", label: "隧道" },
-            ]}
-            value={activeTab}
-            onChange={setActiveTab}
-          />
-        </div>
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-      </div>
+      <PageTabs
+        tabs={[
+          { key: "nodes", label: "节点" },
+          { key: "tunnels", label: "隧道" },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
+      <PageToolbar view={{ value: viewMode, onChange: setViewMode }} />
 
       {nodesError && activeTab === "nodes" && (
         <div className="mb-3 rounded-xl border border-divider bg-content1 px-3 py-2 text-sm text-default-600">

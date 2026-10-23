@@ -14,10 +14,11 @@ import {
   PageHeader,
   PageTabs,
   PageToolbar,
+  ToolbarButton,
 } from "@/components/page-kit";
 import { CARD_GRID, InfoCard } from "@/components/info-card";
 import { RelayLatencyCell } from "@/components/relay-latency";
-import { ViewModeToggle, useViewMode } from "@/components/view-mode";
+import { useViewMode } from "@/components/view-mode";
 import ForwardPage from "@/pages/forward";
 import { RelayModal } from "@/pages/inbound/relay-modal";
 import TunnelPage from "@/pages/tunnel";
@@ -109,9 +110,7 @@ function QualityView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
-      </div>
+      <PageToolbar view={{ value: viewMode, onChange: setViewMode }} />
       <TunnelMonitorView card={viewMode === "card"} />
     </div>
   );
@@ -246,29 +245,20 @@ function LinesView() {
       <PageToolbar
         placeholder="搜索落地名称"
         search={query}
+        view={{ value: viewMode, onChange: setViewMode }}
         onSearch={setQuery}
       >
-        <Button
-          className="shrink-0"
-          color={onlyWithRelays ? "primary" : "default"}
-          size="sm"
-          variant="flat"
+        <ToolbarButton
+          active={onlyWithRelays}
           onPress={() => setOnlyWithRelays((v) => !v)}
         >
           只看有中转的
-        </Button>
+        </ToolbarButton>
         {relays.length > 0 && (
-          <Button
-            className="shrink-0"
-            isLoading={probingIds.size > 0}
-            size="sm"
-            variant="flat"
-            onPress={() => probe([])}
-          >
-            测延迟
-          </Button>
+          <ToolbarButton onPress={() => probe([])}>
+            {probingIds.size > 0 ? "测延迟中…" : "测延迟"}
+          </ToolbarButton>
         )}
-        <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </PageToolbar>
 
       {shown.length === 0 ? (
