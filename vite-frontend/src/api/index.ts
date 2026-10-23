@@ -129,9 +129,7 @@ export interface GithubInfo {
 }
 
 export const getGithubStatus = () =>
-  Network.post<{ enabled: boolean; passwordLogin: boolean }>(
-    "/user/github/status",
-  );
+  Network.post<{ enabled: boolean }>("/user/github/status");
 export const beginGithubLogin = (redirectUri: string) =>
   Network.post<{ url: string }>("/user/github/login/begin", { redirectUri });
 export const finishGithubLogin = (code: string, state: string) =>

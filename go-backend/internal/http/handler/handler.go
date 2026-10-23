@@ -389,11 +389,6 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.passwordLoginDisabled() {
-		response.WriteJSON(w, response.ErrDefault("已禁止密码登录，请使用 GitHub 或通行证密钥登录"))
-		return
-	}
-
 	var req loginRequest
 	if err := decodeJSON(r.Body, &req); err != nil {
 		response.WriteJSON(w, response.Err(500, "请求参数错误"))
@@ -451,6 +446,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if user.Status == 0 {
 		response.WriteJSON(w, response.ErrDefault("账号被停用"))
+		return
+	}
+	// Checked after the password so it doesn't reveal which names are admins.
+	if user.RoleID == 0 && h.adminPasswordLoginDisabled() {
+		response.WriteJSON(w, response.ErrDefault("管理员已禁止使用密码登录，请使用 GitHub 或通行证密钥登录"))
 		return
 	}
 	issueAt := time.Now()
@@ -1007,7 +1007,7 @@ func (h *Handler) updateConfigs(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("配置数据不能为空"))
 		return
 	}
-	if err := h.checkPasswordLoginSwitch(r, payload); err != nil {
+	if err := h.checkPasswordLoginSwitch(payload); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
@@ -1075,7 +1075,7 @@ func (h *Handler) updateSingleConfig(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	if err := h.checkPasswordLoginSwitch(r, map[string]string{name: value}); err != nil {
+	if err := h.checkPasswordLoginSwitch(map[string]string{name: value}); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}

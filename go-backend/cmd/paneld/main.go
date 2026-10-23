@@ -62,8 +62,8 @@ func main() {
 	}
 }
 
-// enablePasswordLogin turns password login back on from the server, for an
-// admin locked out after disabling it (e.g. GitHub unreachable):
+// enablePasswordLogin lets admins log in with their password again, for an
+// admin locked out after turning it off (e.g. GitHub unreachable):
 // docker exec flux-panel-backend /app/paneld enable-password-login
 func enablePasswordLogin(cfg config.Config) {
 	r, err := app.OpenRepository(cfg)
@@ -71,8 +71,8 @@ func enablePasswordLogin(cfg config.Config) {
 		log.Fatalf("open database: %v", err)
 	}
 	defer r.Close()
-	if err := r.UpsertConfig("password_login_disabled", "false", time.Now().UnixMilli()); err != nil {
+	if err := r.UpsertConfig("admin_password_login_disabled", "false", time.Now().UnixMilli()); err != nil {
 		log.Fatalf("enable password login: %v", err)
 	}
-	fmt.Println("已允许密码登录")
+	fmt.Println("已允许管理员使用密码登录")
 }

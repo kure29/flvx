@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go-backend/internal/http/response"
+	"go-backend/internal/security"
 	"go-backend/internal/store/repo"
 )
 
@@ -144,24 +145,33 @@ func TestGithubLoginBindAndLogin(t *testing.T) {
 	}
 }
 
-func TestPasswordLoginCanBeDisabledOnlyWithGithub(t *testing.T) {
+func TestAdminPasswordLoginCanBeDisabledOnlyWithGithub(t *testing.T) {
 	fakeGithub(t)
 	router, r := setupConfigAccessTestRouter(t)
 	admin := mustGenerateConfigAccessToken(t, 1, "admin_user", 0)
-	passwordLogin := func() response.R {
+	pwd, err := security.HashPassword("user_pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.DB().Exec(`INSERT INTO user(id, user, pwd, role_id, exp_time, flow, flow_reset_time, num, created_time, status) VALUES(2, 'alice', ?, 1, 0, 0, 0, 0, 0, 1)`, pwd).Error; err != nil {
+		t.Fatal(err)
+	}
+	adminLogin := func() response.R {
 		return githubPost(t, router, "", "/api/v1/user/login", `{"username":"admin_user","password":"admin_user"}`)
 	}
-	disable := `{"password_login_disabled":"true"}`
+	userLogin := func() response.R {
+		return githubPost(t, router, "", "/api/v1/user/login", `{"username":"alice","password":"user_pass"}`)
+	}
 
-	if out := githubPost(t, router, admin, "/api/v1/config/update", disable); out.Code == 0 {
-		t.Fatal("must not disable password login without GitHub login")
+	if out := githubPost(t, router, admin, "/api/v1/config/update", `{"admin_password_login_disabled":"true"}`); out.Code == 0 {
+		t.Fatal("must not disable admin password login without GitHub login")
 	}
 	if out := githubPost(t, router, admin, "/api/v1/config/update",
-		`{"github_login_enabled":"true","github_oauth_client_id":"cid","github_oauth_secret":"shh","password_login_disabled":"true"}`); out.Code == 0 || !strings.Contains(out.Msg, "绑定") {
-		t.Fatalf("must not disable password login before the admin binds GitHub: %+v", out)
+		`{"github_login_enabled":"true","github_oauth_client_id":"cid","github_oauth_secret":"shh","admin_password_login_disabled":"true"}`); out.Code == 0 || !strings.Contains(out.Msg, "admin_user") {
+		t.Fatalf("must not disable it while an admin has no GitHub bound: %+v", out)
 	}
-	if passwordLogin().Code != 0 {
-		t.Fatal("a refused save must leave password login on")
+	if adminLogin().Code != 0 {
+		t.Fatal("a refused save must leave admin password login on")
 	}
 
 	seedConfigValue(t, r, "github_login_enabled", "true")
@@ -171,24 +181,26 @@ func TestPasswordLoginCanBeDisabledOnlyWithGithub(t *testing.T) {
 	if out := githubPost(t, router, admin, "/api/v1/user/github/bind/finish", `{"code":"octo","state":"`+state+`"}`); out.Code != 0 {
 		t.Fatalf("bind: %+v", out)
 	}
-	if out := githubPost(t, router, admin, "/api/v1/config/update-single", `{"name":"password_login_disabled","value":"true"}`); out.Code != 0 {
+	if out := githubPost(t, router, admin, "/api/v1/config/update-single", `{"name":"admin_password_login_disabled","value":"true"}`); out.Code != 0 {
 		t.Fatalf("disable: %+v", out)
 	}
 
-	if out := passwordLogin(); out.Code == 0 || !strings.Contains(out.Msg, "禁止密码登录") {
-		t.Fatalf("password login must be refused: %+v", out)
+	if out := adminLogin(); out.Code == 0 || !strings.Contains(out.Msg, "禁止使用密码登录") {
+		t.Fatalf("admin password login must be refused: %+v", out)
 	}
-	status := githubPost(t, router, "", "/api/v1/user/github/status", `{}`)
-	if status.Data.(map[string]interface{})["passwordLogin"] != false {
-		t.Fatalf("status: %+v", status)
+	if out := githubPost(t, router, "", "/api/v1/user/login", `{"username":"admin_user","password":"wrong"}`); strings.Contains(out.Msg, "禁止") {
+		t.Fatal("a wrong password must not reveal the account is an admin")
+	}
+	if out := userLogin(); out.Code != 0 {
+		t.Fatalf("ordinary users keep password login: %+v", out)
 	}
 	if out := githubPost(t, router, admin, "/api/v1/user/github/unbind", `{"password":"admin_user"}`); out.Code == 0 {
-		t.Fatal("unbinding must be refused while password login is off")
+		t.Fatal("an admin must not unbind while admin password login is off")
 	}
 
-	// Turning GitHub login off brings password login back.
+	// Turning GitHub login off brings admin password login back.
 	seedConfigValue(t, r, "github_login_enabled", "false")
-	if out := passwordLogin(); out.Code != 0 {
-		t.Fatalf("password login must return with GitHub login off: %+v", out)
+	if out := adminLogin(); out.Code != 0 {
+		t.Fatalf("admin password login must return with GitHub login off: %+v", out)
 	}
 }

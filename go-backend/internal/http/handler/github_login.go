@@ -178,15 +178,16 @@ func (h *Handler) githubStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _, ok := h.githubOAuthConfig()
-	response.WriteJSON(w, response.OK(map[string]bool{"enabled": ok, "passwordLogin": !h.passwordLoginDisabled()}))
+	response.WriteJSON(w, response.OK(map[string]bool{"enabled": ok}))
 }
 
-// passwordLoginDisabled is the effective switch: it only holds while GitHub
-// login is on and configured, so turning GitHub login off (or breaking its
-// config) brings password login back instead of locking everyone out.
-// `paneld enable-password-login` clears it from the server.
-func (h *Handler) passwordLoginDisabled() bool {
-	cfg, err := h.repo.GetConfigByName("password_login_disabled")
+// adminPasswordLoginDisabled reports whether admins must log in with GitHub
+// or a passkey; ordinary users keep their password either way. It only
+// holds while GitHub login is on and configured, so turning GitHub login
+// off (or breaking its config) brings admin password login back instead of
+// locking admins out. `paneld enable-password-login` clears it.
+func (h *Handler) adminPasswordLoginDisabled() bool {
+	cfg, err := h.repo.GetConfigByName("admin_password_login_disabled")
 	if err != nil || cfg == nil || strings.TrimSpace(cfg.Value) != "true" {
 		return false
 	}
@@ -194,11 +195,11 @@ func (h *Handler) passwordLoginDisabled() bool {
 	return ok
 }
 
-// checkPasswordLoginSwitch refuses to turn password login off unless the
-// result has GitHub login configured and the admin saving it can log in
-// with GitHub, so nobody disables the only way they can get in.
-func (h *Handler) checkPasswordLoginSwitch(r *http.Request, payload map[string]string) error {
-	if strings.TrimSpace(payload["password_login_disabled"]) != "true" {
+// checkPasswordLoginSwitch refuses to turn admin password login off unless
+// the result has GitHub login configured and every enabled admin has a
+// GitHub account bound, so no admin loses the only way they can get in.
+func (h *Handler) checkPasswordLoginSwitch(payload map[string]string) error {
+	if strings.TrimSpace(payload["admin_password_login_disabled"]) != "true" {
 		return nil
 	}
 	value := func(name string) string {
@@ -211,14 +212,14 @@ func (h *Handler) checkPasswordLoginSwitch(r *http.Request, payload map[string]s
 		return ""
 	}
 	if value("github_login_enabled") != "true" || value("github_oauth_client_id") == "" || value("github_oauth_secret") == "" {
-		return errors.New("请先启用并配置 GitHub 登录，再禁止密码登录")
+		return errors.New("请先启用并配置 GitHub 登录，再禁止管理员使用密码登录")
 	}
-	userID, err := userIDFromRequest(r)
+	unbound, err := h.repo.ListAdminsWithoutGithub()
 	if err != nil {
-		return errors.New("未登录或token已过期")
+		return err
 	}
-	if link, err := h.repo.GetUserGithub(userID); err != nil || link == nil {
-		return errors.New("请先在个人资料页绑定你自己的 GitHub 账号并确认能用它登录，再禁止密码登录")
+	if len(unbound) > 0 {
+		return fmt.Errorf("管理员 %s 还没有绑定 GitHub，请先在个人资料页绑定并确认能用它登录", strings.Join(unbound, "、"))
 	}
 	return nil
 }
@@ -431,8 +432,8 @@ func (h *Handler) githubUnbind(w http.ResponseWriter, r *http.Request) {
 	if !h.checkGithubPassword(w, userID, req.Password) {
 		return
 	}
-	if h.passwordLoginDisabled() {
-		response.WriteJSON(w, response.ErrDefault("已禁止密码登录，解绑后将无法登录；请先在设置中允许密码登录"))
+	if user, err := h.repo.GetUserByID(userID); err == nil && user != nil && user.RoleID == 0 && h.adminPasswordLoginDisabled() {
+		response.WriteJSON(w, response.ErrDefault("已禁止管理员使用密码登录，解绑后将无法登录；请先在设置中关闭该开关"))
 		return
 	}
 	deleted, err := h.repo.DeleteUserGithub(userID)
