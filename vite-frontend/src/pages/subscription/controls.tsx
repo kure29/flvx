@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+
 import { Switch } from "@/shadcn-bridge/heroui/switch";
 
 /** Small controls shared by the subscription editors. */
@@ -162,5 +165,116 @@ export function ToggleRow({
         {hint && <span className="text-xs text-default-500">{hint}</span>}
       </label>
     </div>
+  );
+}
+
+export function ChipPicker({
+  options,
+  selected,
+  onChange,
+  emptyText,
+}: {
+  options: Array<[string, string]>;
+  selected: string[];
+  onChange: (v: string[]) => void;
+  emptyText: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <button
+        className={`rounded-full border px-2.5 py-1 text-xs ${
+          selected.length === 0
+            ? "border-primary bg-primary-50 text-primary dark:bg-primary-900/30"
+            : "border-divider text-default-500"
+        }`}
+        type="button"
+        onClick={() => onChange([])}
+      >
+        {emptyText}
+      </button>
+      {options.map(([value, label]) => {
+        const on = selected.includes(value);
+
+        return (
+          <button
+            key={value}
+            className={`rounded-full border px-2.5 py-1 text-xs ${
+              on
+                ? "border-primary bg-primary-50 text-primary dark:bg-primary-900/30"
+                : "border-divider text-default-600"
+            }`}
+            type="button"
+            onClick={() =>
+              onChange(
+                on ? selected.filter((x) => x !== value) : [...selected, value],
+              )
+            }
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function Section({
+  title,
+  hint,
+  summary,
+  collapsible,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  /** Shown next to the title (while collapsed, for a collapsible one). */
+  summary?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const shown = !collapsible || open;
+
+  return (
+    <section className="space-y-3 border-t border-divider pt-4 first:border-t-0 first:pt-0">
+      {collapsible ? (
+        <button
+          aria-expanded={open}
+          className="flex w-full items-start gap-2 text-left"
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold">
+              {title}
+              {!open && summary && (
+                <span className="ml-2 text-xs font-normal text-primary">
+                  {summary}
+                </span>
+              )}
+            </h3>
+            {open && hint && <p className="text-xs text-default-500">{hint}</p>}
+          </div>
+          <ChevronDown
+            className={`mt-0.5 h-4 w-4 shrink-0 text-default-400 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      ) : (
+        <div>
+          <h3 className="text-sm font-semibold">
+            {title}
+            {summary && (
+              <span className="ml-2 text-xs font-normal text-primary">
+                {summary}
+              </span>
+            )}
+          </h3>
+          {hint && <p className="text-xs text-default-500">{hint}</p>}
+        </div>
+      )}
+      {shown && children}
+    </section>
   );
 }

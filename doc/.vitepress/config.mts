@@ -48,7 +48,7 @@ export default defineConfig({
         text: "订阅",
         items: [
           { text: "订阅与客户端", link: "/guide/subscription" },
-          { text: "来源与订阅源", link: "/guide/subscription-sources" },
+          { text: "节点组与订阅源", link: "/guide/subscription-sources" },
           { text: "筛选、命名与脚本", link: "/guide/subscription-nodes" },
           { text: "分流规则与链式代理", link: "/guide/subscription-rules" },
           { text: "订阅模板", link: "/guide/subscription-templates" },

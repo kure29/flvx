@@ -30,7 +30,7 @@ features:
   - title: 导入节点
     details: 粘贴分享链接、Clash / sing-box / Surge 配置或订阅地址，别处搭好的节点也能对接中转、加入订阅。
   - title: 订阅
-    details: 参考 Sub-Store：多个订阅各自选落地、过滤、改名、按地区分组，可分享给他人；按客户端自动返回 Clash / Mihomo、sing-box、Surge 或 base64。
+    details: 参考 Sub-Store：节点组统一选落地、过滤、改名，多个订阅自由组合、按地区分组，可分享给他人；按客户端自动返回 Clash / Mihomo、sing-box、Surge 或 base64。
   - title: 延迟与回程
     details: 节点定时测到北京 / 上海 / 广东三网的延迟和丢包，识别 CN2 GIA、9929、CMIN2 等回程线路，有趋势图和异常告警。
   - title: 流量转发

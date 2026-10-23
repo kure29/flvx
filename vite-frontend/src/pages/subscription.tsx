@@ -1,4 +1,6 @@
 import type {
+  NodeGroupDraft,
+  NodeGroupItem,
   RemoteSourceItem,
   SubPipeline,
   SubPreview,
@@ -13,11 +15,13 @@ import type { InboundApiItem } from "@/api/types";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { ChevronDown, Copy, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, X } from "lucide-react";
 
 import {
   deleteSubscription,
   getInboundList,
+  getNodeGroups,
+  orderNodeGroups,
   getRemoteSources,
   getSubscriptions,
   getSubTemplates,
@@ -31,12 +35,11 @@ import { EmptyHint, PageHeader } from "@/components/page-kit";
 import { CARD_GRID, InfoCard } from "@/components/info-card";
 import { ViewModeToggle, useViewMode } from "@/components/view-mode";
 import { PageLoadingState } from "@/components/page-state";
-import { PROTOCOL_LABELS } from "@/pages/inbound/presets";
 import { copyText, panelOrigin } from "@/pages/inbound/share";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
-import { Input, Textarea } from "@/shadcn-bridge/heroui/input";
+import { Input } from "@/shadcn-bridge/heroui/input";
 import { SubTrafficStats } from "@/pages/subscription/traffic-stats";
 import {
   Modal,
@@ -54,27 +57,22 @@ import {
   TemplatesModal,
   slotLabel,
 } from "@/pages/subscription/templates";
-import { RenameRules } from "@/pages/subscription/rename-rules";
 import {
   EditorTabs,
   QuickPickRow,
+  Section,
   Segmented,
   ToggleRow,
 } from "@/pages/subscription/controls";
+import {
+  NodeGroupEditor,
+  NodeGroupList,
+  groupDraftFrom,
+  groupSourceText,
+} from "@/pages/subscription/node-groups";
 
 const modalBase =
   "!w-[calc(100%-32px)] !mx-auto sm:!w-full rounded-2xl overflow-hidden";
-
-/** Protocols that can carry per-user credentials (mirrors the backend). */
-const MULTI_USER_PROTOCOLS = new Set([
-  "vless",
-  "vmess",
-  "trojan",
-  "hysteria2",
-  "tuic",
-  "anytls",
-  "naive",
-]);
 
 const EMPTY_PIPELINE: SubPipeline = {
   lines: "",
@@ -104,20 +102,6 @@ const EMPTY_PIPELINE: SubPipeline = {
   script: "",
   templates: {},
 };
-
-const SCRIPT_EXAMPLE = `// 对处理后的节点再做一遍筛选、改名、排序，返回新的节点数组
-// 每个节点：name 名称（可改）、original 原名、server、port、
-// protocol 协议、region 地区（如 "🇭🇰 香港"）、line（"direct" 直连 / "relay" 中转）
-function operator(nodes) {
-  return nodes
-    .filter((n) => !/过期|剩余/.test(n.name))
-    .map((n) => {
-      n.name = n.name.replace("IEPL", "专线");
-      return n;
-    })
-    .sort((a, b) => a.region.localeCompare(b.region));
-}
-`;
 
 function toDateInput(ms: number): string {
   if (!ms) return "";
@@ -183,155 +167,9 @@ function Usage({ s, compact }: { s: SubscriptionItem; compact?: boolean }) {
   );
 }
 
-function ChipPicker({
-  options,
-  selected,
-  onChange,
-  emptyText,
-}: {
-  options: Array<[string, string]>;
-  selected: string[];
-  onChange: (v: string[]) => void;
-  emptyText: string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      <button
-        className={`rounded-full border px-2.5 py-1 text-xs ${
-          selected.length === 0
-            ? "border-primary bg-primary-50 text-primary dark:bg-primary-900/30"
-            : "border-divider text-default-500"
-        }`}
-        type="button"
-        onClick={() => onChange([])}
-      >
-        {emptyText}
-      </button>
-      {options.map(([value, label]) => {
-        const on = selected.includes(value);
-
-        return (
-          <button
-            key={value}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              on
-                ? "border-primary bg-primary-50 text-primary dark:bg-primary-900/30"
-                : "border-divider text-default-600"
-            }`}
-            type="button"
-            onClick={() =>
-              onChange(
-                on ? selected.filter((x) => x !== value) : [...selected, value],
-              )
-            }
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  hint,
-  summary,
-  collapsible,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  /** Shown next to the title (while collapsed, for a collapsible one). */
-  summary?: string;
-  collapsible?: boolean;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const shown = !collapsible || open;
-
-  return (
-    <section className="space-y-3 border-t border-divider pt-4 first:border-t-0 first:pt-0">
-      {collapsible ? (
-        <button
-          aria-expanded={open}
-          className="flex w-full items-start gap-2 text-left"
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold">
-              {title}
-              {!open && summary && (
-                <span className="ml-2 text-xs font-normal text-primary">
-                  {summary}
-                </span>
-              )}
-            </h3>
-            {open && hint && <p className="text-xs text-default-500">{hint}</p>}
-          </div>
-          <ChevronDown
-            className={`mt-0.5 h-4 w-4 shrink-0 text-default-400 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-      ) : (
-        <div>
-          <h3 className="text-sm font-semibold">
-            {title}
-            {summary && (
-              <span className="ml-2 text-xs font-normal text-primary">
-                {summary}
-              </span>
-            )}
-          </h3>
-          {hint && <p className="text-xs text-default-500">{hint}</p>}
-        </div>
-      )}
-      {shown && children}
-    </section>
-  );
-}
-
 type EditorPage = "basic" | "nodes" | "rules" | "preview";
 
 type ChainRole = "" | "landing" | "relay";
-
-/** Names the filters a pipeline turns on, e.g. "地区 2 个、去重". */
-function filterSummary(o: SubPipeline): string {
-  const steps: string[] = [];
-
-  if (o.lines)
-    steps.push(
-      o.lines === "prefer_relay"
-        ? "有中转优先显示中转"
-        : o.lines === "relay"
-          ? "只要中转"
-          : "只要直连",
-    );
-  if (o.regions.length) steps.push(`地区 ${o.regions.length} 个`);
-  if (o.protocols.length) steps.push(`协议 ${o.protocols.length} 个`);
-  if (o.include || o.exclude) steps.push("名称");
-  if (o.dedupe) steps.push("去重");
-
-  return steps.join("、");
-}
-
-/** Names the naming steps a pipeline turns on, e.g. "改名 2 条、国旗". */
-function namingSummary(o: SubPipeline): string {
-  const steps: string[] = [];
-  const renames = o.rename
-    .split("\n")
-    .filter((l) => l.trim() && !l.trim().startsWith("#")).length;
-
-  if (renames) steps.push(`改名 ${renames} 条`);
-  if (o.addFlag) steps.push("国旗");
-  if (o.prefix) steps.push("前缀");
-  if (o.sort === "name") steps.push("按名称排序");
-
-  return steps.join("、");
-}
 
 interface Draft extends SubscriptionDraft {
   expire: string;
@@ -351,20 +189,21 @@ function gbText(bytes: number): string {
 function draftFrom(
   s?: SubscriptionItem,
   sources: RemoteSourceItem[] = [],
+  groups: NodeGroupItem[] = [],
 ): Draft {
   if (!s) {
     const ids = (role: string) =>
       sources.filter((x) => x.role === role).map((x) => x.id);
     const relays = ids("relay");
+    // A group with every node is the natural start; else the first one.
+    const start = groups.find((g) => g.sourceAll) ?? groups[0];
 
     return {
       name: "",
       // New subscriptions get their own credentials, so any of them can
       // expire, be capped or cut off; older own-credential ones keep working.
       kind: "share",
-      sourceAll: true,
-      inboundIds: [],
-      sourceIds: [],
+      groupIds: start ? [start.id] : [],
       // Sources marked as relays (an airport in front of the own nodes)
       // set up the chain: they relay, the own nodes and landing sources
       // are the exits.
@@ -389,9 +228,7 @@ function draftFrom(
     id: s.id,
     name: s.name,
     kind: s.kind,
-    sourceAll: s.sourceAll,
-    inboundIds: s.inboundIds,
-    sourceIds: s.sourceIds ?? [],
+    groupIds: s.groupIds ?? [],
     options: { ...EMPTY_PIPELINE, ...s.options },
     expireTime: s.expireTime,
     expire: toDateInput(s.expireTime),
@@ -420,9 +257,8 @@ function toPayload(d: Draft): SubscriptionDraft {
 function Editor({
   draft,
   setDraft,
-  inbounds,
+  groups,
   sources,
-  regions,
   ruleGroups,
   templates,
   saving,
@@ -431,9 +267,8 @@ function Editor({
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
-  inbounds: InboundApiItem[];
+  groups: NodeGroupItem[];
   sources: RemoteSourceItem[];
-  regions: string[];
   ruleGroups: SubRuleGroup[];
   templates: SubTemplate[];
   saving: boolean;
@@ -457,24 +292,24 @@ function Editor({
     setPreview(null);
   };
 
-  const protocols = useMemo(
-    () =>
-      [...new Set(inbounds.map((i) => i.protocol))].map(
-        (p) => [p, PROTOCOL_LABELS[p] ?? p] as [string, string],
-      ),
-    [inbounds],
+  const setGroupIds = (groupIds: number[]) => {
+    set({ groupIds });
+    // The chain picks among the groups' nodes.
+    setChainNodes(null);
+  };
+  const groupById = useMemo(
+    () => new Map(groups.map((g) => [g.id, g])),
+    [groups],
   );
-  const selfBuilt = inbounds.filter((i) => !i.external);
-  // Nodes of a remote source are picked as the whole source.
-  const imported = inbounds.filter((i) => i.external && !i.sourceId);
-  const sharedPicked = inbounds.filter(
-    (i) =>
-      (draft.sourceAll
-        ? i.enabled
-        : draft.inboundIds.includes(i.id) ||
-          draft.sourceIds.includes(i.sourceId ?? 0)) &&
-      (i.external || !MULTI_USER_PROTOCOLS.has(i.protocol)),
-  ).length;
+  const pickedGroups = draft.groupIds
+    .map((id) => groupById.get(id))
+    .filter((g): g is NodeGroupItem => Boolean(g));
+  const moveGroup = (i: number, delta: -1 | 1) => {
+    const ids = [...draft.groupIds];
+
+    [ids[i], ids[i + delta]] = [ids[i + delta], ids[i]];
+    setGroupIds(ids);
+  };
 
   const runPreview = async () => {
     // The chain editor lists the nodes dropping would hide too, so they
@@ -576,9 +411,14 @@ function Editor({
       chainLanding: "",
       chainRelay: "",
     });
-    // The node list changes with the sources in the chain.
-    setChainNodes(null);
   };
+  // Sources with nodes in the picked groups, and any already in the chain.
+  const chainSources = sources.filter(
+    (src) =>
+      o.chainLandingSources.includes(src.id) ||
+      o.chainRelaySources.includes(src.id) ||
+      chainNodes?.some((n) => n.sourceId === src.id),
+  );
   const picked = o.templates ?? {};
   const templateOn = Object.values(picked).some(Boolean);
   const setTemplate = (kind: SubTemplateSlot, id: number) =>
@@ -600,35 +440,6 @@ function Editor({
         (o.chainRelayNames.length > 0 || o.chainRelaySources.length > 0)
       : Boolean(o.chainLanding && o.chainRelay);
 
-  const pickList = (title: string, list: InboundApiItem[]) =>
-    list.length > 0 && (
-      <div className="space-y-1">
-        <p className="text-xs text-default-500">{title}</p>
-        {list.map((i) => (
-          <Checkbox
-            key={i.id}
-            className="w-full"
-            isSelected={draft.inboundIds.includes(i.id)}
-            onValueChange={(on) =>
-              set({
-                inboundIds: on
-                  ? [...draft.inboundIds, i.id]
-                  : draft.inboundIds.filter((x) => x !== i.id),
-              })
-            }
-          >
-            <span className="text-sm">{i.name}</span>
-            {!i.enabled && (
-              <span className="ml-1 text-xs text-default-400">已停用</span>
-            )}
-            {(i.external || !MULTI_USER_PROTOCOLS.has(i.protocol)) && (
-              <span className="ml-1 text-xs text-warning">共用凭据</span>
-            )}
-          </Checkbox>
-        ))}
-      </div>
-    );
-
   return (
     <>
       <ModalHeader>
@@ -642,7 +453,11 @@ function Editor({
           <EditorTabs
             tabs={[
               { key: "basic", label: "基本" },
-              { key: "nodes", label: "节点" },
+              {
+                key: "nodes",
+                label: "节点",
+                badge: draft.groupIds.length || "",
+              },
               {
                 key: "rules",
                 label: "规则",
@@ -758,224 +573,96 @@ function Editor({
 
         {page === "nodes" && (
           <div className="space-y-4">
-            <Section hint="中转线路会跟着它的落地一起出现" title="来源">
-              <Segmented
-                options={[
-                  ["all", "全部落地"],
-                  ["pick", "指定落地"],
-                ]}
-                value={draft.sourceAll ? "all" : "pick"}
-                onChange={(v) => set({ sourceAll: v === "all" })}
-              />
-              {draft.sourceAll ? (
+            <Section
+              hint="订阅按顺序列出所选节点组的节点；筛选、改名在「节点组」里设置，多个订阅可以共用"
+              title="节点组"
+            >
+              {pickedGroups.length > 0 && (
+                <div className="divide-y divide-divider rounded-xl border border-divider">
+                  {pickedGroups.map((g, i) => (
+                    <div
+                      key={g.id}
+                      className="flex items-center gap-2 px-3 py-2"
+                    >
+                      <span className="w-5 shrink-0 text-xs text-default-400">
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">{g.name}</div>
+                        <div className="truncate text-xs text-default-400">
+                          {g.nodeCount} 个节点 · {groupSourceText(g)}
+                        </div>
+                      </div>
+                      <Button
+                        isIconOnly
+                        aria-label={`上移 ${g.name}`}
+                        isDisabled={i === 0}
+                        size="sm"
+                        variant="light"
+                        onPress={() => moveGroup(i, -1)}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        aria-label={`下移 ${g.name}`}
+                        isDisabled={i === pickedGroups.length - 1}
+                        size="sm"
+                        variant="light"
+                        onPress={() => moveGroup(i, 1)}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        aria-label={`移除 ${g.name}`}
+                        size="sm"
+                        variant="light"
+                        onPress={() =>
+                          setGroupIds(draft.groupIds.filter((x) => x !== g.id))
+                        }
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {groups.length === 0 ? (
                 <p className="text-xs text-default-500">
-                  包括以后新增的落地；只想要一部分可以用下面的筛选
+                  还没有节点组，先在订阅页上方切到「节点组」新建一个
                 </p>
               ) : (
-                <div className="max-h-56 space-y-3 overflow-y-auto rounded-xl border border-divider p-2">
-                  {pickList("自建", selfBuilt)}
-                  {pickList("导入", imported)}
-                  {sources.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-default-500">
-                        订阅源（整个源，更新后的节点自动跟上）
-                      </p>
-                      {sources.map((src) => {
-                        const inChain =
-                          o.chainRelaySources.includes(src.id) ||
-                          o.chainLandingSources.includes(src.id);
-
-                        return (
-                          <Checkbox
-                            key={src.id}
-                            className="w-full"
-                            isDisabled={inChain}
-                            isSelected={
-                              inChain || draft.sourceIds.includes(src.id)
-                            }
-                            onValueChange={(on) =>
-                              set({
-                                sourceIds: on
-                                  ? [...draft.sourceIds, src.id]
-                                  : draft.sourceIds.filter((x) => x !== src.id),
-                              })
-                            }
-                          >
-                            <span className="text-sm">{src.name}</span>
-                            <span className="ml-1 text-xs text-default-400">
-                              {src.nodeCount} 个节点
-                              {inChain && " · 链式代理在用，自动包含"}
-                            </span>
-                          </Checkbox>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                groups.some((g) => !draft.groupIds.includes(g.id)) && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-default-500">
+                      {pickedGroups.length ? "再加入" : "选择节点组"}
+                    </p>
+                    {groups
+                      .filter((g) => !draft.groupIds.includes(g.id))
+                      .map((g) => (
+                        <Checkbox
+                          key={g.id}
+                          className="w-full"
+                          isSelected={false}
+                          onValueChange={() =>
+                            setGroupIds([...draft.groupIds, g.id])
+                          }
+                        >
+                          <span className="text-sm">{g.name}</span>
+                          <span className="ml-1 text-xs text-default-400">
+                            {g.nodeCount} 个节点 · {groupSourceText(g)}
+                          </span>
+                        </Checkbox>
+                      ))}
+                  </div>
+                )
               )}
-              {sharedPicked > 0 && (
-                <p className="text-xs text-warning">
-                  其中 {sharedPicked} 个是导入的节点或 Shadowsocks /
-                  Snell，没法单独分配凭据：对方拿到共用的密码，停用后订阅失效，但已导入的配置仍能连接。
-                </p>
-              )}
-            </Section>
-
-            <Section
-              collapsible
-              defaultOpen={false}
-              hint="只保留需要的节点；筛完剩几个可以在“预览”里看"
-              summary={filterSummary(o) || "未设置"}
-              title="筛选"
-            >
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">线路</p>
-                <Segmented
-                  columns={2}
-                  options={[
-                    ["", "全部"],
-                    ["relay", "只要中转"],
-                    ["direct", "只要直连"],
-                    ["prefer_relay", "有中转优先显示中转"],
-                  ]}
-                  value={o.lines}
-                  onChange={(lines) => setOpts({ lines })}
-                />
-                {o.lines === "prefer_relay" && (
-                  <p className="text-xs text-default-500">
-                    同一落地有启用的中转时隐藏原直连，保留全部中转线路；没有中转则保留直连。按中转配置判断，不随测速结果变化，其他筛选继续生效。
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">地区</p>
-                <ChipPicker
-                  emptyText="全部地区"
-                  options={regions.map((r) => [r, r])}
-                  selected={o.regions}
-                  onChange={(regions) => setOpts({ regions })}
-                />
-              </div>
-              {protocols.length > 1 && (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium">协议</p>
-                  <ChipPicker
-                    emptyText="全部协议"
-                    options={protocols}
-                    selected={o.protocols}
-                    onChange={(protocols) => setOpts({ protocols })}
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Input
-                  description="多个关键词用 | 分隔，或 /正则/"
-                  label="名称包含"
-                  placeholder="例如 IEPL|专线"
-                  value={o.include}
-                  variant="bordered"
-                  onChange={(e) => setOpts({ include: e.target.value })}
-                />
-                <Input
-                  label="名称排除"
-                  placeholder="例如 /过期|剩余/"
-                  value={o.exclude}
-                  variant="bordered"
-                  onChange={(e) => setOpts({ exclude: e.target.value })}
-                />
-              </div>
-              <ToggleRow
-                hint="地址、端口、协议都相同的只保留第一个"
-                id="sub-dedupe"
-                label="去重"
-                value={o.dedupe}
-                onChange={(dedupe) => setOpts({ dedupe })}
-              />
-            </Section>
-            <Section
-              collapsible
-              defaultOpen={false}
-              hint="按顺序执行：改名 → 国旗 → 前缀 → 排序"
-              summary={namingSummary(o) || "未设置"}
-              title="命名"
-            >
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">改名规则</p>
+              {pickedGroups.length > 1 && (
                 <p className="text-xs text-default-500">
-                  从上到下依次替换，替换为留空就是删除匹配的部分，可用 $1
-                  引用分组
+                  几个组里有同一个落地时它会出现多次，可以在节点组里用筛选区分
                 </p>
-                <RenameRules
-                  value={o.rename}
-                  onChange={(rename) => setOpts({ rename })}
-                />
-              </div>
-              <ToggleRow
-                hint="按名称识别地区，在前面加上国旗"
-                id="sub-flag"
-                label="自动加国旗"
-                value={o.addFlag}
-                onChange={(addFlag) => setOpts({ addFlag })}
-              />
-              <Input
-                label="名称前缀"
-                placeholder="例如 [家宽] "
-                value={o.prefix}
-                variant="bordered"
-                onChange={(e) => setOpts({ prefix: e.target.value })}
-              />
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium">排序</p>
-                <Segmented
-                  options={[
-                    ["", "面板顺序"],
-                    ["name", "按名称"],
-                  ]}
-                  value={o.sort}
-                  onChange={(sort) => setOpts({ sort })}
-                />
-              </div>
-            </Section>
-            <Section
-              collapsible
-              defaultOpen={false}
-              hint="在上面的筛选、改名、排序之后运行，可以写任意 JS 来筛选、改名、排序；只取回节点顺序和名称"
-              summary={o.script ? "已设置" : "未设置"}
-              title="JS 脚本"
-            >
-              <Textarea
-                classNames={{ input: "font-mono text-xs" }}
-                minRows={6}
-                placeholder={"function operator(nodes) {\n  return nodes;\n}"}
-                value={o.script}
-                variant="bordered"
-                onChange={(e) => setOpts({ script: e.target.value })}
-              />
-              <div className="flex flex-wrap gap-2">
-                {!o.script && (
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    onPress={() => setOpts({ script: SCRIPT_EXAMPLE })}
-                  >
-                    插入示例
-                  </Button>
-                )}
-                {o.script && (
-                  <Button
-                    color="primary"
-                    isLoading={previewing}
-                    size="sm"
-                    variant="flat"
-                    onPress={async () => {
-                      await runPreview();
-                      setPage("preview");
-                    }}
-                  >
-                    试运行并预览
-                  </Button>
-                )}
-              </div>
+              )}
             </Section>
           </div>
         )}
@@ -1155,12 +842,11 @@ function Editor({
                       chainLanding: "",
                       chainRelay: "",
                     });
-                    setChainNodes(null);
                   }}
                 />
-                {sources.length > 0 && (
+                {chainSources.length > 0 && (
                   <div className="divide-y divide-divider rounded-xl border border-divider">
-                    {sources.map((src) => {
+                    {chainSources.map((src) => {
                       const role: ChainRole = o.chainLandingSources.includes(
                         src.id,
                       )
@@ -1245,7 +931,7 @@ function Editor({
                   </p>
                 ) : chainNodes.length === 0 ? (
                   <p className="py-6 text-center text-xs text-default-500">
-                    订阅里还没有节点
+                    所选节点组里还没有节点
                   </p>
                 ) : (
                   <div className="max-h-80 divide-y divide-divider overflow-y-auto rounded-xl border border-divider">
@@ -1291,11 +977,6 @@ function Editor({
               {previewing && !preview && (
                 <p className="py-6 text-center text-xs text-default-500">
                   正在生成…
-                </p>
-              )}
-              {preview?.scriptError && (
-                <p className="rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger dark:bg-danger-500/10">
-                  {preview.scriptError}；订阅会先不经过脚本输出
                 </p>
               )}
               {preview && (
@@ -1409,6 +1090,9 @@ export default function SubscriptionPage() {
   const [ruleGroups, setRuleGroups] = useState<SubRuleGroup[]>([]);
   const [inbounds, setInbounds] = useState<InboundApiItem[]>([]);
   const [sources, setSources] = useState<RemoteSourceItem[]>([]);
+  const [groups, setGroups] = useState<NodeGroupItem[]>([]);
+  const [groupDraft, setGroupDraft] = useState<NodeGroupDraft | null>(null);
+  const [tab, setTab] = useState<"subs" | "groups">("subs");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState<SubscriptionItem | null>(null);
@@ -1431,13 +1115,15 @@ export default function SubscriptionPage() {
   }, []);
   const load = useCallback(async () => {
     try {
-      const [subRes, inRes, srcRes] = await Promise.all([
+      const [subRes, inRes, srcRes, groupRes] = await Promise.all([
         getSubscriptions(),
         getInboundList(),
         getRemoteSources(),
+        getNodeGroups(),
       ]);
 
       if (srcRes.code === 0) setSources(srcRes.data ?? []);
+      if (groupRes.code === 0) setGroups(groupRes.data?.items ?? []);
 
       if (subRes.code === 0 && subRes.data) {
         setSubs(subRes.data.items ?? []);
@@ -1502,6 +1188,19 @@ export default function SubscriptionPage() {
     }
   };
 
+  const moveGroup = async (i: number, delta: -1 | 1) => {
+    const next = [...groups];
+
+    [next[i], next[i + delta]] = [next[i + delta], next[i]];
+    setGroups(next);
+    const res = await orderNodeGroups(next.map((g) => g.id));
+
+    if (res.code !== 0) {
+      toast.error(res.msg || "排序失败");
+      await load();
+    }
+  };
+
   const resetTraffic = async () => {
     if (!detail) return;
     setResettingTraffic(true);
@@ -1549,15 +1248,12 @@ export default function SubscriptionPage() {
 
   if (loading) return <PageLoadingState message="正在加载..." />;
 
+  const groupName = new Map(groups.map((g) => [g.id, g.name]));
   const sourceText = (s: SubscriptionItem) =>
-    s.sourceAll
-      ? "全部落地"
-      : [
-          s.inboundIds.length ? `${s.inboundIds.length} 个落地` : "",
-          s.sourceIds?.length ? `${s.sourceIds.length} 个订阅源` : "",
-        ]
-          .filter(Boolean)
-          .join(" + ");
+    (s.groupIds ?? [])
+      .map((id) => groupName.get(id))
+      .filter(Boolean)
+      .join("、") || "未选节点组";
   const stateChip = (s: SubscriptionItem) =>
     !s.enabled ? (
       <Chip size="sm" variant="flat">
@@ -1625,7 +1321,7 @@ export default function SubscriptionPage() {
       }
       rows={[
         ["节点", `${s.nodeCount} 个`],
-        ["来源", sourceText(s)],
+        ["节点组", sourceText(s)],
         ["到期", s.expireTime ? expiryLabel(s.expireTime) : "永不过期"],
         ...(s.userId
           ? ([["用户", s.userName || `#${s.userId}`]] as Array<
@@ -1696,12 +1392,24 @@ export default function SubscriptionPage() {
   return (
     <AnimatedPage className="space-y-4 px-3 py-6 lg:px-6">
       <PageHeader
-        description="每个订阅一个链接：选落地、过滤、改名，客户端自动识别格式"
-        primary={{
-          key: "create",
-          label: "新建订阅",
-          onPress: () => setDraft(draftFrom(undefined, sources)),
-        }}
+        description={
+          tab === "subs"
+            ? "每个订阅一个链接：选节点组、分流和链式代理，客户端自动识别格式"
+            : "节点组：从落地和订阅源挑节点，筛选、改名后给订阅用，多个订阅可以共用"
+        }
+        primary={
+          tab === "subs"
+            ? {
+                key: "create",
+                label: "新建订阅",
+                onPress: () => setDraft(draftFrom(undefined, sources, groups)),
+              }
+            : {
+                key: "create-group",
+                label: "新建节点组",
+                onPress: () => setGroupDraft(groupDraftFrom()),
+              }
+        }
         secondary={{
           key: "templates",
           label: templates.length > 0 ? `模板 ${templates.length}` : "模板",
@@ -1718,7 +1426,24 @@ export default function SubscriptionPage() {
         onClose={() => setTemplatesOpen(false)}
       />
 
-      {subs.length === 0 ? (
+      <div className="max-w-xs">
+        <Segmented
+          options={[
+            ["subs", `订阅 ${subs.length}`],
+            ["groups", `节点组 ${groups.length}`],
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </div>
+
+      {tab === "groups" ? (
+        <NodeGroupList
+          groups={groups}
+          onEdit={(g) => setGroupDraft(groupDraftFrom(g))}
+          onMove={(i, d) => void moveGroup(i, d)}
+        />
+      ) : subs.length === 0 ? (
         <EmptyHint
           text={
             inbounds.length === 0
@@ -1896,8 +1621,7 @@ export default function SubscriptionPage() {
             draft && (
               <Editor
                 draft={draft}
-                inbounds={inbounds}
-                regions={regions}
+                groups={groups}
                 ruleGroups={ruleGroups}
                 saving={saving}
                 setDraft={setDraft}
@@ -1905,6 +1629,39 @@ export default function SubscriptionPage() {
                 templates={templates}
                 onClose={onClose}
                 onSave={save}
+              />
+            )
+          }
+        </ModalContent>
+      </Modal>
+
+      <Modal
+        backdrop="blur"
+        classNames={{ base: modalBase }}
+        isOpen={Boolean(groupDraft)}
+        placement="center"
+        scrollBehavior="inside"
+        size="2xl"
+        onOpenChange={(open) => !open && setGroupDraft(null)}
+      >
+        <ModalContent>
+          {(onClose) =>
+            groupDraft && (
+              <NodeGroupEditor
+                draft={groupDraft}
+                inbounds={inbounds}
+                regions={regions}
+                setDraft={setGroupDraft}
+                sources={sources}
+                usedBy={
+                  groups.find((g) => g.id === groupDraft.id)?.subscriptions ??
+                  []
+                }
+                onClose={onClose}
+                onSaved={() => {
+                  setGroupDraft(null);
+                  void load();
+                }}
               />
             )
           }

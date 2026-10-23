@@ -64,18 +64,24 @@ SINGBOX = json.dumps({
 t1 = api("/subscription/template/save", {"name": "我的分流", "kind": "clash", "content": MIHOMO, "sourceUrl": ""})["data"]["id"]
 t2 = api("/subscription/template/save", {"name": "sing-box 简洁版", "kind": "singbox", "content": SINGBOX, "sourceUrl": ""})["data"]["id"]
 
-def sub(name, **kw):
-    body = {"name": name, "kind": "share", "sourceAll": True, "inboundIds": [], "sourceIds": [], "options": {}, "expireTime": 0,
+def group(name, inbound_ids=None, **opts):
+    body = {"name": name, "sourceAll": inbound_ids is None, "inboundIds": inbound_ids or [], "sourceIds": [], "options": opts}
+    return api("/subscription/group/save", body)["data"]["id"]
+g_all = group("全部节点", addFlag=True)
+g_own = group("自建精选", [inb["香港 Reality"], inb["东京 Reality"], inb["圣何塞 Hysteria2"]], addFlag=True)
+g_air = group("机场备用", [inb["机场 · 台湾 01"], inb["机场 · 韩国 01"], inb["机场 · 英国 01"]], addFlag=True)
+
+def sub(name, groups, **kw):
+    body = {"name": name, "kind": "share", "groupIds": groups, "options": {}, "expireTime": 0,
             "enabled": True, "remark": "", "trafficLimit": 0, "resetDay": 0}
     body.update(kw)
     return api("/subscription/save", body)["data"]["id"]
 all_groups = [g["key"] for g in api("/subscription/list")["data"]["ruleGroups"]]
-s1 = sub("全部节点", options={"rules": True, "ruleGroups": all_groups, "addFlag": True})
-s2 = sub("小明 · 手机", options={"addFlag": True, "templates": {"clash": t1, "singbox": t2}}, trafficLimit=200 * G, resetDay=1,
+s1 = sub("全部节点", [g_all], options={"rules": True, "ruleGroups": all_groups})
+s2 = sub("小明 · 手机", [g_all], options={"templates": {"clash": t1, "singbox": t2}}, trafficLimit=200 * G, resetDay=1,
          expireTime=now + 60 * DAY)
-s3 = sub("阿强 · 电脑", sourceAll=False, inboundIds=[inb["香港 Reality"], inb["东京 Reality"], inb["圣何塞 Hysteria2"]],
-         options={"addFlag": True}, trafficLimit=100 * G, resetDay=15, expireTime=now + 5 * DAY)
-s4 = sub("机场备用", sourceAll=False, inboundIds=[inb["机场 · 台湾 01"], inb["机场 · 韩国 01"], inb["机场 · 英国 01"]], options={"addFlag": True})
+s3 = sub("阿强 · 电脑", [g_own], trafficLimit=100 * G, resetDay=15, expireTime=now + 5 * DAY)
+s4 = sub("机场备用", [g_air, g_own])
 x("UPDATE subscription SET user_id=?, upload_bytes=?, download_bytes=? WHERE id=?", (users["xiaoming"], 6 * G, 62 * G, s2))
 x("UPDATE subscription SET user_id=?, upload_bytes=?, download_bytes=? WHERE id=?", (users["aqiang"], 9 * G, 83 * G, s3))
 for iid in inb.values():
