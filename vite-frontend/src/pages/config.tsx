@@ -218,6 +218,15 @@ const CONFIG_ITEMS: ConfigItem[] = [
     dependsValue: "true",
   },
   {
+    key: "password_login_disabled",
+    label: "禁止密码登录",
+    description:
+      "登录页不再显示用户名和密码，只能用 GitHub 或通行证密钥登录；未绑定 GitHub 的用户将无法登录，手机 App 也无法用 GitHub 登录。需先绑定你自己的 GitHub。被锁在外面时，在服务器执行 docker exec flux-panel-backend /app/paneld enable-password-login 恢复",
+    type: "switch",
+    dependsOn: "github_login_enabled",
+    dependsValue: "true",
+  },
+  {
     key: "github_proxy_enabled",
     label: "开启 GitHub 加速",
     description: "节点安装、升级和内核下载经代理，适合 GitHub 访问受限的地区",
@@ -335,6 +344,7 @@ const SECTION_CONFIG_KEYS: Partial<Record<SectionKey, string[]>> = {
     "github_login_enabled",
     "github_oauth_client_id",
     "github_oauth_secret",
+    "password_login_disabled",
     "allow_local_remote_addr",
   ],
   network: [
@@ -1583,6 +1593,7 @@ export default function ConfigPage() {
           {renderItem("github_login_enabled")}
           {renderItem("github_oauth_client_id")}
           {renderItem("github_oauth_secret")}
+          {renderItem("password_login_disabled")}
           {renderItem("allow_local_remote_addr")}
         </ConfigSection>
 

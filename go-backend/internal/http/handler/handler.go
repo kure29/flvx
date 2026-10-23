@@ -389,6 +389,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.passwordLoginDisabled() {
+		response.WriteJSON(w, response.ErrDefault("已禁止密码登录，请使用 GitHub 或通行证密钥登录"))
+		return
+	}
+
 	var req loginRequest
 	if err := decodeJSON(r.Body, &req); err != nil {
 		response.WriteJSON(w, response.Err(500, "请求参数错误"))
@@ -1002,6 +1007,10 @@ func (h *Handler) updateConfigs(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("配置数据不能为空"))
 		return
 	}
+	if err := h.checkPasswordLoginSwitch(r, payload); err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
 
 	now := time.Now().UnixMilli()
 	for k, v := range payload {
@@ -1063,6 +1072,10 @@ func (h *Handler) updateSingleConfig(w http.ResponseWriter, r *http.Request) {
 
 	value, err := normalizeAndValidateConfigValue(name, req.Value)
 	if err != nil {
+		response.WriteJSON(w, response.ErrDefault(err.Error()))
+		return
+	}
+	if err := h.checkPasswordLoginSwitch(r, map[string]string{name: value}); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}

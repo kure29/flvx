@@ -20,25 +20,30 @@ type App struct {
 	h      *handler.Handler
 }
 
-func New(cfg config.Config) (*App, error) {
-	var (
-		r   *repo.Repository
-		err error
-	)
-
+// OpenRepository opens the database the config points at.
+func OpenRepository(cfg config.Config) (*repo.Repository, error) {
 	switch strings.ToLower(strings.TrimSpace(cfg.DBType)) {
 	case "", "sqlite":
-		r, err = repo.Open(cfg.DBPath)
+		r, err := repo.Open(cfg.DBPath)
 		if err != nil {
 			return nil, fmt.Errorf("open sqlite: %w", err)
 		}
+		return r, nil
 	case "postgres", "postgresql":
-		r, err = repo.OpenPostgres(cfg.DatabaseURL)
+		r, err := repo.OpenPostgres(cfg.DatabaseURL)
 		if err != nil {
 			return nil, fmt.Errorf("open postgres: %w", err)
 		}
+		return r, nil
 	default:
 		return nil, fmt.Errorf("unsupported DB_TYPE %q", cfg.DBType)
+	}
+}
+
+func New(cfg config.Config) (*App, error) {
+	r, err := OpenRepository(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	h := handler.New(r, cfg.JWTSecret)

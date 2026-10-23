@@ -49,14 +49,18 @@ export default function IndexPage() {
   const [siteKey, setSiteKey] = useState("");
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);
   const [githubEnabled, setGithubEnabled] = useState(false);
+  const [passwordLogin, setPasswordLogin] = useState(true);
   const navigate = useNavigate();
   const isWebView = useWebViewMode();
 
   // The app's WebView can't come back from GitHub, so no button there.
   useEffect(() => {
-    if (isWebView) return;
     getGithubStatus()
-      .then((res) => setGithubEnabled(res.code === 0 && res.data.enabled))
+      .then((res) => {
+        if (res.code !== 0) return;
+        setGithubEnabled(!isWebView && res.data.enabled);
+        setPasswordLogin(res.data.passwordLogin !== false);
+      })
       .catch(() => setGithubEnabled(false));
   }, [isWebView]);
 
@@ -285,56 +289,67 @@ export default function IndexPage() {
             </CardHeader>
             <CardBody className="px-6 py-6 mt-2">
               <div className="flex flex-col gap-5">
-                <Input
-                  classNames={{
-                    inputWrapper:
-                      "bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/30 dark:border-white/10 h-12 shadow-sm rounded-xl",
-                    input: "text-base font-medium",
-                  }}
-                  errorMessage={errors.username}
-                  isDisabled={loading}
-                  isInvalid={!!errors.username}
-                  label="Username"
-                  placeholder="admin"
-                  value={form.username}
-                  variant="bordered"
-                  onChange={(e) =>
-                    handleInputChange("username", e.target.value)
-                  }
-                  onKeyDown={handleKeyPress}
-                />
+                {passwordLogin && (
+                  <>
+                    <Input
+                      classNames={{
+                        inputWrapper:
+                          "bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/30 dark:border-white/10 h-12 shadow-sm rounded-xl",
+                        input: "text-base font-medium",
+                      }}
+                      errorMessage={errors.username}
+                      isDisabled={loading}
+                      isInvalid={!!errors.username}
+                      label="Username"
+                      placeholder="admin"
+                      value={form.username}
+                      variant="bordered"
+                      onChange={(e) =>
+                        handleInputChange("username", e.target.value)
+                      }
+                      onKeyDown={handleKeyPress}
+                    />
 
-                <Input
-                  classNames={{
-                    inputWrapper:
-                      "bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/30 dark:border-white/10 h-12 shadow-sm rounded-xl",
-                    input: "text-base font-medium tracking-wider",
-                  }}
-                  isDisabled={loading}
-                  isInvalid={!!errors.password}
-                  label="Password"
-                  placeholder="••••••••"
-                  type="password"
-                  value={form.password}
-                  variant="bordered"
-                  onChange={(e) =>
-                    handleInputChange("password", e.target.value)
-                  }
-                  onKeyDown={handleKeyPress}
-                />
+                    <Input
+                      classNames={{
+                        inputWrapper:
+                          "bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/30 dark:border-white/10 h-12 shadow-sm rounded-xl",
+                        input: "text-base font-medium tracking-wider",
+                      }}
+                      isDisabled={loading}
+                      isInvalid={!!errors.password}
+                      label="Password"
+                      placeholder="••••••••"
+                      type="password"
+                      value={form.password}
+                      variant="bordered"
+                      onChange={(e) =>
+                        handleInputChange("password", e.target.value)
+                      }
+                      onKeyDown={handleKeyPress}
+                    />
 
-                <Button
-                  className="mt-4 h-12 rounded-xl bg-primary text-white font-bold text-base shadow-[0_8px_16px_rgba(0,122,255,0.3)] transition-transform active:scale-[0.98]"
-                  disabled={loading}
-                  isLoading={loading}
-                  onPress={handleLogin}
-                >
-                  {loading
-                    ? showCaptcha
-                      ? "Verifying..."
-                      : "Signing in..."
-                    : "Sign In"}
-                </Button>
+                    <Button
+                      className="mt-4 h-12 rounded-xl bg-primary text-white font-bold text-base shadow-[0_8px_16px_rgba(0,122,255,0.3)] transition-transform active:scale-[0.98]"
+                      disabled={loading}
+                      isLoading={loading}
+                      onPress={handleLogin}
+                    >
+                      {loading
+                        ? showCaptcha
+                          ? "Verifying..."
+                          : "Signing in..."
+                        : "Sign In"}
+                    </Button>
+                  </>
+                )}
+                {!passwordLogin && (
+                  <p className="text-center text-sm text-default-500">
+                    {githubEnabled
+                      ? "管理员已关闭密码登录"
+                      : "管理员已关闭密码登录，请在浏览器中使用 GitHub 登录"}
+                  </p>
+                )}
                 {passkeyEnabled && (
                   <Button
                     className="h-12 rounded-xl"
@@ -347,9 +362,14 @@ export default function IndexPage() {
                 )}
                 {githubEnabled && (
                   <Button
-                    className="h-12 rounded-xl"
+                    className={
+                      passwordLogin
+                        ? "h-12 rounded-xl"
+                        : "h-12 rounded-xl bg-primary text-white font-bold text-base"
+                    }
                     disabled={loading}
-                    variant="bordered"
+                    isLoading={loading && !passwordLogin}
+                    variant={passwordLogin ? "bordered" : "solid"}
                     onPress={() => void handleGithubLogin()}
                   >
                     使用 GitHub 登录
