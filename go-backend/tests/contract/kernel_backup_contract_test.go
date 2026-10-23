@@ -26,6 +26,10 @@ func TestInboundBackupRoundTripContract(t *testing.T) {
 	}
 	_, forwardID := seedRelayForward(t, r, 1, relayNode, 0, 30005, inboundID)
 	settingsBefore := mustQueryString(t, r, `SELECT settings FROM node_inbound WHERE id = ?`, inboundID)
+	group := saveNodeGroup(t, router, admin, `{"name":"东京组","inboundIds":[`+jsonInt64(inboundID)+`],"options":{"prefix":"[JP] "}}`)
+	if out := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"备份订阅","groupIds":[`+jsonInt64(group)+`]}`); out.Code != 0 {
+		t.Fatalf("subscription: %+v", out)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/backup/export", bytes.NewBufferString(`{"types":["inbounds"]}`))
 	req.Header.Set("Authorization", admin)
@@ -41,7 +45,10 @@ func TestInboundBackupRoundTripContract(t *testing.T) {
 		t.Fatalf("export must carry kernels, inbounds (imported too) and relays: %v", backup["inbounds"])
 	}
 
-	for _, table := range []string{"node_inbound_relay", "node_inbound", "node_kernel"} {
+	if groups, _ := section["nodeGroups"].([]interface{}); len(groups) < 2 { // 我的订阅's group and 东京组
+		t.Fatalf("export must carry node groups: %v", section["nodeGroups"])
+	}
+	for _, table := range []string{"node_inbound_relay", "node_inbound", "node_kernel", "node_group"} {
 		if err := r.DB().Exec(`DELETE FROM ` + table).Error; err != nil {
 			t.Fatal(err)
 		}
@@ -60,6 +67,10 @@ func TestInboundBackupRoundTripContract(t *testing.T) {
 	if mustQueryInt(t, r, `SELECT COUNT(*) FROM node_inbound_relay WHERE inbound_id = ? AND forward_id = ?`, inboundID, forwardID) != 1 {
 		t.Fatal("the relay link must come back")
 	}
+	if mustQueryString(t, r, `SELECT options FROM node_group WHERE id = ?`, group) != `{"lines":"","regions":[],"protocols":[],"include":"","exclude":"","rename":"","addFlag":false,"prefix":"[JP] ","dedupe":false,"sort":"","script":""}` ||
+		mustQueryString(t, r, `SELECT group_ids FROM subscription WHERE name = '备份订阅'`) != jsonInt64(group) {
+		t.Fatal("node groups come back with their ids, still used by the subscription")
+	}
 	if mustQueryString(t, r, `SELECT applied_hash FROM node_kernel WHERE node_id = ?`, landing) != "" {
 		t.Fatal("a restored kernel must be pushed to its node again")
 	}
@@ -68,7 +79,8 @@ func TestInboundBackupRoundTripContract(t *testing.T) {
 	if out := kernelContractPost(t, router, admin, "/api/v1/backup/import", string(raw)); out.Code != 0 {
 		t.Fatalf("re-import: %+v", out)
 	}
-	if mustQueryInt(t, r, `SELECT COUNT(*) FROM node_inbound`) != 2 || mustQueryInt(t, r, `SELECT COUNT(*) FROM node_kernel`) != 1 {
+	if mustQueryInt(t, r, `SELECT COUNT(*) FROM node_inbound`) != 2 || mustQueryInt(t, r, `SELECT COUNT(*) FROM node_kernel`) != 1 ||
+		mustQueryInt(t, r, `SELECT COUNT(*) FROM node_group`) != 2 {
 		t.Fatal("re-import must not duplicate rows")
 	}
 }
