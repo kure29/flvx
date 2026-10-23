@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -40,6 +41,14 @@ func TestRemoteSourceContract(t *testing.T) {
 
 	if out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/save", `{"name":"机场","url":"ftp://x"}`); out.Code == 0 {
 		t.Fatal("non-http url must be rejected")
+	}
+	// The test server is on loopback: refused until the panel allows it.
+	if out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/save",
+		`{"name":"机场","url":"`+srv.URL+`"}`); out.Code == 0 || !strings.Contains(out.Msg, "拉取订阅可访问内网地址") {
+		t.Fatalf("loopback source must be refused: %+v", out)
+	}
+	if err := r.UpsertConfig("fetch_allow_local", "true", time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
 	}
 	out := kernelContractPost(t, router, admin, "/api/v1/subscription/source/save",
 		`{"name":"机场","url":"`+srv.URL+`","intervalHours":12}`)

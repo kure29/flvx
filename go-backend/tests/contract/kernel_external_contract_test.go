@@ -112,6 +112,9 @@ func TestExternalImportFromSubscriptionURLContract(t *testing.T) {
 		_, _ = w.Write([]byte("proxies:\n  - {name: A, type: trojan, server: a.example.com, port: 443, password: pw}\n  - {name: B, type: hysteria2, server: 198.51.100.30, port: 443, password: pw, sni: b.example.com}\n"))
 	}))
 	defer sub.Close()
+	if err := r.UpsertConfig("fetch_allow_local", "true", time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
 
 	out := kernelContractPost(t, router, admin, "/api/v1/inbound/import", `{"links":"`+sub.URL+`/sub","relayOnly":true}`)
 	if out.Code != 0 || len(out.Data.(map[string]interface{})["created"].([]interface{})) != 2 {

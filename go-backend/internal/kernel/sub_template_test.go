@@ -54,9 +54,13 @@ func TestCheckClashTemplate(t *testing.T) {
 	if len(s.Groups[1].Nodes) != 4 {
 		t.Fatalf("include-all without a filter takes every node: %v", s.Groups[1].Nodes)
 	}
-	// Look-behind is Mihomo syntax Go cannot preview; the client still applies it.
-	if s.Groups[3].FilterError == "" || s.Groups[3].Nodes != nil {
-		t.Fatalf("unpreviewable filter: %+v", s.Groups[3])
+	// Look-behind previews like Mihomo (regexp2): "美国" is left out.
+	if s.Groups[3].FilterError != "" || s.Groups[3].Nodes == nil || len(s.Groups[3].Nodes) != 0 {
+		t.Fatalf("look-behind filter: %+v", s.Groups[3])
+	}
+	s, err = CheckTemplate(TemplateClash, "proxy-groups:\n  - {name: a, type: select, include-all: true, filter: \"(港\"}\n", []string{"港"})
+	if err != nil || s.Groups[0].FilterError == "" || s.Groups[0].Nodes != nil {
+		t.Fatalf("unpreviewable filter: %+v %v", s.Groups, err)
 	}
 
 	for tpl, want := range map[string]string{
@@ -322,6 +326,44 @@ rules:
 	}
 	if len(cfg.Groups) != 1 || !strings.Contains(fmt.Sprint(cfg.Groups[0]["proxies"]), "美国 落地 01") || cfg.Proxies[0]["dialer-proxy"] != "香港 中转" {
 		t.Fatalf("shadowrocket chain:\n%s", body)
+	}
+}
+
+// Stash / Shadowrocket groups are written out the way Mihomo would fill
+// them: anchors and merge keys, look-arounds and exclude-type included.
+func TestStashTemplateExpandsLikeMihomo(t *testing.T) {
+	tpl := `base: &base {type: select, include-all: true}
+proxy-groups:
+  - &hk {<<: *base, name: 香港, filter: "港"}
+  - name: 其他
+    type: select
+    include-all: true
+    filter: "^(?!.*(港|美)).*$"
+  - {name: 非 SS, type: select, include-all: true, exclude-type: "Shadowsocks|Http"}
+  - {<<: [*hk, *base], name: 香港备用}
+rules:
+  - MATCH,香港
+`
+	eps := namedEndpoints("香港 01", "美国 01", "德国 01")
+	body, _, err := Subscription(FormatStash, eps, SubOptions{Templates: map[string]string{TemplateStash: tpl}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Groups []map[string]interface{} `yaml:"proxy-groups"`
+	}
+	if err := yaml.Unmarshal([]byte(body), &cfg); err != nil {
+		t.Fatalf("%v\n%s", err, body)
+	}
+	want := map[string]string{"香港": "[香港 01]", "其他": "[德国 01]", "非 SS": "[DIRECT]", "香港备用": "[香港 01]"}
+	if len(cfg.Groups) != len(want) {
+		t.Fatalf("groups:\n%s", body)
+	}
+	for _, g := range cfg.Groups {
+		name, _ := g["name"].(string)
+		if got := fmt.Sprint(g["proxies"]); got != want[name] || g["include-all"] != nil || g["type"] != "select" {
+			t.Errorf("%s: proxies %s, want %s\n%s", name, got, want[name], body)
+		}
 	}
 }
 

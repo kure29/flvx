@@ -72,7 +72,7 @@ func (h *Handler) inboundImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isSubscriptionURL(text) {
-		body, err := fetchSubscription(r.Context(), text)
+		body, err := h.fetchSubscription(r.Context(), text)
 		if err != nil {
 			response.WriteJSON(w, response.ErrDefault("获取订阅失败："+err.Error()))
 			return
@@ -156,14 +156,15 @@ func isSubscriptionURL(text string) bool {
 
 // fetchSubscription downloads a subscription. The Mihomo user agent makes
 // most providers return a Clash profile, which carries every parameter.
-func fetchSubscription(ctx context.Context, rawURL string) (string, error) {
-	body, _, err := fetchSubscriptionInfo(ctx, rawURL)
+func (h *Handler) fetchSubscription(ctx context.Context, rawURL string) (string, error) {
+	body, _, err := h.fetchSubscriptionInfo(ctx, rawURL)
 	return body, err
 }
 
 // fetchSubscriptionInfo is fetchSubscription plus the provider's
-// Subscription-Userinfo header (plan traffic and expiry).
-func fetchSubscriptionInfo(ctx context.Context, rawURL string) (string, string, error) {
+// Subscription-Userinfo header (plan traffic and expiry). It may not reach
+// internal addresses unless allowed (see fetchClient).
+func (h *Handler) fetchSubscriptionInfo(ctx context.Context, rawURL string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
@@ -171,9 +172,9 @@ func fetchSubscriptionInfo(ctx context.Context, rawURL string) (string, string, 
 		return "", "", err
 	}
 	req.Header.Set("User-Agent", "clash.meta/1.19.0")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := fetchClient(h.fetchAllowLocal(), 0).Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", fetchErr(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

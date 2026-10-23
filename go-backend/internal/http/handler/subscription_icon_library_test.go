@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"go-backend/internal/kernel"
 	"go-backend/internal/store/repo"
@@ -26,6 +27,10 @@ func TestIconLibraryAddListDelete(t *testing.T) {
 		_, _ = w.Write([]byte(`{"name":"Mine","icons":[{"name":"YouTube.png","url":"https://x.test/YouTube.png"}]}`))
 	}))
 	t.Cleanup(lib.Close)
+	// The test server is on loopback.
+	if err := r.UpsertConfig(fetchAllowLocalConfigKey, "true", time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
 
 	call := func(fn http.HandlerFunc, body string, out interface{}) (int, string) {
 		w := httptest.NewRecorder()

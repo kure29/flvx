@@ -51,14 +51,14 @@ func (h *Handler) iconLibraries() []iconLibraryRef {
 }
 
 // loadIconLibrary downloads a library, or returns it from the cache.
-func loadIconLibrary(r *http.Request, url string, fresh bool) (kernel.IconLibrary, error) {
+func (h *Handler) loadIconLibrary(r *http.Request, url string, fresh bool) (kernel.IconLibrary, error) {
 	iconLibraryCache.Lock()
 	e, ok := iconLibraryCache.m[url]
 	iconLibraryCache.Unlock()
 	if ok && !fresh && time.Since(e.at) < iconLibraryTTL {
 		return e.lib, nil
 	}
-	body, _, err := fetchSubscriptionInfo(r.Context(), url)
+	body, _, err := h.fetchSubscriptionInfo(r.Context(), url)
 	if err != nil {
 		return kernel.IconLibrary{}, errText("下载图标库失败：" + err.Error())
 	}
@@ -97,7 +97,7 @@ func (h *Handler) subscriptionIconLibraryIcons(w http.ResponseWriter, r *http.Re
 	}
 	for _, l := range h.iconLibraries() {
 		if l.URL == req.URL {
-			lib, err := loadIconLibrary(r, l.URL, false)
+			lib, err := h.loadIconLibrary(r, l.URL, false)
 			if err != nil {
 				response.WriteJSON(w, response.ErrDefault(err.Error()))
 				return
@@ -137,7 +137,7 @@ func (h *Handler) subscriptionIconLibrarySave(w http.ResponseWriter, r *http.Req
 		response.WriteJSON(w, response.ErrDefault("最多添加 20 个图标库"))
 		return
 	}
-	lib, err := loadIconLibrary(r, req.URL, true)
+	lib, err := h.loadIconLibrary(r, req.URL, true)
 	if err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return

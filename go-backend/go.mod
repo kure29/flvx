@@ -3,6 +3,8 @@ module go-backend
 go 1.25.0
 
 require (
+	github.com/dlclark/regexp2/v2 v2.2.1
+	github.com/dop251/goja v0.0.0-20260629171413-2a84ae0cf10d
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-webauthn/webauthn v0.14.0
@@ -16,8 +18,6 @@ require (
 )
 
 require (
-	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
-	github.com/dop251/goja v0.0.0-20260629171413-2a84ae0cf10d // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect

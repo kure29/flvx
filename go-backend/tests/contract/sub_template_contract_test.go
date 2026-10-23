@@ -33,7 +33,7 @@ rules:
 // subscription, rendered into the subscription link, kept while in use.
 func TestSubscriptionTemplateContract(t *testing.T) {
 	secret := "contract-jwt-secret"
-	router, _ := setupContractRouter(t, secret)
+	router, r := setupContractRouter(t, secret)
 	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
 	post := func(path, body string) response.R { return kernelContractPost(t, router, admin, path, body) }
 	allGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"全部","sourceAll":true}`))
@@ -75,6 +75,9 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 		_, _ = w.Write([]byte(remote))
 	}))
 	defer srv.Close()
+	if err := r.UpsertConfig("fetch_allow_local", "true", time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
 	urlTpl := post("/api/v1/subscription/template/save", `{"name":"网址","kind":"singbox","sourceUrl":"`+srv.URL+`"}`)
 	if urlTpl.Code != 0 || !strings.Contains(urlTpl.Data.(map[string]interface{})["content"].(string), "{all}") {
 		t.Fatalf("url template: %+v", urlTpl)

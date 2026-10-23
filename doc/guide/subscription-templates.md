@@ -71,6 +71,7 @@ rules:
 - Stash 没单独选模板时，沿用 Mihomo 的模板；Mihomo 模板里有 `mrs` 规则集（Stash 读不了）时不沿用，改用内置规则
 - **Stash、Shadowrocket** 用 Mihomo 格式的模板，可以和 Mihomo 共用同一个：
   - 这两个客户端不一定认 `include-all` / `filter`，面板会把这类组展开成具体的节点列表（模板里原本写的成员排在前面），一个节点都匹配不到时放一个 `DIRECT`，避免客户端报空组
+  - 展开时和 Mihomo 收节点的规则一致：`filter` 支持 `(?!...)`、`(?<!...)` 这类前后断言（如“其他地区”常用的 `^(?!.*(港|日|美)).*$`），`exclude-type` 按协议排除（如 `Shadowsocks|Http`），用 YAML 锚点 `<<: *xxx` 继承来的 `include-all`、`filter` 也会生效
   - 规则集要用 `yaml` 或 `text` 格式：`mrs` 只有 Mihomo 能读，模板检查时会提醒
   - Shadowrocket 开了链式代理时，落地节点按中转各复制一份（“落地（经 中转）”），和不用模板时一样
   - Shadowrocket 选了模板后下发的是完整配置，订阅详情里的 Shadowrocket 按钮会改为导入配置

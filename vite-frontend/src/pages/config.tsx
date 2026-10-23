@@ -249,6 +249,13 @@ const CONFIG_ITEMS: ConfigItem[] = [
       "普通用户的规则可指向 127.0.0.1、10.x、172.16–31.x、192.168.x 等内网地址；默认关闭，避免成为开放代理",
     type: "switch",
   },
+  {
+    key: "fetch_allow_local",
+    label: "拉取订阅可访问内网地址",
+    description:
+      "订阅源、网址模板和图标库可从 127.0.0.1、10.x、192.168.x 等内网地址下载，例如同机或局域网里的 Sub-Store；默认关闭，避免面板被用来读取内网服务",
+    type: "switch",
+  },
 ];
 
 const BACKUP_TYPE_OPTIONS = [
@@ -292,6 +299,7 @@ const getInitialConfigs = (): Record<string, string> => {
     "github_proxy_enabled",
     "github_proxy_url",
     "allow_local_remote_addr",
+    "fetch_allow_local",
     "hide_footer_brand",
   ];
   const initialConfigs: Record<string, string> = {};
@@ -346,6 +354,7 @@ const SECTION_CONFIG_KEYS: Partial<Record<SectionKey, string[]>> = {
     "github_oauth_secret",
     "admin_password_login_disabled",
     "allow_local_remote_addr",
+    "fetch_allow_local",
   ],
   network: [
     "monitor_tunnel_quality_enabled",
@@ -1584,7 +1593,7 @@ export default function ConfigPage() {
             "allow_local_remote_addr",
             "允许",
             "禁止",
-          )}`}
+          )} · 拉取内网订阅${onOff("fetch_allow_local", "允许", "禁止")}`}
           title="安全与登录"
         >
           {renderItem("captcha_enabled")}
@@ -1595,6 +1604,7 @@ export default function ConfigPage() {
           {renderItem("github_oauth_secret")}
           {renderItem("admin_password_login_disabled")}
           {renderItem("allow_local_remote_addr")}
+          {renderItem("fetch_allow_local")}
         </ConfigSection>
 
         <ConfigSection

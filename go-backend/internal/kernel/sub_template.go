@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/dlclark/regexp2/v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -170,29 +172,24 @@ func templateGroupNames(kind, content string) []string {
 
 // nameFilter matches node names against include / exclude expressions.
 type nameFilter struct {
-	include []*regexp.Regexp
-	exclude []*regexp.Regexp
+	include []*regexp2.Regexp
+	exclude []*regexp2.Regexp
+}
+
+func anyMatch(res []*regexp2.Regexp, name string) bool {
+	for _, re := range res {
+		if ok, _ := re.MatchString(name); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (f nameFilter) keep(name string) bool {
-	if len(f.include) > 0 {
-		ok := false
-		for _, re := range f.include {
-			if re.MatchString(name) {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
+	if len(f.include) > 0 && !anyMatch(f.include, name) {
+		return false
 	}
-	for _, re := range f.exclude {
-		if re.MatchString(name) {
-			return false
-		}
-	}
-	return true
+	return !anyMatch(f.exclude, name)
 }
 
 func (f nameFilter) apply(names []string) []string {
@@ -205,16 +202,24 @@ func (f nameFilter) apply(names []string) []string {
 	return out
 }
 
-func compileAll(exprs []string) ([]*regexp.Regexp, error) {
-	var out []*regexp.Regexp
+// filterMatchTimeout bounds one match, so a backtracking expression cannot
+// stall a subscription.
+const filterMatchTimeout = 100 * time.Millisecond
+
+// compileAll compiles group filters the way Mihomo does (regexp2, which
+// reads lookarounds such as "^(?!.*港).*$"; so do Surge and sing-box's
+// Python-style filters).
+func compileAll(exprs []string) ([]*regexp2.Regexp, error) {
+	var out []*regexp2.Regexp
 	for _, e := range exprs {
 		if strings.TrimSpace(e) == "" {
 			continue
 		}
-		re, err := regexp.Compile(e)
+		re, err := regexp2.Compile(e)
 		if err != nil {
 			return nil, fmt.Errorf("无法预览过滤条件 %q", e)
 		}
+		re.MatchTimeout = filterMatchTimeout
 		out = append(out, re)
 	}
 	return out, nil
@@ -250,6 +255,49 @@ func tplStrings(m *yaml.Node, key string) []string {
 	for _, c := range v.Content {
 		if c.Kind == yaml.ScalarNode {
 			out = append(out, c.Value)
+		}
+	}
+	return out
+}
+
+// tplFlat reads a template group the way Mihomo does: an alias ("- *g")
+// is the node it points to, and "<<" merge keys fold the anchored keys in
+// (the group's own keys win, then earlier merges).
+func tplFlat(n *yaml.Node) *yaml.Node {
+	for n != nil && n.Kind == yaml.AliasNode {
+		n = n.Alias
+	}
+	if n == nil || n.Kind != yaml.MappingNode {
+		return n
+	}
+	var own, merged []*yaml.Node
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		k, v := n.Content[i], n.Content[i+1]
+		if k.Value != "<<" || k.Tag == "!!str" {
+			own = append(own, k, v)
+			continue
+		}
+		srcs := []*yaml.Node{v}
+		if v.Kind == yaml.SequenceNode {
+			srcs = v.Content
+		}
+		for _, src := range srcs {
+			if m := tplFlat(src); m != nil && m.Kind == yaml.MappingNode {
+				merged = append(merged, m.Content...)
+			}
+		}
+	}
+	if merged == nil {
+		return n
+	}
+	out := &yaml.Node{Kind: yaml.MappingNode, Tag: n.Tag, Style: n.Style, Line: n.Line, Column: n.Column}
+	seen := map[string]bool{}
+	for _, list := range [][]*yaml.Node{own, merged} {
+		for i := 0; i+1 < len(list); i += 2 {
+			if !seen[list[i].Value] {
+				seen[list[i].Value] = true
+				out.Content = append(out.Content, list[i], list[i+1])
+			}
 		}
 	}
 	return out
@@ -308,6 +356,7 @@ func checkClashTemplate(content string, names []string) (TemplateSummary, error)
 		return s, errors.New("模板里没有 proxy-groups")
 	}
 	for _, g := range groups.Content {
+		g = tplFlat(g)
 		name := tplScalar(g, "name")
 		if name == "" {
 			return s, errors.New("有策略组没有 name")
@@ -408,8 +457,10 @@ var autoKeys = map[string]bool{"include-all": true, "include-all-proxies": true,
 
 // expandedGroup writes out an auto group's nodes (its own members first),
 // for clients that don't fill include-all groups; nil for other groups. A
-// filter Go can't read keeps every node.
-func expandedGroup(g *yaml.Node, names []string) yamlNode {
+// filter that does not compile keeps every node. types maps node names to
+// their Mihomo proxy type, for exclude-type.
+func expandedGroup(g *yaml.Node, names []string, types map[string]string) yamlNode {
+	g = tplFlat(g)
 	if tplScalar(g, "include-all") != "true" && tplScalar(g, "include-all-proxies") != "true" {
 		return nil
 	}
@@ -419,6 +470,7 @@ func expandedGroup(g *yaml.Node, names []string) yamlNode {
 	if errors.Join(err1, err2) == nil {
 		picked = nameFilter{include: inc, exclude: exc}.apply(names)
 	}
+	picked = excludeTypes(picked, tplScalar(g, "exclude-type"), types)
 	seen := map[string]bool{}
 	list := []interface{}{}
 	for _, m := range append(tplStrings(g, "proxies"), picked...) {
@@ -451,6 +503,57 @@ func expandedGroup(g *yaml.Node, names []string) yamlNode {
 	return out
 }
 
+// mihomoAdapterType is the adapter type name Mihomo's exclude-type matches
+// (case-insensitively) for a proxy's "type".
+func mihomoAdapterType(typ string) string {
+	switch typ = strings.ToLower(typ); typ {
+	case "ss":
+		return "shadowsocks"
+	case "ssr":
+		return "shadowsocksr"
+	}
+	return typ
+}
+
+// excludeTypes drops the names whose type is in spec ("Shadowsocks|Http").
+func excludeTypes(names []string, spec string, types map[string]string) []string {
+	drop := map[string]bool{}
+	for _, t := range strings.Split(spec, "|") {
+		if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
+			drop[t] = true
+		}
+	}
+	if len(drop) == 0 {
+		return names
+	}
+	out := []string{}
+	for _, n := range names {
+		if !drop[mihomoAdapterType(types[n])] {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// proxyTypes maps rendered proxies' names to their type.
+func proxyTypes(proxies []interface{}) map[string]string {
+	out := map[string]string{}
+	for _, p := range proxies {
+		node, _ := p.(yamlNode)
+		var name, typ string
+		for _, f := range node {
+			switch f.Key {
+			case "name":
+				name, _ = f.Value.(string)
+			case "type":
+				typ, _ = f.Value.(string)
+			}
+		}
+		out[name] = typ
+	}
+	return out
+}
+
 // clashTemplateProfile renders a Mihomo-format template for Mihomo, or for
 // Stash / Shadowrocket (slot), which get their auto groups written out;
 // Shadowrocket also gets its own node list (chained copies, no VLESS
@@ -474,12 +577,17 @@ func clashTemplateProfile(content string, endpoints []Endpoint, slot string, hid
 		proxies, names, chainGroupNodes, hidden = clashTemplateProxies(endpoints, hideRelays)
 	}
 	expand := slot == TemplateStash || slot == TemplateShadowrocket || hidden
+	types := proxyTypes(proxies)
 	groups, gi := tplMapGet(root, "proxy-groups")
-	if root.Style&yaml.FlowStyle != 0 || groups == nil || groups.Kind != yaml.SequenceNode || groups.Style&yaml.FlowStyle != 0 {
+	if root.Style&yaml.FlowStyle != 0 || groups == nil || groups.Kind != yaml.SequenceNode || groups.Style&yaml.FlowStyle != 0 ||
+		(expand && expandsAnchor(groups, names, types)) {
+		// Through the encoder: a rewritten group that carries an anchor
+		// keeps it, so the aliases pointing at it stay valid.
 		if expand && groups != nil && groups.Kind == yaml.SequenceNode {
 			for i, g := range groups.Content {
-				if x := expandedGroup(g, names); x != nil {
+				if x := expandedGroup(g, names, types); x != nil {
 					if n, err := tplValue(x); err == nil {
+						n.Anchor = g.Anchor
 						groups.Content[i] = n
 					}
 				}
@@ -506,7 +614,7 @@ func clashTemplateProfile(content string, endpoints []Endpoint, slot string, hid
 	if expand {
 		end := clashBlockEnd(root, gi, lines)
 		for i, g := range groups.Content {
-			x := expandedGroup(g, names)
+			x := expandedGroup(g, names, types)
 			if x == nil {
 				continue
 			}
@@ -550,6 +658,20 @@ func clashTemplateProfile(content string, endpoints []Endpoint, slot string, hid
 		out += "\n"
 	}
 	return out, nil
+}
+
+// expandsAnchor reports whether a group to be written out carries an
+// anchor that text splicing would drop.
+func expandsAnchor(groups *yaml.Node, names []string, types map[string]string) bool {
+	if groups == nil || groups.Kind != yaml.SequenceNode {
+		return false
+	}
+	for _, g := range groups.Content {
+		if g.Anchor != "" && expandedGroup(g, names, types) != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // clashTemplateProxies renders Mihomo / Stash proxies, with the chain

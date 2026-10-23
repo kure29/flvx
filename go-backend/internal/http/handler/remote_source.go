@@ -97,7 +97,7 @@ func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource,
 		}
 	} else {
 		var err error
-		if body, userinfo, err = fetchSubscriptionInfo(ctx, src.URL); err != nil {
+		if body, userinfo, err = h.fetchSubscriptionInfo(ctx, src.URL); err != nil {
 			return fail(fmt.Errorf("获取订阅失败：%v", err))
 		}
 	}
