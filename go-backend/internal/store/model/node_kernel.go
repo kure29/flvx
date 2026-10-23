@@ -85,7 +85,11 @@ type RemoteSource struct {
 	NodeCount int    `gorm:"column:node_count;not null;default:0"`
 	// Userinfo is the provider's Subscription-Userinfo header (traffic and
 	// expiry of the airport plan), shown as is.
-	Userinfo    string `gorm:"type:varchar(255);not null;default:''"`
+	Userinfo string `gorm:"type:varchar(255);not null;default:''"`
+	// UserAgent is sent when fetching; "" uses the panel's default (see
+	// defaultFetchUserAgent). Some providers pick the format or the nodes
+	// by it.
+	UserAgent   string `gorm:"column:user_agent;type:varchar(255);not null;default:''"`
 	CreatedTime int64  `gorm:"column:created_time;not null"`
 	UpdatedTime int64  `gorm:"column:updated_time;not null"`
 }

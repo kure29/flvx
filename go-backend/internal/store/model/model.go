@@ -548,6 +548,7 @@ type RemoteSourceBackup struct {
 	RelayOnly     int    `json:"relayOnly"`
 	Kind          string `json:"kind,omitempty"`
 	Role          string `json:"role,omitempty"`
+	UserAgent     string `json:"userAgent,omitempty"`
 	Enabled       int    `json:"enabled"`
 	CreatedTime   int64  `json:"createdTime"`
 }

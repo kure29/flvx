@@ -77,6 +77,7 @@ interface SourceDraft {
   role: RemoteSourceRole;
   intervalHours: number;
   relayOnly: boolean;
+  userAgent: string;
   /** A newly chosen file (file sources). */
   content?: string;
   fileName?: string;
@@ -90,6 +91,7 @@ const draftOf = (s: RemoteSourceItem): SourceDraft => ({
   role: s.role,
   intervalHours: s.intervalHours,
   relayOnly: s.relayOnly,
+  userAgent: s.userAgent ?? "",
 });
 
 function ago(ms: number): string {
@@ -204,6 +206,7 @@ export function RemoteSourcesSection({
         role: draft.role,
         intervalHours: draft.intervalHours,
         relayOnly: draft.relayOnly,
+        userAgent: draft.kind === "url" ? draft.userAgent.trim() : "",
         content: draft.kind === "file" ? draft.content : undefined,
       };
       const res = await saveRemoteSource(data);
@@ -258,6 +261,7 @@ export function RemoteSourcesSection({
               role: "",
               intervalHours: 12,
               relayOnly: false,
+              userAgent: "",
             })
           }
         >
@@ -464,6 +468,18 @@ export function RemoteSourcesSection({
                         }
                       />
                     </div>
+                  )}
+                  {draft.kind === "url" && (
+                    <Input
+                      description="拉取订阅时发送的 UA。有的机场按 UA 决定返回的格式或节点，拿不到节点或缺节点时可以换成客户端的 UA，比如 mihomo/1.19.0、Shadowrocket/2070；留空用默认的 clash.meta/1.19.0"
+                      label="User-Agent（可选）"
+                      placeholder="clash.meta/1.19.0"
+                      value={draft.userAgent}
+                      variant="bordered"
+                      onChange={(e) =>
+                        setDraft({ ...draft, userAgent: e.target.value })
+                      }
+                    />
                   )}
                   <p className="text-xs text-default-500">
                     {draft.kind === "url" ? "更新" : "重新上传"}

@@ -1036,6 +1036,8 @@ export interface RemoteSourceItem {
   nodeCount: number;
   /** The provider's Subscription-Userinfo header. */
   userinfo: string;
+  /** Sent when fetching; "" uses the panel's default (a Mihomo UA). */
+  userAgent: string;
 }
 export interface RemoteSyncResult {
   added: number;
@@ -1057,6 +1059,7 @@ export const saveRemoteSource = (data: {
   intervalHours: number;
   relayOnly: boolean;
   enabled?: boolean;
+  userAgent?: string;
 }) =>
   Network.post<
     RemoteSourceItem | { source: RemoteSourceItem; result: RemoteSyncResult }

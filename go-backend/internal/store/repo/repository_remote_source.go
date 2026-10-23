@@ -38,7 +38,7 @@ func (r *Repository) SaveRemoteSource(s *model.RemoteSource) error {
 	}
 	return r.db.Model(&model.RemoteSource{}).Where("id = ?", s.ID).Updates(map[string]interface{}{
 		"name": s.Name, "url": s.URL, "interval_hours": s.IntervalHours, "relay_only": s.RelayOnly,
-		"kind": s.Kind, "role": s.Role, "enabled": s.Enabled, "updated_time": s.UpdatedTime,
+		"kind": s.Kind, "role": s.Role, "user_agent": s.UserAgent, "enabled": s.Enabled, "updated_time": s.UpdatedTime,
 	}).Error
 }
 

@@ -69,7 +69,7 @@ func (r *Repository) exportInbounds() (*model.InboundsBackup, error) {
 	for _, src := range sources {
 		out.Sources = append(out.Sources, model.RemoteSourceBackup{
 			ID: src.ID, Name: src.Name, URL: src.URL, IntervalHours: src.IntervalHours,
-			RelayOnly: src.RelayOnly, Kind: src.Kind, Role: src.Role, Enabled: src.Enabled, CreatedTime: src.CreatedTime,
+			RelayOnly: src.RelayOnly, Kind: src.Kind, Role: src.Role, UserAgent: src.UserAgent, Enabled: src.Enabled, CreatedTime: src.CreatedTime,
 		})
 	}
 	var templates []model.SubscriptionTemplate
@@ -145,11 +145,11 @@ func importInbounds(tx *gorm.DB, b *model.InboundsBackup, now int64) (int, error
 		}
 		item := model.RemoteSource{
 			ID: src.ID, Name: src.Name, URL: src.URL, IntervalHours: src.IntervalHours,
-			RelayOnly: src.RelayOnly, Kind: kind, Role: src.Role, Enabled: src.Enabled, CreatedTime: src.CreatedTime, UpdatedTime: now,
+			RelayOnly: src.RelayOnly, Kind: kind, Role: src.Role, UserAgent: src.UserAgent, Enabled: src.Enabled, CreatedTime: src.CreatedTime, UpdatedTime: now,
 		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"name", "url", "interval_hours", "relay_only", "kind", "role", "enabled", "updated_time"}),
+			DoUpdates: clause.AssignmentColumns([]string{"name", "url", "interval_hours", "relay_only", "kind", "role", "user_agent", "enabled", "updated_time"}),
 		}).Create(&item).Error; err != nil {
 			return 0, err
 		}

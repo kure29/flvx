@@ -123,7 +123,7 @@ func (h *Handler) checkPipelineTemplates(p subPipeline) error {
 
 // fetchTemplate downloads a template's content.
 func (h *Handler) fetchTemplate(ctx context.Context, url string) (string, error) {
-	body, _, err := h.fetchSubscriptionInfo(ctx, url)
+	body, _, err := h.fetchSubscriptionInfo(ctx, url, "")
 	if err != nil {
 		return "", errText("下载模板失败：" + err.Error())
 	}

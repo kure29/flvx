@@ -157,21 +157,29 @@ func isSubscriptionURL(text string) bool {
 // fetchSubscription downloads a subscription. The Mihomo user agent makes
 // most providers return a Clash profile, which carries every parameter.
 func (h *Handler) fetchSubscription(ctx context.Context, rawURL string) (string, error) {
-	body, _, err := h.fetchSubscriptionInfo(ctx, rawURL)
+	body, _, err := h.fetchSubscriptionInfo(ctx, rawURL, "")
 	return body, err
 }
 
+// defaultFetchUserAgent is the Mihomo user agent downloads send unless a
+// source sets its own.
+const defaultFetchUserAgent = "clash.meta/1.19.0"
+
 // fetchSubscriptionInfo is fetchSubscription plus the provider's
-// Subscription-Userinfo header (plan traffic and expiry). It may not reach
-// internal addresses unless allowed (see fetchClient).
-func (h *Handler) fetchSubscriptionInfo(ctx context.Context, rawURL string) (string, string, error) {
+// Subscription-Userinfo header (plan traffic and expiry), sent with
+// userAgent ("" for the default). It may not reach internal addresses
+// unless allowed (see fetchClient).
+func (h *Handler) fetchSubscriptionInfo(ctx context.Context, rawURL, userAgent string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", "", err
 	}
-	req.Header.Set("User-Agent", "clash.meta/1.19.0")
+	if userAgent == "" {
+		userAgent = defaultFetchUserAgent
+	}
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := fetchClient(h.fetchAllowLocal(), 0).Do(req)
 	if err != nil {
 		return "", "", fetchErr(err)

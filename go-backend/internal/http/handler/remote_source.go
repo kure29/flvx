@@ -37,13 +37,14 @@ type remoteSourceView struct {
 	LastError     string `json:"lastError"`
 	NodeCount     int    `json:"nodeCount"`
 	Userinfo      string `json:"userinfo"`
+	UserAgent     string `json:"userAgent"`
 }
 
 func remoteSourceViewOf(s *model.RemoteSource) remoteSourceView {
 	return remoteSourceView{
 		ID: s.ID, Name: s.Name, URL: s.URL, Kind: sourceKind(s), Role: s.Role, IntervalHours: s.IntervalHours, RelayOnly: s.RelayOnly == 1,
 		Enabled: s.Enabled == 1, LastFetch: s.LastFetch, LastError: s.LastError, NodeCount: s.NodeCount,
-		Userinfo: s.Userinfo,
+		Userinfo: s.Userinfo, UserAgent: s.UserAgent,
 	}
 }
 
@@ -97,7 +98,7 @@ func (h *Handler) syncRemoteSource(ctx context.Context, src *model.RemoteSource,
 		}
 	} else {
 		var err error
-		if body, userinfo, err = h.fetchSubscriptionInfo(ctx, src.URL); err != nil {
+		if body, userinfo, err = h.fetchSubscriptionInfo(ctx, src.URL, src.UserAgent); err != nil {
 			return fail(fmt.Errorf("获取订阅失败：%v", err))
 		}
 	}
@@ -290,6 +291,8 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 		IntervalHours int    `json:"intervalHours"`
 		RelayOnly     bool   `json:"relayOnly"`
 		Enabled       *bool  `json:"enabled"`
+		// UserAgent is sent when fetching; "" uses the default.
+		UserAgent string `json:"userAgent"`
 	}
 	// A JSON-escaped file can be larger than the file itself.
 	if err := decodeJSON(http.MaxBytesReader(w, r.Body, 2*maxSubscriptionBytes), &req); err != nil {
@@ -316,6 +319,11 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("请填写 http(s) 订阅地址"))
 		return
 	}
+	req.UserAgent = strings.TrimSpace(req.UserAgent)
+	if len(req.UserAgent) > 255 || strings.ContainsFunc(req.UserAgent, func(c rune) bool { return c < 0x20 || c == 0x7f }) {
+		response.WriteJSON(w, response.ErrDefault("User-Agent 不正确（一行文字，最多 255 个字符）"))
+		return
+	}
 	if req.IntervalHours < 0 || req.IntervalHours > 24*7 {
 		response.WriteJSON(w, response.ErrDefault("更新间隔不正确"))
 		return
@@ -330,7 +338,7 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Kind == model.RemoteSourceFile {
-		req.URL, req.IntervalHours = "", 0
+		req.URL, req.IntervalHours, req.UserAgent = "", 0, ""
 		if strings.TrimSpace(req.Content) == "" && (src.ID == 0 || sourceKind(src) != model.RemoteSourceFile) {
 			response.WriteJSON(w, response.ErrDefault("请选择订阅文件"))
 			return
@@ -338,8 +346,10 @@ func (h *Handler) remoteSourceSave(w http.ResponseWriter, r *http.Request) {
 	} else {
 		req.Content = ""
 	}
-	fetch := src.ID == 0 || src.URL != req.URL || sourceKind(src) != req.Kind || req.Content != ""
+	fetch := src.ID == 0 || src.URL != req.URL || sourceKind(src) != req.Kind || req.Content != "" ||
+		(req.Kind == model.RemoteSourceURL && src.UserAgent != req.UserAgent)
 	src.Name, src.URL, src.IntervalHours, src.Kind, src.Role = req.Name, req.URL, req.IntervalHours, req.Kind, req.Role
+	src.UserAgent = req.UserAgent
 	src.RelayOnly = boolToInt(req.RelayOnly)
 	if req.Enabled != nil {
 		src.Enabled = boolToInt(*req.Enabled)

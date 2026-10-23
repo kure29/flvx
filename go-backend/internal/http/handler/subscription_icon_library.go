@@ -58,7 +58,7 @@ func (h *Handler) loadIconLibrary(r *http.Request, url string, fresh bool) (kern
 	if ok && !fresh && time.Since(e.at) < iconLibraryTTL {
 		return e.lib, nil
 	}
-	body, _, err := h.fetchSubscriptionInfo(r.Context(), url)
+	body, _, err := h.fetchSubscriptionInfo(r.Context(), url, "")
 	if err != nil {
 		return kernel.IconLibrary{}, errText("下载图标库失败：" + err.Error())
 	}
