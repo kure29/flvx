@@ -47,6 +47,7 @@ import {
 import { ConfigSection, Field, SubHeading } from "@/pages/config/section";
 import { isAdmin } from "@/utils/auth";
 import { getCachedConfigs, configCache, updateSiteConfig } from "@/config/site";
+import { githubCallbackUrl } from "@/utils/github-login";
 import {
   DEFAULT_TUNNEL_QUALITY_INTERVAL_SEC,
   MAX_TUNNEL_QUALITY_INTERVAL_SEC,
@@ -202,8 +203,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
     key: "github_oauth_client_id",
     label: "GitHub OAuth App Client ID",
     placeholder: "Ov23li...",
-    description:
-      "在 GitHub → Settings → Developer settings → OAuth Apps 新建，Authorization callback URL 填面板网址根路径，例如 https://panel.example.com/",
+    description: `在 GitHub → Settings → Developer settings → OAuth Apps 新建，Authorization callback URL 只填这一个：${githubCallbackUrl()}`,
     type: "input",
     dependsOn: "github_login_enabled",
     dependsValue: "true",

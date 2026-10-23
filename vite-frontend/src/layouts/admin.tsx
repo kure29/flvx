@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { AnimatePresence, motion } from "framer-motion";
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut, UserRound } from "lucide-react";
 
 import { Button } from "@/shadcn-bridge/heroui/button";
 import {
@@ -518,6 +518,13 @@ export default function AdminLayout({
           {!isMobile && (
             <div className="flex flex-col gap-1">
               {[
+                // Login methods (passkey, GitHub) live on the account page.
+                {
+                  key: "account",
+                  label: "账户与登录",
+                  icon: UserRound,
+                  onPress: () => navigate("/profile"),
+                },
                 {
                   key: "password",
                   label: "修改密码",

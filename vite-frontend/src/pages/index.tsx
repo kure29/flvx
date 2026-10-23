@@ -20,15 +20,10 @@ import {
   finishPasskeyLogin,
   getGithubStatus,
   beginGithubLogin,
-  finishGithubLogin,
 } from "@/api";
 import { writeLoginSession } from "@/utils/session";
 import { getPasskey } from "@/utils/passkey";
-import {
-  githubRedirectUri,
-  goToGithub,
-  takeGithubCallback,
-} from "@/utils/github-login";
+import { githubCallbackUrl, goToGithub } from "@/utils/github-login";
 import { useWebViewMode } from "@/hooks/useWebViewMode";
 
 interface LoginForm {
@@ -60,38 +55,10 @@ export default function IndexPage() {
       .catch(() => setGithubEnabled(false));
   }, [isWebView]);
 
-  // Back from GitHub with ?code&state.
-  useEffect(() => {
-    const callback = takeGithubCallback("login");
-
-    if (!callback) return;
-    if ("error" in callback) {
-      toast.error(callback.error);
-
-      return;
-    }
-    setLoading(true);
-    finishGithubLogin(callback.code, callback.state)
-      .then((result) => {
-        if (result.code !== 0) {
-          toast.error(result.msg || "GitHub 登录失败", { duration: 6000 });
-
-          return;
-        }
-        writeLoginSession(result.data);
-        toast.success("登录成功");
-        navigate(
-          result.data.requirePasswordChange ? "/change-password" : "/dashboard",
-        );
-      })
-      .catch(() => toast.error("GitHub 登录失败"))
-      .finally(() => setLoading(false));
-  }, [navigate]);
-
   const handleGithubLogin = async () => {
     setLoading(true);
     try {
-      const res = await beginGithubLogin(githubRedirectUri("login"));
+      const res = await beginGithubLogin(githubCallbackUrl());
 
       if (res.code !== 0) {
         toast.error(res.msg || "无法使用 GitHub 登录");

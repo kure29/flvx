@@ -36,6 +36,7 @@ const SubscriptionPage = lazy(() => import("@/pages/subscription"));
 const MySubscriptionsPage = lazy(() => import("@/pages/my-subscriptions"));
 const ConfigPage = lazy(() => import("@/pages/config"));
 const PanelSharingPage = lazy(() => import("@/pages/panel-sharing"));
+const GithubCallbackPage = lazy(() => import("@/pages/github-callback"));
 
 const ProtectedRoute = ({
   children,
@@ -180,6 +181,14 @@ function App() {
     <AnimatePresence mode="wait">
       <Routes key={location.pathname} location={location}>
         <Route element={<LoginRoute />} path="/" />
+        <Route
+          element={
+            <Suspense fallback={<PageLoadingState message="正在加载..." />}>
+              <GithubCallbackPage />
+            </Suspense>
+          }
+          path="/github-callback"
+        />
         <Route
           element={
             <ProtectedRoute skipLayout={true}>

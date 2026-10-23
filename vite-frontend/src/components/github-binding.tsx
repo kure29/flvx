@@ -1,73 +1,40 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { Github } from "lucide-react";
 
-import { Card, CardBody } from "@/shadcn-bridge/heroui/card";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Input } from "@/shadcn-bridge/heroui/input";
 import {
-  beginGithubBind,
-  finishGithubBind,
-  getGithubInfo,
-  unbindGithub,
-  type GithubInfo,
-} from "@/api";
-import { useWebViewMode } from "@/hooks/useWebViewMode";
-import {
-  githubRedirectUri,
-  goToGithub,
-  takeGithubCallback,
-} from "@/utils/github-login";
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@/shadcn-bridge/heroui/modal";
+import { beginGithubBind, unbindGithub, type GithubInfo } from "@/api";
+import { githubCallbackUrl, goToGithub } from "@/utils/github-login";
 
-/** Binds the GitHub account used for GitHub login (profile page). */
-export function GithubBinding() {
-  const [info, setInfo] = useState<GithubInfo | null>(null);
+/** Binds or unbinds the GitHub account used for GitHub login. */
+export function GithubBindingModal({
+  info,
+  isOpen,
+  onClose,
+  onChanged,
+}: {
+  info: GithubInfo | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const isWebView = useWebViewMode();
-
-  const refresh = () =>
-    getGithubInfo()
-      .then((res) => {
-        if (res.code === 0) setInfo(res.data);
-      })
-      .catch(() => setInfo(null));
+  const bound = Boolean(info?.bound);
 
   useEffect(() => {
-    const callback = takeGithubCallback("bind");
+    if (isOpen) setPassword("");
+  }, [isOpen]);
 
-    if (!callback) {
-      void refresh();
-
-      return;
-    }
-    if ("error" in callback) {
-      toast.error(callback.error);
-      void refresh();
-
-      return;
-    }
-    setBusy(true);
-    finishGithubBind(callback.code, callback.state)
-      .then((res) => {
-        if (res.code !== 0) {
-          toast.error(res.msg || "绑定失败", { duration: 6000 });
-
-          return;
-        }
-        toast.success(`已绑定 GitHub 账号 ${res.data.login}`);
-      })
-      .catch(() => toast.error("绑定失败"))
-      .finally(() => {
-        setBusy(false);
-        void refresh();
-      });
-  }, []);
-
-  // Hidden until an admin turns GitHub login on, unless already bound so
-  // the user can still unbind.
-  if (!info || isWebView || (!info.enabled && !info.bound)) return null;
-
-  const bind = async () => {
+  const submit = async () => {
     if (!password) {
       toast.error("请输入当前密码");
 
@@ -75,29 +42,20 @@ export function GithubBinding() {
     }
     setBusy(true);
     try {
-      const res = await beginGithubBind(githubRedirectUri("bind"), password);
+      if (!bound) {
+        const res = await beginGithubBind(githubCallbackUrl(), password);
 
-      if (res.code !== 0) {
-        toast.error(res.msg || "无法绑定 GitHub");
-        setBusy(false);
+        if (res.code !== 0) {
+          toast.error(res.msg || "无法绑定 GitHub");
+          setBusy(false);
+
+          return;
+        }
+        // Leaves the page; GitHub comes back to /github-callback.
+        goToGithub("bind", res.data.url);
 
         return;
       }
-      goToGithub("bind", res.data.url);
-    } catch {
-      toast.error("无法绑定 GitHub");
-      setBusy(false);
-    }
-  };
-
-  const unbind = async () => {
-    if (!password) {
-      toast.error("请输入当前密码以解绑");
-
-      return;
-    }
-    setBusy(true);
-    try {
       const res = await unbindGithub(password);
 
       if (res.code !== 0) {
@@ -106,49 +64,69 @@ export function GithubBinding() {
         return;
       }
       toast.success("已解绑 GitHub 账号");
-      setPassword("");
-      await refresh();
+      onChanged();
+      onClose();
     } catch {
-      toast.error("解绑失败");
+      toast.error(bound ? "解绑失败" : "无法绑定 GitHub");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Card>
-      <CardBody className="p-4 space-y-4">
-        <div>
-          <h3 className="text-base font-medium">GitHub 登录</h3>
-          <p className="text-sm text-default-500">
-            {info.bound
-              ? `已绑定 GitHub 账号 ${info.login}，可在登录页使用 GitHub 登录。`
-              : "绑定后可在登录页使用 GitHub 账号登录。"}
-            绑定和解绑均需输入当前密码。
-          </p>
-        </div>
-        <Input
-          label="当前密码"
-          type="password"
-          value={password}
-          variant="bordered"
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {info.bound ? (
+    <Modal
+      backdrop="blur"
+      classNames={{
+        base: "!w-[calc(100%-32px)] !mx-auto sm:!w-full rounded-2xl overflow-hidden",
+      }}
+      isOpen={isOpen}
+      placement="center"
+      size="md"
+      onClose={onClose}
+    >
+      <ModalContent>
+        <ModalHeader>GitHub 登录</ModalHeader>
+        <ModalBody>
+          <div className="flex items-center gap-3 rounded-xl bg-default-100 px-3 py-3">
+            <Github className="h-5 w-5 shrink-0 text-default-600" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">
+                {bound ? info?.login : "未绑定"}
+              </div>
+              <div className="text-xs text-default-500">
+                {bound
+                  ? `绑定于 ${new Date(info?.createdAt || 0).toLocaleDateString()}，可在登录页用 GitHub 登录`
+                  : "绑定后可在登录页用 GitHub 账号登录"}
+              </div>
+            </div>
+          </div>
+          <Input
+            autoComplete="current-password"
+            label="当前密码"
+            placeholder={bound ? "输入当前密码以解绑" : "输入当前密码以绑定"}
+            type="password"
+            value={password}
+            variant="bordered"
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void submit();
+            }}
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="light" onPress={onClose}>
+            取消
+          </Button>
           <Button
-            color="danger"
-            disabled={busy}
-            variant="flat"
-            onPress={() => void unbind()}
+            color={bound ? "danger" : "primary"}
+            isLoading={busy}
+            variant={bound ? "flat" : "solid"}
+            onPress={() => void submit()}
           >
-            解绑 GitHub
+            {bound ? "解绑" : "去 GitHub 授权"}
           </Button>
-        ) : (
-          <Button disabled={busy} onPress={() => void bind()}>
-            绑定 GitHub 账号
-          </Button>
-        )}
-      </CardBody>
-    </Card>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 }

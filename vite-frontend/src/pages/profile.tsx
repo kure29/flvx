@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
-  Activity,
   ChevronRight,
+  Fingerprint,
+  Github,
   KeyRound,
   LogOut,
   Settings,
@@ -25,11 +26,18 @@ import { Input } from "@/shadcn-bridge/heroui/input";
 import { isWebViewFunc } from "@/utils/panel";
 import { siteConfig } from "@/config/site";
 import { VersionFooter } from "@/components/version-footer";
-import { updatePassword } from "@/api";
+import {
+  getGithubInfo,
+  getPasskeyStatus,
+  listPasskeys,
+  updatePassword,
+  type GithubInfo,
+  type PasskeyItem,
+} from "@/api";
 import { safeLogout } from "@/utils/logout";
 import { getAdminFlag, getSessionName } from "@/utils/session";
-import { PasskeyManager } from "@/components/passkey-manager";
-import { GithubBinding } from "@/components/github-binding";
+import { PasskeyModal } from "@/components/passkey-manager";
+import { GithubBindingModal } from "@/components/github-binding";
 import { PageHeader } from "@/components/page-kit";
 
 interface PasswordForm {
@@ -43,15 +51,19 @@ interface MenuItem {
   key: string;
   label: string;
   description?: string;
+  /** Shown on the right, e.g. a binding's state. */
+  value?: string;
   icon: LucideIcon;
   danger?: boolean;
   onPress: () => void;
 }
 
-function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
+function MenuGroup({ title, items }: { title?: string; items: MenuItem[] }) {
   return (
     <section className="space-y-1.5">
-      <h2 className="px-1 text-xs font-medium text-default-500">{title}</h2>
+      {title && (
+        <h2 className="px-1 text-xs font-medium text-default-500">{title}</h2>
+      )}
       <div className="divide-y divide-divider overflow-hidden rounded-xl border border-divider bg-content1">
         {items.map((item) => {
           const Icon = item.icon;
@@ -78,6 +90,11 @@ function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
                   </div>
                 )}
               </div>
+              {item.value && (
+                <span className="max-w-[45%] shrink-0 truncate text-xs text-default-500">
+                  {item.value}
+                </span>
+              )}
               {!item.danger && (
                 <ChevronRight className="h-4 w-4 shrink-0 text-default-300" />
               )}
@@ -102,23 +119,50 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
 
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
+  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
+  const [github, setGithub] = useState<GithubInfo | null>(null);
+  const [openLogin, setOpenLogin] = useState<"passkey" | "github" | null>(null);
+  // The app's WebView can't do passkeys or come back from GitHub.
+  const webView = isWebViewFunc();
+
+  const loadPasskeys = () =>
+    listPasskeys()
+      .then((res) => {
+        if (res.code === 0) setPasskeys(res.data || []);
+      })
+      .catch(() => setPasskeys([]));
+  const loadGithub = () =>
+    getGithubInfo()
+      .then((res) => {
+        if (res.code === 0) setGithub(res.data);
+      })
+      .catch(() => setGithub(null));
+
   useEffect(() => {
     // 获取用户信息
     setUsername(getSessionName() || "Admin");
     setIsAdmin(getAdminFlag());
+    void loadGithub();
+    if (
+      window.isSecureContext &&
+      typeof window.PublicKeyCredential !== "undefined"
+    ) {
+      getPasskeyStatus()
+        .then((res) => {
+          if (res.code === 0 && res.data.enabled) {
+            setPasskeyEnabled(true);
+            void loadPasskeys();
+          }
+        })
+        .catch(() => setPasskeyEnabled(false));
+    }
   }, []);
 
   const go = (path: string) => () => navigate(path);
 
   // 管理员菜单项
   const adminMenuItems: MenuItem[] = [
-    {
-      key: "/monitor",
-      label: "监控",
-      description: "节点与隧道监控",
-      icon: Activity,
-      onPress: go("/monitor"),
-    },
     {
       key: "/panel-sharing",
       label: "面板共享",
@@ -217,6 +261,32 @@ export default function ProfilePage() {
 
   const accountMenuItems: MenuItem[] = [
     { key: "password", label: "修改密码", icon: KeyRound, onPress: onOpen },
+    ...(passkeyEnabled && !webView
+      ? [
+          {
+            key: "passkey",
+            label: "通行证密钥",
+            value: passkeys.length > 0 ? `${passkeys.length} 个` : "未绑定",
+            icon: Fingerprint,
+            onPress: () => setOpenLogin("passkey"),
+          },
+        ]
+      : []),
+    // Shown once an admin turns GitHub login on, or while still bound so
+    // the user can unbind.
+    ...(github && !webView && (github.enabled || github.bound)
+      ? [
+          {
+            key: "github",
+            label: "GitHub 登录",
+            value: github.bound ? `已绑定 ${github.login}` : "未绑定",
+            icon: Github,
+            onPress: () => setOpenLogin("github"),
+          },
+        ]
+      : []),
+  ];
+  const logoutMenuItems: MenuItem[] = [
     {
       key: "logout",
       label: "退出登录",
@@ -246,9 +316,7 @@ export default function ProfilePage() {
 
           {isAdmin && <MenuGroup items={adminMenuItems} title="管理" />}
           <MenuGroup items={accountMenuItems} title="账户" />
-
-          <PasskeyManager />
-          <GithubBinding />
+          <MenuGroup items={logoutMenuItems} />
         </div>
       </div>
 
@@ -258,6 +326,19 @@ export default function ProfilePage() {
         updateBadgeClassName="ml-2 inline-flex items-center rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white"
         version={isWebViewFunc() ? siteConfig.app_version : siteConfig.version}
         versionClassName="mt-1 text-xs text-default-400"
+      />
+
+      <PasskeyModal
+        isOpen={openLogin === "passkey"}
+        items={passkeys}
+        onChanged={() => void loadPasskeys()}
+        onClose={() => setOpenLogin(null)}
+      />
+      <GithubBindingModal
+        info={github}
+        isOpen={openLogin === "github"}
+        onChanged={() => void loadGithub()}
+        onClose={() => setOpenLogin(null)}
       />
 
       {/* 修改密码弹窗 */}
