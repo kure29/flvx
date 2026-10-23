@@ -250,6 +250,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.NodeTraffic{},
 		&model.RemoteSource{},
 		&model.SubscriptionTemplate{},
+		&model.NodeGroup{},
 		&model.NodeLatencySample{},
 	}
 

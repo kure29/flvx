@@ -558,6 +558,11 @@ func (r *Repository) Import(backup *model.BackupData, types []string) (*model.Im
 	if err != nil {
 		return nil, err
 	}
+	// Rows restored with their ids leave PostgreSQL sequences behind; move
+	// them past the restored ids so new rows don't collide.
+	if err := ensurePostgresIDDefaultsFn(r.db); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 

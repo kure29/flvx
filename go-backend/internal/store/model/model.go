@@ -430,21 +430,37 @@ type InboundsBackup struct {
 	Subscriptions []SubscriptionBackup   `json:"subscriptions,omitempty"`
 	Sources       []RemoteSourceBackup   `json:"sources,omitempty"`
 	Templates     []TemplateBackup       `json:"templates,omitempty"`
+	NodeGroups    []NodeGroupBackup      `json:"nodeGroups,omitempty"`
 	// Users are shared users from 3.0.10 backups; imported as share
 	// subscriptions.
 	Users []SubUserBackup `json:"users,omitempty"`
 }
 
-type SubscriptionBackup struct {
+// NodeGroupBackup keeps its id: subscriptions refer to it.
+type NodeGroupBackup struct {
 	ID          int64  `json:"id"`
 	Name        string `json:"name"`
-	Kind        string `json:"kind"`
-	Token       string `json:"token"`
-	UUID        string `json:"uuid"`
-	Password    string `json:"password"`
 	SourceAll   int    `json:"sourceAll"`
 	InboundIDs  string `json:"inboundIds"`
-	SourceIDs   string `json:"sourceIds,omitempty"`
+	SourceIDs   string `json:"sourceIds"`
+	Options     string `json:"options"`
+	Inx         int    `json:"inx"`
+	CreatedTime int64  `json:"createdTime"`
+}
+
+type SubscriptionBackup struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	Token      string `json:"token"`
+	UUID       string `json:"uuid"`
+	Password   string `json:"password"`
+	SourceAll  int    `json:"sourceAll"`
+	InboundIDs string `json:"inboundIds"`
+	SourceIDs  string `json:"sourceIds,omitempty"`
+	// GroupIDs are its node groups; empty in backups from before them
+	// (the sources above then become a group on import).
+	GroupIDs    string `json:"groupIds,omitempty"`
 	Options     string `json:"options"`
 	ExpireTime  int64  `json:"expireTime"`
 	Enabled     int    `json:"enabled"`

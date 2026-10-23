@@ -79,6 +79,15 @@ func migrateSubscriptions(db *gorm.DB, now int64) error {
 	if err := shareOwnSubscriptions(db); err != nil {
 		return err
 	}
+	if err := createFirstSubscriptions(db, now); err != nil {
+		return err
+	}
+	return groupLegacySubscriptions(db, now)
+}
+
+// createFirstSubscriptions turns the pre-3.1 single subscription and its
+// shared users into subscriptions when there are none yet.
+func createFirstSubscriptions(db *gorm.DB, now int64) error {
 	var count int64
 	if err := db.Model(&model.Subscription{}).Count(&count).Error; err != nil {
 		return err
@@ -138,6 +147,10 @@ func (r *Repository) ListSubscriptions() ([]model.Subscription, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")
 	}
+	// Rows from older versions or backups get their node group first.
+	if err := r.GroupLegacySubscriptions(); err != nil {
+		return nil, err
+	}
 	var out []model.Subscription
 	err := r.db.Order("inx ASC, id ASC").Find(&out).Error
 	return out, err
@@ -147,6 +160,10 @@ func (r *Repository) ListSubscriptions() ([]model.Subscription, error) {
 func (r *Repository) ListUserSubscriptions(userID int64) ([]model.Subscription, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")
+	}
+	// Rows from older versions or backups get their node group first.
+	if err := r.GroupLegacySubscriptions(); err != nil {
+		return nil, err
 	}
 	var out []model.Subscription
 	err := r.db.Where("user_id = ?", userID).Order("inx ASC, id ASC").Find(&out).Error
@@ -195,6 +212,10 @@ func (r *Repository) GetSubscription(id int64) (*model.Subscription, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")
 	}
+	// Rows from older versions or backups get their node group first.
+	if err := r.GroupLegacySubscriptions(); err != nil {
+		return nil, err
+	}
 	var s model.Subscription
 	res := r.db.Where("id = ?", id).Limit(1).Find(&s)
 	if res.Error != nil || res.RowsAffected == 0 {
@@ -206,6 +227,10 @@ func (r *Repository) GetSubscription(id int64) (*model.Subscription, error) {
 func (r *Repository) GetSubscriptionByToken(token string) (*model.Subscription, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("repository not initialized")
+	}
+	// Rows from older versions or backups get their node group first.
+	if err := r.GroupLegacySubscriptions(); err != nil {
+		return nil, err
 	}
 	var s model.Subscription
 	res := r.db.Where("token = ?", token).Limit(1).Find(&s)
@@ -230,7 +255,14 @@ func (r *Repository) DefaultSubscription(now int64) (*model.Subscription, error)
 		return &s, nil
 	}
 	s = newDefaultSubscription(randomToken(), "", now)
-	return &s, r.db.Create(&s).Error
+	if err := r.db.Create(&s).Error; err != nil {
+		return nil, err
+	}
+	// It takes every node: one node group of everything.
+	if err := groupLegacySubscriptions(r.db, now); err != nil {
+		return nil, err
+	}
+	return r.GetSubscription(s.ID)
 }
 
 func (r *Repository) SaveSubscription(s *model.Subscription) error {

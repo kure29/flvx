@@ -576,7 +576,12 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = filtered
 	}
-	endpoints := h.subEndpoints(sub, rows)
+	c, err := h.subContextFor(rows)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	endpoints := h.subNodes(c, sub)
 	opts := h.subOptions(parsePipeline(sub.Options))
 	opts.SingboxSnell = kernel.SingboxClientHasSnell(r.UserAgent())
 	body, contentType, err := kernel.Subscription(format, endpoints, opts)
@@ -593,7 +598,7 @@ func (h *Handler) openSubscription(w http.ResponseWriter, r *http.Request) {
 		up, down, total = sub.UploadBytes, sub.DownloadBytes, sub.TrafficLimit
 	} else {
 		want := map[int64]bool{}
-		for _, id := range subInboundIDs(sub, rows) {
+		for _, id := range c.inboundIDs(sub) {
 			want[id] = true
 		}
 		for _, row := range rows {

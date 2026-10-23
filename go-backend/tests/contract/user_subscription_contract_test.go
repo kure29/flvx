@@ -25,16 +25,17 @@ func TestUserSubscriptionsContract(t *testing.T) {
 		}
 	}
 	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
+	allGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"全部","sourceAll":true}`))
 	xiaoming, _ := auth.GenerateToken(2, "xiaoming", 1, secret)
 	aqiang, _ := auth.GenerateToken(3, "aqiang", 1, secret)
 
 	save := kernelContractPost(t, router, admin, "/api/v1/subscription/save",
-		`{"name":"小明 · 手机","sourceAll":true,"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`)
+		`{"name":"小明 · 手机","groupIds":[`+allGroup+`],"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`)
 	if save.Code != 0 {
 		t.Fatalf("save: %+v", save)
 	}
 	subID := int64(save.Data.(map[string]interface{})["id"].(float64))
-	other := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"别人的","sourceAll":true}`)
+	other := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"别人的","groupIds":[`+allGroup+`]}`)
 	otherID := int64(other.Data.(map[string]interface{})["id"].(float64))
 	names := map[int]string{2: "xiaoming", 3: "aqiang", 99: "nobody"}
 	ids := func(list ...int64) string {
@@ -87,7 +88,7 @@ func TestUserSubscriptionsContract(t *testing.T) {
 	}
 	// Editing the subscription keeps its assignment.
 	if res := kernelContractPost(t, router, admin, "/api/v1/subscription/save",
-		`{"id":`+jsonInt64(subID)+`,"name":"小明 · 手机","sourceAll":true,"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`); res.Code != 0 || owner(subID) != 2 {
+		`{"id":`+jsonInt64(subID)+`,"name":"小明 · 手机","groupIds":[`+allGroup+`],"trafficLimit":214748364800,"resetDay":1,"expireTime":`+jsonInt64(now+86400000*30)+`}`); res.Code != 0 || owner(subID) != 2 {
 		t.Fatalf("edit: %+v owner %d", res, owner(subID))
 	}
 
@@ -102,7 +103,7 @@ func TestUserSubscriptionsContract(t *testing.T) {
 		item["nextResetTime"].(float64) <= float64(now) || !strings.HasPrefix(oldPath, "/api/v1/open_api/sub/") {
 		t.Fatalf("user view: %v", item)
 	}
-	for _, key := range []string{"options", "inboundIds", "remark", "userId"} {
+	for _, key := range []string{"options", "groupIds", "remark", "userId"} {
 		if _, ok := item[key]; ok {
 			t.Fatalf("user view leaks %s: %v", key, item)
 		}

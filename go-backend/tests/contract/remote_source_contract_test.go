@@ -56,10 +56,10 @@ func TestRemoteSourceContract(t *testing.T) {
 	if len(list) != 2 || list[0].(map[string]interface{})["sourceName"] != "机场" {
 		t.Fatalf("inbound list: %v", list)
 	}
-	sub := kernelContractPost(t, router, admin, "/api/v1/subscription/save",
-		`{"name":"合并","sourceAll":false,"inboundIds":[],"sourceIds":[`+jsonInt64(srcID)+`]}`)
+	group := saveNodeGroup(t, router, admin, `{"name":"机场","sourceAll":false,"inboundIds":[],"sourceIds":[`+jsonInt64(srcID)+`]}`)
+	sub := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"合并","groupIds":[`+jsonInt64(group)+`]}`)
 	subView := sub.Data.(map[string]interface{})
-	if sub.Code != 0 || valueAsInt(subView["nodeCount"]) != 2 || len(subView["inboundIds"].([]interface{})) != 0 {
+	if sub.Code != 0 || valueAsInt(subView["nodeCount"]) != 2 {
 		t.Fatalf("subscription from source: %+v", sub)
 	}
 
@@ -130,10 +130,13 @@ func TestFileSourceChainContract(t *testing.T) {
 		t.Fatal("a file source is not refreshed from a URL")
 	}
 
-	sub := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"链式","sourceAll":false,"inboundIds":[],"sourceIds":[],"options":{`+
+	// The chain picks relays and landings among its node groups' nodes.
+	landingID := jsonInt64(int64(landing["id"].(float64)))
+	chainGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"机场+落地","sourceIds":[`+airportID+`,`+landingID+`]}`))
+	sub := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"链式","groupIds":[`+chainGroup+`],"options":{`+
 		`"chainRelaySources":[`+airportID+`],"chainLandingSources":[`+jsonInt64(int64(landing["id"].(float64)))+`],"chainNoneNames":["日本 01"],"chainHideRelays":true}}`)
 	if sub.Code != 0 || valueAsInt(sub.Data.(map[string]interface{})["nodeCount"]) != 3 {
-		t.Fatalf("chain sources join the subscription: %+v", sub)
+		t.Fatalf("chain over the group's nodes: %+v", sub)
 	}
 	path := sub.Data.(map[string]interface{})["path"].(string)
 	check := func(relay string) {
@@ -171,7 +174,7 @@ func TestFileSourceChainContract(t *testing.T) {
 	check("香港 01 2x")
 
 	// Only the airport's 香港 nodes relay; the rest of it is left out.
-	sub = kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"香港前置","sourceAll":false,"inboundIds":[],"sourceIds":[],"options":{`+
+	sub = kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"香港前置","groupIds":[`+chainGroup+`],"options":{`+
 		`"chainRelaySources":[`+airportID+`],"chainLandingSources":[`+jsonInt64(int64(landing["id"].(float64)))+`],`+
 		`"chainSourceFilters":{"`+airportID+`":"香港","999":"ignored"},"chainDropUnused":true}}`)
 	if sub.Code != 0 {

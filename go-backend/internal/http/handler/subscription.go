@@ -65,13 +65,14 @@ type subPipeline struct {
 	Templates map[string]int64 `json:"templates,omitempty"`
 }
 
+// options are the subscription's own steps: the chain, region groups and
+// rules. Its nodes come processed from its node groups; the node fields
+// here (Lines ... Script) are what older versions stored and are ignored.
 func (p subPipeline) options() kernel.SubOptions {
 	return kernel.SubOptions{
-		Lines: p.Lines, Regions: p.Regions, Protocols: p.Protocols, Include: p.Include, Exclude: p.Exclude,
-		Rename: p.Rename, AddFlag: p.AddFlag, Prefix: p.Prefix, Dedupe: p.Dedupe, Sort: p.Sort,
 		RegionGroups: p.RegionGroups, ChainLanding: p.ChainLanding, ChainRelay: p.ChainRelay,
 		Rules: p.Rules, RuleGroups: p.RuleGroups,
-		ChainLandingNames: p.ChainLandingNames, ChainRelayNames: p.ChainRelayNames, Script: p.Script,
+		ChainLandingNames: p.ChainLandingNames, ChainRelayNames: p.ChainRelayNames,
 		ChainLandingSources: p.ChainLandingSources, ChainRelaySources: p.ChainRelaySources,
 		ChainLandingOwn: p.ChainLandingOwn, ChainNoneNames: p.ChainNoneNames, ChainHideRelays: p.ChainHideRelays,
 		ChainSourceFilters: p.ChainSourceFilters, ChainDropUnused: p.ChainDropUnused,
@@ -79,29 +80,13 @@ func (p subPipeline) options() kernel.SubOptions {
 }
 
 func (p *subPipeline) normalize() error {
-	p.Rename = strings.TrimSpace(strings.ReplaceAll(p.Rename, "\r\n", "\n"))
-	p.Include = strings.TrimSpace(p.Include)
-	p.Exclude = strings.TrimSpace(p.Exclude)
+	// Node processing is the node groups' (see groupPipeline).
+	p.Lines, p.Include, p.Exclude, p.Rename, p.Prefix, p.Sort, p.Script = "", "", "", "", "", "", ""
+	p.Regions, p.Protocols, p.AddFlag, p.Dedupe = []string{}, []string{}, false, false
 	p.ChainLanding = strings.TrimSpace(p.ChainLanding)
 	p.ChainRelay = strings.TrimSpace(p.ChainRelay)
-	if len(p.Rename) > 10000 || len(p.Include) > 1000 || len(p.Exclude) > 1000 ||
-		len(p.ChainLanding) > 1000 || len(p.ChainRelay) > 1000 {
+	if len(p.ChainLanding) > 1000 || len(p.ChainRelay) > 1000 {
 		return errText("规则太长")
-	}
-	if len([]rune(p.Prefix)) > 50 {
-		return errText("前缀最多 50 个字")
-	}
-	if p.Sort != "name" {
-		p.Sort = ""
-	}
-	if p.Lines != "relay" && p.Lines != "direct" && p.Lines != "prefer_relay" {
-		p.Lines = ""
-	}
-	if p.Regions == nil {
-		p.Regions = []string{}
-	}
-	if p.Protocols == nil {
-		p.Protocols = []string{}
 	}
 	p.RuleGroups = kernel.NormalizeRuleGroups(p.RuleGroups)
 	var err error
@@ -135,7 +120,6 @@ func (p *subPipeline) normalize() error {
 		}
 	}
 	p.ChainSourceFilters = filters
-	p.Script = strings.TrimSpace(strings.ReplaceAll(p.Script, "\r\n", "\n"))
 	templates := map[string]int64{}
 	for _, kind := range kernel.TemplateSlots {
 		if id := p.Templates[kind]; id > 0 {
@@ -327,49 +311,6 @@ func kernelUser(s *model.Subscription) kernel.User {
 	return kernel.User{ID: s.ID, UUID: s.UUID, Password: s.Password}
 }
 
-// subInboundIDs resolves the subscription's sources against the inbounds.
-func subInboundIDs(s *model.Subscription, rows []model.NodeInbound) []int64 {
-	if s.SourceAll == 1 {
-		ids := make([]int64, 0, len(rows))
-		for _, r := range rows {
-			ids = append(ids, r.ID)
-		}
-		return ids
-	}
-	ids := subExplicitIDs(s, rows)
-	picked := make(map[int64]bool, len(ids))
-	for _, id := range ids {
-		picked[id] = true
-	}
-	sources := map[int64]bool{}
-	pipeline := parsePipeline(s.Options)
-	// The chain's sources come with their nodes.
-	for _, id := range append(append(parseIDList(s.SourceIDs), pipeline.ChainLandingSources...), pipeline.ChainRelaySources...) {
-		sources[id] = true
-	}
-	for _, r := range rows {
-		if r.SourceID != 0 && sources[r.SourceID] && !picked[r.ID] {
-			ids = append(ids, r.ID)
-		}
-	}
-	return ids
-}
-
-// subExplicitIDs are the inbounds picked one by one (still existing).
-func subExplicitIDs(s *model.Subscription, rows []model.NodeInbound) []int64 {
-	known := make(map[int64]bool, len(rows))
-	for _, r := range rows {
-		known[r.ID] = true
-	}
-	var ids []int64
-	for _, id := range parseIDList(s.InboundIDs) {
-		if known[id] {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // activeUsersByInbound maps inbound ids to the share subscriptions whose
 // credentials the kernels must currently accept.
 func (h *Handler) activeUsersByInbound(now time.Time) map[int64][]kernel.User {
@@ -378,19 +319,19 @@ func (h *Handler) activeUsersByInbound(now time.Time) map[int64][]kernel.User {
 		log.Printf("subscription lookup failed: %v", err)
 		return nil
 	}
-	var rows []model.NodeInbound
+	var c *subContext
 	out := map[int64][]kernel.User{}
 	for i := range subs {
 		s := &subs[i]
 		if !isShare(s) || !subActive(s, now) {
 			continue
 		}
-		if rows == nil {
-			if rows, err = h.repo.ListNodeInbounds(); err != nil {
+		if c == nil {
+			if c, err = h.loadSubContext(); err != nil {
 				return nil
 			}
 		}
-		for _, id := range subInboundIDs(s, rows) {
+		for _, id := range c.inboundIDs(s) {
 			out[id] = append(out[id], kernelUser(s))
 		}
 	}
@@ -424,7 +365,7 @@ func (h *Handler) syncSubscriptions(now time.Time) {
 	if err != nil {
 		return
 	}
-	var rows []model.NodeInbound
+	var c *subContext
 	for i := range subs {
 		s := &subs[i]
 		if subDueReset(s, now) {
@@ -439,12 +380,12 @@ func (h *Handler) syncSubscriptions(now time.Time) {
 		if active == s.AppliedActive {
 			continue
 		}
-		if rows == nil {
-			if rows, err = h.repo.ListNodeInbounds(); err != nil {
+		if c == nil {
+			if c, err = h.loadSubContext(); err != nil {
 				return
 			}
 		}
-		if err := h.applyKernelsForInbounds(subInboundIDs(s, rows)); err != nil {
+		if err := h.applyKernelsForInbounds(c.inboundIDs(s)); err != nil {
 			log.Printf("subscription %d kernel push failed: %v", s.ID, err)
 		}
 		_ = h.repo.UpdateSubscriptionApplied(s.ID, active)
@@ -465,45 +406,18 @@ func (h *Handler) runSubscriptionLoop(ctx context.Context) {
 	}
 }
 
-// subEndpoints are the subscription's endpoints before its pipeline: the
-// selected inbounds and their relays, with the share credentials where
-// the protocol allows.
-func (h *Handler) subEndpoints(s *model.Subscription, rows []model.NodeInbound) []kernel.Endpoint {
-	want := map[int64]bool{}
-	for _, id := range subInboundIDs(s, rows) {
-		want[id] = true
-	}
-	selected := make([]model.NodeInbound, 0, len(want))
-	for _, row := range rows {
-		if want[row.ID] {
-			selected = append(selected, row)
-		}
-	}
-	endpoints, _ := h.inboundEndpoints(selected)
-	if isShare(s) {
-		ku := kernelUser(s)
-		for i := range endpoints {
-			if endpoints[i].Proxy == nil {
-				endpoints[i].Inbound = endpoints[i].Inbound.ForUser(ku)
-			}
-		}
-	}
-	return endpoints
-}
-
 // ---- API ----
 
 type subscriptionView struct {
-	ID         int64   `json:"id"`
-	Name       string  `json:"name"`
-	Kind       string  `json:"kind"`
-	Token      string  `json:"token"`
-	Path       string  `json:"path"`
-	SourceAll  bool    `json:"sourceAll"`
-	InboundIDs []int64 `json:"inboundIds"`
-	SourceIDs  []int64 `json:"sourceIds"`
-	// SharedIDs are selected inbounds of a share subscription that can't
-	// carry per-user credentials (Snell, Shadowsocks, imported nodes).
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Kind  string `json:"kind"`
+	Token string `json:"token"`
+	Path  string `json:"path"`
+	// GroupIDs are the node groups it lists, in order.
+	GroupIDs []int64 `json:"groupIds"`
+	// SharedIDs are its groups' inbounds that can't carry per-user
+	// credentials (Snell, Shadowsocks, imported nodes).
 	SharedIDs  []int64     `json:"sharedIds"`
 	Options    subPipeline `json:"options"`
 	ExpireTime int64       `json:"expireTime"`
@@ -536,10 +450,10 @@ func (h *Handler) withUserName(v subscriptionView, names map[int64]string) subsc
 	return v
 }
 
-func (h *Handler) subscriptionView(s *model.Subscription, rows []model.NodeInbound, now time.Time) subscriptionView {
-	ids := subInboundIDs(s, rows)
-	byID := make(map[int64]model.NodeInbound, len(rows))
-	for _, r := range rows {
+func (h *Handler) subscriptionView(s *model.Subscription, c *subContext, now time.Time) subscriptionView {
+	ids := c.inboundIDs(s)
+	byID := make(map[int64]model.NodeInbound, len(c.rows))
+	for _, r := range c.rows {
 		byID[r.ID] = r
 	}
 	shared := []int64{}
@@ -553,18 +467,16 @@ func (h *Handler) subscriptionView(s *model.Subscription, rows []model.NodeInbou
 			}
 		}
 	}
-	selected := []int64{}
-	sourceIDs := []int64{}
-	if s.SourceAll != 1 {
-		selected = append(selected, subExplicitIDs(s, rows)...)
-		sourceIDs = append(sourceIDs, parseIDList(s.SourceIDs)...)
+	groupIDs := []int64{}
+	for _, g := range c.subGroups(s) {
+		groupIDs = append(groupIDs, g.ID)
 	}
 	pipe := parsePipeline(s.Options)
 	return subscriptionView{
 		ID: s.ID, Name: s.Name, Kind: s.Kind, Token: s.Token, Path: "/api/v1/open_api/sub/" + s.Token,
-		SourceAll: s.SourceAll == 1, InboundIDs: selected, SourceIDs: sourceIDs, SharedIDs: shared, Options: pipe,
+		GroupIDs: groupIDs, SharedIDs: shared, Options: pipe,
 		ExpireTime: s.ExpireTime, Enabled: s.Enabled == 1, Active: subActive(s, now), Remark: s.Remark,
-		NodeCount:   len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
+		NodeCount:   len(kernel.ApplySubOptions(h.subNodes(c, s), pipe.options())),
 		UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes, TrafficLimit: s.TrafficLimit,
 		ResetDay: s.ResetDay, OverQuota: subOverQuota(s), UserID: s.UserID, TrafficSince: subTrafficSince(s),
 	}
@@ -589,7 +501,7 @@ func (h *Handler) subscriptionList(w http.ResponseWriter, r *http.Request) {
 		}
 		subs = append(subs, *def)
 	}
-	rows, err := h.repo.ListNodeInbounds()
+	c, err := h.loadSubContext()
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
@@ -598,7 +510,7 @@ func (h *Handler) subscriptionList(w http.ResponseWriter, r *http.Request) {
 	names, _ := h.repo.UserNames()
 	items := make([]subscriptionView, 0, len(subs))
 	for i := range subs {
-		items = append(items, h.withUserName(h.subscriptionView(&subs[i], rows, now), names))
+		items = append(items, h.withUserName(h.subscriptionView(&subs[i], c, now), names))
 	}
 	response.WriteJSON(w, response.OK(map[string]interface{}{
 		"items":      items,
@@ -611,9 +523,7 @@ type subscriptionRequest struct {
 	ID         int64       `json:"id"`
 	Name       string      `json:"name"`
 	Kind       string      `json:"kind"`
-	SourceAll  bool        `json:"sourceAll"`
-	InboundIDs []int64     `json:"inboundIds"`
-	SourceIDs  []int64     `json:"sourceIds"`
+	GroupIDs   []int64     `json:"groupIds"`
 	Options    subPipeline `json:"options"`
 	ExpireTime int64       `json:"expireTime"`
 	Enabled    *bool       `json:"enabled"`
@@ -623,11 +533,11 @@ type subscriptionRequest struct {
 	ResetDay     int   `json:"resetDay"`
 }
 
-// validate checks the request and returns the inbound ids it selects.
-func (req *subscriptionRequest) validate(rows []model.NodeInbound) ([]int64, error) {
+// validate checks the request and keeps the node groups that exist.
+func (req *subscriptionRequest) validate(c *subContext) error {
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" || len([]rune(req.Name)) > 100 {
-		return nil, errText("请填写名称（最多 100 个字）")
+		return errText("请填写名称（最多 100 个字）")
 	}
 	// Every subscription has its own credentials.
 	req.Kind = model.SubscriptionShare
@@ -638,33 +548,24 @@ func (req *subscriptionRequest) validate(rows []model.NodeInbound) ([]int64, err
 		req.TrafficLimit = 0
 	}
 	if req.ResetDay < 0 || req.ResetDay > 28 {
-		return nil, errText("每月重置日只能是 1–28 号")
+		return errText("每月重置日只能是 1–28 号")
 	}
 	if err := req.Options.normalize(); err != nil {
-		return nil, err
-	}
-	known := make(map[int64]bool, len(rows))
-	for _, r := range rows {
-		known[r.ID] = true
+		return err
 	}
 	var ids []int64
-	for _, id := range req.InboundIDs {
-		if known[id] {
+	seen := map[int64]bool{}
+	for _, id := range req.GroupIDs {
+		if c.groups[id] != nil && !seen[id] {
+			seen[id] = true
 			ids = append(ids, id)
 		}
 	}
-	var sources []int64
-	for _, id := range req.SourceIDs {
-		if id > 0 {
-			sources = append(sources, id)
-		}
+	req.GroupIDs = ids
+	if len(ids) == 0 {
+		return errText("请至少选择一个节点组")
 	}
-	req.SourceIDs = sources
-	chainSources := len(req.Options.ChainLandingSources) + len(req.Options.ChainRelaySources)
-	if !req.SourceAll && len(ids) == 0 && len(sources) == 0 && chainSources == 0 {
-		return nil, errText("请至少选择一个入站或订阅源，或选择全部")
-	}
-	return ids, nil
+	return nil
 }
 
 func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
@@ -677,12 +578,12 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
 		return
 	}
-	rows, err := h.repo.ListNodeInbounds()
+	c, err := h.loadSubContext()
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	ids, err := req.validate(rows)
+	err = req.validate(c)
 	if err == nil {
 		err = h.checkPipelineTemplates(req.Options)
 	}
@@ -699,7 +600,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if isShare(s) {
-			before = subInboundIDs(s, rows)
+			before = c.inboundIDs(s)
 		}
 	} else {
 		s = &model.Subscription{Token: randomHex(16), Enabled: 1, CreatedTime: now.UnixMilli(), TrafficSince: now.UnixMilli()}
@@ -709,9 +610,7 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 	if isShare(s) && (s.UUID == "" || s.Password == "") {
 		s.UUID, s.Password = newUUID(), randomHex(16)
 	}
-	s.SourceAll = boolToInt(req.SourceAll)
-	s.InboundIDs = formatIDList(ids)
-	s.SourceIDs = formatIDList(req.SourceIDs)
+	s.GroupIDs = repo.FormatGroupIDs(req.GroupIDs)
 	opts, _ := json.Marshal(req.Options)
 	s.Options = string(opts)
 	s.ExpireTime = req.ExpireTime
@@ -734,9 +633,9 @@ func (h *Handler) subscriptionSave(w http.ResponseWriter, r *http.Request) {
 	}
 	push := before
 	if isShare(s) {
-		push = append(push, subInboundIDs(s, rows)...)
+		push = append(push, c.inboundIDs(s)...)
 	}
-	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, rows, now), nil))
+	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, c, now), nil))
 }
 
 func (h *Handler) respondAfterSubPush(w http.ResponseWriter, inboundIDs []int64, data interface{}) {
@@ -759,8 +658,8 @@ func (h *Handler) subscriptionDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	var push []int64
 	if isShare(s) {
-		if rows, err := h.repo.ListNodeInbounds(); err == nil {
-			push = subInboundIDs(s, rows)
+		if c, err := h.loadSubContext(); err == nil {
+			push = c.inboundIDs(s)
 		}
 	}
 	if err := h.repo.DeleteSubscription(id); err != nil {
@@ -782,17 +681,17 @@ func (h *Handler) subscriptionReset(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.ErrDefault("订阅不存在"))
 		return
 	}
-	rows, push, err := h.resetSubscriptionLink(s)
+	c, push, err := h.resetSubscriptionLink(s)
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, rows, time.Now()), nil))
+	h.respondAfterSubPush(w, push, h.withUserName(h.subscriptionView(s, c, time.Now()), nil))
 }
 
 // resetSubscriptionLink gives a subscription a new token and credentials,
 // returning the inbounds whose kernels must drop the old ones.
-func (h *Handler) resetSubscriptionLink(s *model.Subscription) ([]model.NodeInbound, []int64, error) {
+func (h *Handler) resetSubscriptionLink(s *model.Subscription) (*subContext, []int64, error) {
 	s.Token = randomHex(16)
 	if isShare(s) {
 		s.UUID, s.Password = newUUID(), randomHex(16)
@@ -801,12 +700,15 @@ func (h *Handler) resetSubscriptionLink(s *model.Subscription) ([]model.NodeInbo
 	if err := h.repo.SaveSubscription(s); err != nil {
 		return nil, nil, err
 	}
-	rows, _ := h.repo.ListNodeInbounds()
+	c, err := h.loadSubContext()
+	if err != nil {
+		return nil, nil, err
+	}
 	var push []int64
 	if isShare(s) {
-		push = subInboundIDs(s, rows)
+		push = c.inboundIDs(s)
 	}
-	return rows, push, nil
+	return c, push, nil
 }
 
 // subscriptionResetTraffic zeroes a share subscription's traffic and puts
@@ -831,8 +733,12 @@ func (h *Handler) subscriptionResetTraffic(w http.ResponseWriter, r *http.Reques
 	}
 	h.syncSubscriptions(now)
 	s, _ = h.repo.GetSubscription(id)
-	rows, _ := h.repo.ListNodeInbounds()
-	response.WriteJSON(w, response.OK(h.subscriptionView(s, rows, now)))
+	c, err := h.loadSubContext()
+	if err != nil {
+		response.WriteJSON(w, response.Err(-2, err.Error()))
+		return
+	}
+	response.WriteJSON(w, response.OK(h.subscriptionView(s, c, now)))
 }
 
 type subPreviewItem struct {
@@ -864,34 +770,19 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 	if req.Name == "" {
 		req.Name = "preview"
 	}
-	rows, err := h.repo.ListNodeInbounds()
+	c, err := h.loadSubContext()
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	ids, err := req.validate(rows)
-	if err != nil {
+	if err := req.validate(c); err != nil {
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	options, _ := json.Marshal(req.Options)
-	draft := &model.Subscription{SourceAll: boolToInt(req.SourceAll), InboundIDs: formatIDList(ids), SourceIDs: formatIDList(req.SourceIDs),
-		Options: string(options)}
-	source := h.subEndpoints(draft, rows)
+	draft := &model.Subscription{GroupIDs: repo.FormatGroupIDs(req.GroupIDs)}
+	source := h.subNodes(c, draft)
 	result := kernel.ApplySubOptions(source, req.Options.options())
-	items := make([]subPreviewItem, 0, len(result))
-	for _, e := range result {
-		line := "relay"
-		if e.Direct {
-			line = "direct"
-		}
-		items = append(items, subPreviewItem{Name: e.Name, Original: e.Original, Region: kernel.RegionOf(e.Name),
-			Protocol: kernel.EndpointProtocol(e), Line: line, Chain: e.ChainRole, SourceID: e.SourceID, Own: e.Proxy == nil && e.SourceID == 0})
-	}
-	scriptError := ""
-	if err := kernel.SubScriptError(source, req.Options.options()); err != nil {
-		scriptError = err.Error()
-	}
+	items := previewItems(result)
 	// The picked templates' groups with these nodes.
 	names := make([]string, len(result))
 	for i, e := range result {
@@ -913,11 +804,10 @@ func (h *Handler) subscriptionPreview(w http.ResponseWriter, r *http.Request) {
 		templates[kind] = view
 	}
 	response.WriteJSON(w, response.OK(map[string]interface{}{
-		"items":       items,
-		"total":       len(source),
-		"dropped":     len(source) - len(items),
-		"scriptError": scriptError,
-		"templates":   templates,
+		"items":     items,
+		"total":     len(source),
+		"dropped":   len(source) - len(items),
+		"templates": templates,
 	}))
 }
 

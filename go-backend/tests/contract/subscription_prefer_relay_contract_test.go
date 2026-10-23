@@ -23,25 +23,26 @@ func TestSubscriptionPreferRelayContract(t *testing.T) {
 	_, f1 := seedRelayForward(t, r, 1, entry, 0, 30005, a)
 	_, f2 := seedRelayForward(t, r, 1, entry, 0, 30006, a)
 	// Shared subscriptions replace credentials but retain the inbound identity.
-	save := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"中转优先","sourceAll":true,"options":{"lines":"prefer_relay"}}`)
+	group := saveNodeGroup(t, router, admin, `{"name":"中转优先","sourceAll":true,"options":{"lines":"prefer_relay"}}`)
+	save := kernelContractPost(t, router, admin, "/api/v1/subscription/save", `{"name":"中转优先","groupIds":[`+jsonInt64(group)+`]}`)
 	if save.Code != 0 {
 		t.Fatalf("save: %+v", save)
 	}
 	view := save.Data.(map[string]interface{})
 	path := view["path"].(string)
-	if view["options"].(map[string]interface{})["lines"] != "prefer_relay" || valueAsInt(view["nodeCount"]) != 3 {
-		t.Fatalf("option/count: %v", view)
+	if valueAsInt(view["nodeCount"]) != 3 {
+		t.Fatalf("count: %v", view)
 	}
-	list := kernelContractPost(t, router, admin, "/api/v1/subscription/list", `{}`).Data.(map[string]interface{})["items"].([]interface{})
+	list := kernelContractPost(t, router, admin, "/api/v1/subscription/group/list", `{}`).Data.(map[string]interface{})["items"].([]interface{})
 	for _, item := range list {
 		v := item.(map[string]interface{})
-		if v["path"] == path && v["options"].(map[string]interface{})["lines"] != "prefer_relay" {
+		if int64(v["id"].(float64)) == group && v["options"].(map[string]interface{})["lines"] != "prefer_relay" {
 			t.Fatal("saved option lost on read")
 		}
 	}
 	checkPreview := func(want int) {
 		t.Helper()
-		p := kernelContractPost(t, router, admin, "/api/v1/subscription/preview", `{"sourceAll":true,"options":{"lines":"prefer_relay"}}`)
+		p := kernelContractPost(t, router, admin, "/api/v1/subscription/group/preview", `{"sourceAll":true,"options":{"lines":"prefer_relay"}}`)
 		if p.Code != 0 || len(p.Data.(map[string]interface{})["items"].([]interface{})) != want {
 			t.Fatalf("preview: %+v", p)
 		}
@@ -83,7 +84,7 @@ func TestSubscriptionPreferRelayContract(t *testing.T) {
 		}
 	}
 	// An unrelated subscription keeps both direct and relay endpoints.
-	ordinary := kernelContractPost(t, router, admin, "/api/v1/subscription/preview", `{"sourceAll":true,"options":{}}`)
+	ordinary := kernelContractPost(t, router, admin, "/api/v1/subscription/group/preview", `{"sourceAll":true,"options":{}}`)
 	if len(ordinary.Data.(map[string]interface{})["items"].([]interface{})) != 4 {
 		t.Fatal("other subscriptions changed")
 	}

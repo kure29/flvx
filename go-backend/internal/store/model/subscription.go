@@ -28,7 +28,13 @@ type Subscription struct {
 	// SourceIDs (comma separated) adds every node of these remote sources,
 	// including ones a later refresh brings.
 	SourceIDs string `gorm:"column:source_ids;type:text;not null;default:''"`
-	// Options is the JSON processing pipeline.
+	// GroupIDs (comma separated, in order) are the node groups whose nodes
+	// the subscription lists. SourceAll / InboundIDs / SourceIDs and the
+	// node processing in Options are what older versions used; on upgrade
+	// they became one node group each and are kept only for a downgrade.
+	GroupIDs string `gorm:"column:group_ids;type:text;not null;default:''"`
+	// Options is the JSON pipeline: the chain, rules and templates (and,
+	// before node groups, the node processing).
 	Options string `gorm:"type:text;not null;default:''"`
 	// ExpireTime is unix ms; 0 never expires.
 	ExpireTime int64 `gorm:"column:expire_time;not null;default:0"`
@@ -57,6 +63,25 @@ type Subscription struct {
 }
 
 func (Subscription) TableName() string { return "subscription" }
+
+// NodeGroup is a reusable set of nodes for subscriptions: which inbounds
+// it draws from and how their nodes are filtered, renamed and sorted
+// (Options, the node part of kernel.SubOptions as JSON).
+type NodeGroup struct {
+	ID   int64  `gorm:"primaryKey;autoIncrement"`
+	Name string `gorm:"type:varchar(100);not null"`
+	// SourceAll takes every inbound (new ones too); otherwise InboundIDs
+	// and every node of the remote sources in SourceIDs (comma separated).
+	SourceAll   int    `gorm:"column:source_all;not null;default:0"`
+	InboundIDs  string `gorm:"column:inbound_ids;type:text;not null;default:''"`
+	SourceIDs   string `gorm:"column:source_ids;type:text;not null;default:''"`
+	Options     string `gorm:"type:text;not null;default:''"`
+	Inx         int    `gorm:"not null;default:0"`
+	CreatedTime int64  `gorm:"column:created_time;not null"`
+	UpdatedTime int64  `gorm:"column:updated_time;not null"`
+}
+
+func (NodeGroup) TableName() string { return "node_group" }
 
 // SubscriptionCounter remembers the last cumulative per-user counter seen
 // from a node, so the next sample adds only the difference.

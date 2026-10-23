@@ -36,12 +36,13 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 	router, _ := setupContractRouter(t, secret)
 	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
 	post := func(path, body string) response.R { return kernelContractPost(t, router, admin, path, body) }
+	allGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"全部","sourceAll":true}`))
 
 	link := "ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:secret")) + "@198.51.100.20:8388#%E6%97%A5%E6%9C%AC%E8%90%BD%E5%9C%B0"
 	if res := post("/api/v1/inbound/import", `{"links":"`+link+`"}`); res.Code != 0 {
 		t.Fatalf("import: %+v", res)
 	}
-	sub := post("/api/v1/subscription/save", `{"name":"我的","sourceAll":true}`)
+	sub := post("/api/v1/subscription/save", `{"name":"我的","groupIds":[`+allGroup+`]}`)
 	subID := jsonInt64(int64(sub.Data.(map[string]interface{})["id"].(float64)))
 	path := sub.Data.(map[string]interface{})["path"].(string)
 
@@ -80,10 +81,10 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 	}
 	sbID := jsonInt64(int64(urlTpl.Data.(map[string]interface{})["id"].(float64)))
 
-	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","sourceAll":true,"options":{"templates":{"singbox":`+clashID+`}}}`); res.Code == 0 {
+	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","groupIds":[`+allGroup+`],"options":{"templates":{"singbox":`+clashID+`}}}`); res.Code == 0 {
 		t.Fatal("a clash template cannot serve sing-box")
 	}
-	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","sourceAll":true,"options":{"templates":{"clash":`+clashID+`,"singbox":`+sbID+`}}}`); res.Code != 0 {
+	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","groupIds":[`+allGroup+`],"options":{"templates":{"clash":`+clashID+`,"singbox":`+sbID+`}}}`); res.Code != 0 {
 		t.Fatalf("pick templates: %+v", res)
 	}
 
@@ -99,7 +100,7 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 		t.Fatalf("surge has no template and keeps the built-in profile:\n%s", surge)
 	}
 
-	preview := post("/api/v1/subscription/preview", `{"name":"我的","sourceAll":true,"options":{"templates":{"clash":`+clashID+`}}}`)
+	preview := post("/api/v1/subscription/preview", `{"name":"我的","groupIds":[`+allGroup+`],"options":{"templates":{"clash":`+clashID+`}}}`)
 	view := preview.Data.(map[string]interface{})["templates"].(map[string]interface{})["clash"].(map[string]interface{})
 	if view["name"] != "我的分流" || len(view["groups"].([]interface{})) != 2 {
 		t.Fatalf("preview groups: %v", view)
@@ -137,7 +138,7 @@ func TestSubscriptionTemplateContract(t *testing.T) {
 	}
 
 	// Without the subscription using it, the template can go.
-	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","sourceAll":true}`); res.Code != 0 {
+	if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"我的","groupIds":[`+allGroup+`]}`); res.Code != 0 {
 		t.Fatal(res.Msg)
 	}
 	if res := post("/api/v1/subscription/template/delete", `{"id":`+clashID+`}`); res.Code != 0 {
@@ -152,6 +153,7 @@ func TestSubscriptionTemplateStashShadowrocketContract(t *testing.T) {
 	router, r := setupContractRouter(t, secret)
 	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
 	post := func(path, body string) response.R { return kernelContractPost(t, router, admin, path, body) }
+	allGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"全部","sourceAll":true}`))
 
 	link := "ss://" + base64.RawURLEncoding.EncodeToString([]byte("aes-256-gcm:secret")) + "@198.51.100.20:8388#%E6%97%A5%E6%9C%AC%E8%90%BD%E5%9C%B0"
 	if res := post("/api/v1/inbound/import", `{"links":"`+link+`"}`); res.Code != 0 {
@@ -160,10 +162,10 @@ func TestSubscriptionTemplateStashShadowrocketContract(t *testing.T) {
 	clashID := jsonInt64(int64(post("/api/v1/subscription/template/save", `{"name":"共用","kind":"clash","content":`+jsonString(contractClashTpl)+`}`).Data.(map[string]interface{})["id"].(float64)))
 	sbID := jsonInt64(int64(post("/api/v1/subscription/template/save", `{"name":"sb","kind":"singbox","content":`+jsonString(`{"outbounds":[{"type":"selector","tag":"a","outbounds":["{all}"]}]}`)+`}`).Data.(map[string]interface{})["id"].(float64)))
 
-	if res := post("/api/v1/subscription/save", `{"name":"x","sourceAll":true,"options":{"templates":{"shadowrocket":`+sbID+`}}}`); res.Code == 0 {
+	if res := post("/api/v1/subscription/save", `{"name":"x","groupIds":[`+allGroup+`],"options":{"templates":{"shadowrocket":`+sbID+`}}}`); res.Code == 0 {
 		t.Fatal("shadowrocket takes Mihomo templates only")
 	}
-	sub := post("/api/v1/subscription/save", `{"name":"我的","sourceAll":true,"options":{"templates":{"stash":`+clashID+`,"shadowrocket":`+clashID+`}}}`)
+	sub := post("/api/v1/subscription/save", `{"name":"我的","groupIds":[`+allGroup+`],"options":{"templates":{"stash":`+clashID+`,"shadowrocket":`+clashID+`}}}`)
 	if sub.Code != 0 {
 		t.Fatalf("save: %+v", sub)
 	}

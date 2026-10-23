@@ -316,3 +316,13 @@ func containsInt(list []int, v int) bool {
 	}
 	return false
 }
+
+// saveNodeGroup creates a subscription node group and returns its id.
+func saveNodeGroup(t *testing.T, router http.Handler, token, body string) int64 {
+	t.Helper()
+	out := kernelContractPost(t, router, token, "/api/v1/subscription/group/save", body)
+	if out.Code != 0 {
+		t.Fatalf("node group: %+v", out)
+	}
+	return int64(out.Data.(map[string]interface{})["id"].(float64))
+}

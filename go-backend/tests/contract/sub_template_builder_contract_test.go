@@ -14,6 +14,7 @@ func TestSubscriptionTemplateBuilderContract(t *testing.T) {
 	router, _ := setupContractRouter(t, secret)
 	admin, _ := auth.GenerateToken(1, "admin_user", 0, secret)
 	post := func(path, body string) response.R { return kernelContractPost(t, router, admin, path, body) }
+	allGroup := jsonInt64(saveNodeGroup(t, router, admin, `{"name":"全部","sourceAll":true}`))
 	catalog := post("/api/v1/subscription/template/catalog", `{}`)
 	if catalog.Code != 0 || len(catalog.Data.([]interface{})) != 19 {
 		t.Fatalf("catalog: %+v", catalog)
@@ -22,7 +23,7 @@ func TestSubscriptionTemplateBuilderContract(t *testing.T) {
 	if res := post("/api/v1/inbound/import", `{"links":"`+link+`"}`); res.Code != 0 {
 		t.Fatal(res.Msg)
 	}
-	sub := post("/api/v1/subscription/save", `{"name":"builder-test","sourceAll":true}`)
+	sub := post("/api/v1/subscription/save", `{"name":"builder-test","groupIds":[`+allGroup+`]}`)
 	subID := jsonInt64(int64(sub.Data.(map[string]interface{})["id"].(float64)))
 	path := sub.Data.(map[string]interface{})["path"].(string)
 	builder := `{"version":1,"preset":"custom","groups":[{"name":"美国","type":"url-test","filter":"US"}],"rules":[{"type":"domain_suffix","value":"example.com","target":"美国"},{"type":"category","value":"ads","target":"REJECT"}],"final":"节点选择"}`
@@ -42,7 +43,7 @@ func TestSubscriptionTemplateBuilderContract(t *testing.T) {
 			if view["builder"] == nil || strings.Contains(view["content"].(string), "untrusted") {
 				t.Fatalf("recipe not persisted: %v", view)
 			}
-			if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"builder-test","sourceAll":true,"options":{"templates":{"`+kind+`":`+id+`}}}`); res.Code != 0 {
+			if res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"builder-test","groupIds":[`+allGroup+`],"options":{"templates":{"`+kind+`":`+id+`}}}`); res.Code != 0 {
 				t.Fatal(res.Msg)
 			}
 			body := getSub(t, router, path+"?format="+kind, "").Body.String()
@@ -52,7 +53,7 @@ func TestSubscriptionTemplateBuilderContract(t *testing.T) {
 			if kind == "clash" {
 				// Visual Mihomo templates also serve the Stash / Shadowrocket slots.
 				for _, slot := range []string{"stash", "shadowrocket"} {
-					res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"builder-test","sourceAll":true,"options":{"templates":{"`+slot+`":`+id+`}}}`)
+					res := post("/api/v1/subscription/save", `{"id":`+subID+`,"name":"builder-test","groupIds":[`+allGroup+`],"options":{"templates":{"`+slot+`":`+id+`}}}`)
 					if res.Code != 0 {
 						t.Fatal(res.Msg)
 					}

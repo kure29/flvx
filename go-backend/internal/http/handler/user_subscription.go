@@ -52,13 +52,13 @@ func nextResetAt(d int, now time.Time) time.Time {
 	return lastResetAt(d, now.AddDate(0, 1, 0))
 }
 
-func (h *Handler) userSubscriptionView(s *model.Subscription, rows []model.NodeInbound, now time.Time) userSubscriptionView {
+func (h *Handler) userSubscriptionView(s *model.Subscription, c *subContext, now time.Time) userSubscriptionView {
 	pipe := parsePipeline(s.Options)
 	v := userSubscriptionView{
 		ID: s.ID, Name: s.Name, Path: "/api/v1/open_api/sub/" + s.Token, Status: subStatus(s, now),
 		ExpireTime: s.ExpireTime, UploadBytes: s.UploadBytes, DownloadBytes: s.DownloadBytes,
 		TrafficLimit: s.TrafficLimit, ResetDay: s.ResetDay, TrafficSince: subTrafficSince(s), Rules: pipe.Rules, Templates: templateSlots(pipe),
-		NodeCount: len(kernel.ApplySubOptions(h.subEndpoints(s, rows), pipe.options())),
+		NodeCount: len(kernel.ApplySubOptions(h.subNodes(c, s), pipe.options())),
 	}
 	if s.ResetDay > 0 {
 		v.NextResetTime = nextResetAt(s.ResetDay, now).UnixMilli()
@@ -84,14 +84,14 @@ func (h *Handler) userSubscriptionList(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]userSubscriptionView, 0, len(subs))
 	if len(subs) > 0 {
-		rows, err := h.repo.ListNodeInbounds()
+		c, err := h.loadSubContext()
 		if err != nil {
 			response.WriteJSON(w, response.Err(-2, err.Error()))
 			return
 		}
 		now := time.Now()
 		for i := range subs {
-			items = append(items, h.userSubscriptionView(&subs[i], rows, now))
+			items = append(items, h.userSubscriptionView(&subs[i], c, now))
 		}
 	}
 	response.WriteJSON(w, response.OK(items))
@@ -114,12 +114,12 @@ func (h *Handler) userSubscriptionReset(w http.ResponseWriter, r *http.Request) 
 		response.WriteJSON(w, response.ErrDefault("订阅不存在"))
 		return
 	}
-	rows, push, err := h.resetSubscriptionLink(s)
+	c, push, err := h.resetSubscriptionLink(s)
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	h.respondAfterSubPush(w, push, h.userSubscriptionView(s, rows, time.Now()))
+	h.respondAfterSubPush(w, push, h.userSubscriptionView(s, c, time.Now()))
 }
 
 // userSubscriptionIDs reads the subscriptionIds of a user create / update

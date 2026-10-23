@@ -246,21 +246,22 @@ func (h *Handler) subscriptionTemplateCheck(w http.ResponseWriter, r *http.Reque
 		response.WriteJSON(w, response.ErrDefault(err.Error()))
 		return
 	}
-	rows, err := h.repo.ListNodeInbounds()
+	c, err := h.loadSubContext()
 	if err != nil {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
-	sub := &model.Subscription{SourceAll: 1}
+	// Every node, unprocessed, unless a subscription is picked.
+	nodes, _ := h.inboundEndpoints(c.rows)
 	var opts kernel.SubOptions
 	sample := "全部节点"
 	if req.SubscriptionID > 0 {
 		if s, err := h.repo.GetSubscription(req.SubscriptionID); err == nil && s != nil {
-			sub, opts, sample = s, parsePipeline(s.Options).options(), s.Name
+			nodes, opts, sample = h.subNodes(c, s), parsePipeline(s.Options).options(), s.Name
 		}
 	}
 	var names []string
-	for _, e := range kernel.ApplySubOptions(h.subEndpoints(sub, rows), opts) {
+	for _, e := range kernel.ApplySubOptions(nodes, opts) {
 		names = append(names, e.Name)
 	}
 	summary, err := kernel.CheckTemplate(req.Kind, content, names)
