@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -450,6 +451,8 @@ func TestSingboxACMEAndNaive(t *testing.T) {
 		{ID: 2, Protocol: ProtocolHysteria2, Port: 443, Transport: Transport{Type: TransportQUIC}, Settings: Settings{Password: "hy2-secret"}, Security: acme},
 		{ID: 3, Protocol: ProtocolTrojan, Port: 8443, Settings: Settings{Password: "trojan-secret"},
 			Security: Security{Type: SecurityTLS, CertMode: CertModeACME, SNI: "cf.example.com", ACMEDNS: ACMEDNSCloudflare, ACMEDNSKey: "cf-token"}},
+		{ID: 4, Protocol: ProtocolAnyTLS, Port: 9443, Settings: Settings{Password: "anytls-secret"}, Security: acme},
+		{ID: 5, Protocol: ProtocolVLESS, Port: 10443, Transport: Transport{Type: TransportWS, Path: "/ws"}, Settings: Settings{UUID: testUUID}, Security: acme},
 	}
 	for i := range list {
 		if err := Normalize(TypeSingbox, &list[i]); err != nil {
@@ -472,9 +475,17 @@ func TestSingboxACMEAndNaive(t *testing.T) {
 	if len(parsed.Providers) != 2 {
 		t.Fatalf("one provider per domain, got %d", len(parsed.Providers))
 	}
-	for i, want := range []string{"acme-1", "acme-1", "acme-2"} {
+	for i, want := range []string{"acme-1", "acme-1", "acme-2", "acme-1", "acme-1"} {
 		if got := parsed.Inbounds[i]["tls"].(map[string]interface{})["certificate_provider"]; got != want {
 			t.Fatalf("inbound %d provider %v, want %s", i, got, want)
+		}
+	}
+	// HTTP-01/TLS-ALPN puts acme-tls/1 in the listener's ALPN; uTLS clients
+	// offering h2/http/1.1 are refused unless the usual protocols sit next
+	// to it. DNS-01 adds nothing, and QUIC keeps h3.
+	for i, want := range []string{"[h2 http/1.1]", "[h3]", "<nil>", "[h2 http/1.1]", "[http/1.1]"} {
+		if got := fmt.Sprint(parsed.Inbounds[i]["tls"].(map[string]interface{})["alpn"]); got != want {
+			t.Fatalf("inbound %d alpn %s, want %s", i, got, want)
 		}
 	}
 

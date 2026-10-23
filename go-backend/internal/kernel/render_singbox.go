@@ -226,7 +226,7 @@ func singboxInbounds(in Inbound, acme *acmeProviders) ([]interface{}, error) {
 		item["users"] = append(item["users"].([]interface{}), extra...)
 	}
 
-	if tls, err := singboxTLS(in.Security, acme); err != nil {
+	if tls, err := singboxTLS(in, acme); err != nil {
 		return nil, err
 	} else if tls != nil {
 		item["tls"] = tls
@@ -269,7 +269,8 @@ func singboxShadowTLSFront(in Inbound, backend obj) ([]interface{}, error) {
 	return []interface{}{front, backend}, nil
 }
 
-func singboxTLS(sec Security, acme *acmeProviders) (obj, error) {
+func singboxTLS(in Inbound, acme *acmeProviders) (obj, error) {
+	sec := in.Security
 	switch sec.Type {
 	case SecurityTLS:
 		tls := obj{"enabled": true, "server_name": sec.SNI}
@@ -279,6 +280,16 @@ func singboxTLS(sec Security, acme *acmeProviders) (obj, error) {
 		switch sec.CertMode {
 		case CertModeACME:
 			tls["certificate_provider"] = acme.tag(sec)
+			// Without DNS-01, sing-box answers the TLS-ALPN challenge on this
+			// listener, so acme-tls/1 becomes its only ALPN and clients that
+			// offer h2/http/1.1 (every uTLS fingerprint) get "no application
+			// protocol". Advertise the usual web ALPN next to it.
+			if len(sec.ALPN) == 0 && sec.ACMEDNS == "" {
+				tls["alpn"] = []string{"h2", "http/1.1"}
+				if in.Transport.Type == TransportWS {
+					tls["alpn"] = []string{"http/1.1"}
+				}
+			}
 		case CertModeFile:
 			tls["certificate_path"] = sec.CertFile
 			tls["key_path"] = sec.KeyFile
