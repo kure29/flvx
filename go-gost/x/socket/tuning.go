@@ -220,6 +220,10 @@ func applyTuning(groupIDs []string) (tuneStatus, error) {
 	}
 
 	var warnings []string
+	if InContainer() && len(chosen) > 0 {
+		// /etc/sysctl.d is the container's, not the host's.
+		warnings = append(warnings, "节点运行在 Docker 中：调优需要容器以 --privileged 运行，宿主机重启后需在面板重新应用")
+	}
 	if chosen["bbr"] {
 		if avail, _ := readSysctl("net.ipv4.tcp_available_congestion_control"); !strings.Contains(" "+avail+" ", " bbr ") {
 			_ = tuneModprobe("tcp_bbr")

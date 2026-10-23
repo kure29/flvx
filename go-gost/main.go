@@ -106,6 +106,11 @@ func init() {
 }
 
 func main() {
+	if err := ApplyEnvConfig("config.json"); err != nil {
+		fmt.Printf("❌ 写入环境变量配置失败: %v\n", err)
+		os.Exit(1)
+	}
+
 	// 加载配置文件
 	config, err := LoadConfig("config.json")
 	if err != nil {
@@ -124,6 +129,9 @@ func main() {
 	logger.SetDefault(log)
 
 	distro := socket.DetectDistro()
+	if socket.InContainer() {
+		distro = "docker" // the image's base OS says nothing about the host
+	}
 	fullVersion := fmt.Sprintf("%s (%s/%s)", version, distro, runtime.GOARCH)
 	service.SetHTTPReportURL(config.Addr, config.Secret)
 

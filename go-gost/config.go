@@ -41,3 +41,35 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	return &config, nil
 }
+
+// ApplyEnvConfig writes FLUX_AGENT_ADDR and FLUX_AGENT_SECRET into the
+// config file, creating it when missing. The Docker image is configured this
+// way; the ports the panel stored in the file are kept.
+func ApplyEnvConfig(configPath string) error {
+	addr := os.Getenv("FLUX_AGENT_ADDR")
+	secret := os.Getenv("FLUX_AGENT_SECRET")
+	if addr == "" && secret == "" {
+		return nil
+	}
+
+	var config Config
+	if data, err := os.ReadFile(configPath); err == nil {
+		if err := json.Unmarshal(data, &config); err != nil {
+			return fmt.Errorf("解析配置文件失败: %v", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("读取配置文件失败: %v", err)
+	}
+	if addr != "" {
+		config.Addr = addr
+	}
+	if secret != "" {
+		config.Secret = secret
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, data, 0600)
+}

@@ -316,6 +316,8 @@ func (h *Handler) nodeInstall(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID      int64  `json:"id"`
 		Channel string `json:"channel"`
+		// Mode "docker" returns a docker run command instead of install.sh.
+		Mode string `json:"mode"`
 	}
 	if err := decodeJSON(r.Body, &req); err != nil {
 		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
@@ -347,6 +349,10 @@ func (h *Handler) nodeInstall(w http.ResponseWriter, r *http.Request) {
 		response.WriteJSON(w, response.Err(-2, err.Error()))
 		return
 	}
+	if req.Mode == "docker" {
+		response.WriteJSON(w, response.OK(dockerInstallCommand(version, processServerAddress(panelAddr), secret)))
+		return
+	}
 	enabled, proxyURL := h.getGithubProxyConfig()
 
 	var cmd string
@@ -358,6 +364,17 @@ func (h *Handler) nodeInstall(w http.ResponseWriter, r *http.Request) {
 			githubRepo, version, version, processServerAddress(panelAddr), secret)
 	}
 	response.WriteJSON(w, response.OK(cmd))
+}
+
+// dockerInstallCommand runs the agent image published with the release.
+// Host networking lets forwards listen on any port, NET_ADMIN is for the
+// nftables counters and whitelists, and the restart policy brings the
+// container back after a one-click upgrade. An existing container of the
+// same name is replaced, so the command also reinstalls.
+func dockerInstallCommand(version, panelAddr, secret string) string {
+	owner := strings.ToLower(strings.SplitN(githubRepo, "/", 2)[0])
+	return fmt.Sprintf("docker rm -f flux_agent >/dev/null 2>&1; docker run -d --name flux_agent --restart unless-stopped --network host --cap-add NET_ADMIN -v /etc/flux_agent:/etc/flux_agent -e FLUX_AGENT_ADDR=%s -e FLUX_AGENT_SECRET=%s ghcr.io/%s/flux-agent:%s",
+		panelAddr, secret, owner, version)
 }
 
 func (h *Handler) nodeUpdateOrder(w http.ResponseWriter, r *http.Request) {

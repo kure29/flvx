@@ -1505,6 +1505,16 @@ func (w *WebSocketReporter) handleUpgradeAgent(data interface{}) error {
 	w.sendUpgradeProgress("installing", 80, "准备重启...")
 	fmt.Printf("✅ 升级包下载完成 (%d bytes), 准备重启...\n", downloaded)
 
+	if InContainer() {
+		if err := installAndRestartInContainer(tmpPath, binaryPath); err != nil {
+			os.Remove(tmpPath)
+			return err
+		}
+		w.sendUpgradeProgress("installing", 100, "重启中...")
+		fmt.Println("🔄 新版本已就位, 容器将在 1 秒后重启...")
+		return nil
+	}
+
 	// 执行重启脚本
 	// 使用 systemd-run 在独立的 transient unit 中运行重启脚本，
 	// 避免 systemctl stop 杀死 flux_agent cgroup 内所有进程（包括此脚本自身）导致 mv 未执行。
@@ -1530,6 +1540,25 @@ func (w *WebSocketReporter) handleRollbackAgent(data interface{}) error {
 	}
 
 	fmt.Println("🔄 开始回退到旧版本...")
+
+	if InContainer() {
+		// The running binary can't be written in place; copy the backup
+		// beside it and rename over it.
+		data, err := os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("读取备份失败: %v", err)
+		}
+		tmpPath := binaryPath + ".new"
+		if err := os.WriteFile(tmpPath, data, 0755); err != nil {
+			return fmt.Errorf("写入备份失败: %v", err)
+		}
+		if err := installAndRestartInContainer(tmpPath, binaryPath); err != nil {
+			os.Remove(tmpPath)
+			return err
+		}
+		fmt.Println("🔄 已回退, 容器将在 1 秒后重启...")
+		return nil
+	}
 
 	// 执行回退脚本（同升级逻辑，使用 systemd-run 避免 cgroup 问题）
 	script := fmt.Sprintf("sleep 1 && systemctl stop flux_agent && cp %s %s && systemctl start flux_agent", backupPath, binaryPath)

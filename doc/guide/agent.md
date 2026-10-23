@@ -10,8 +10,32 @@
 
 ## 用面板生成的命令安装（推荐）
 
-1. **节点** 页新建节点，点击 **安装**，安装命令会复制到剪贴板（复制失败时会弹出命令框）
+1. **节点** 页新建节点，点击 **安装**，在弹出的窗口里选 **一键脚本** 或 **Docker**，点 **复制**
 2. 到节点服务器上以 root 执行，等节点状态变为 **在线**
+
+## 用 Docker 安装
+
+节点服务器已装好 Docker 时，可以用容器运行 agent。在安装窗口切到 **Docker**，复制的命令形如：
+
+```bash
+docker rm -f flux_agent >/dev/null 2>&1; docker run -d --name flux_agent \
+  --restart unless-stopped --network host --cap-add NET_ADMIN \
+  -v /etc/flux_agent:/etc/flux_agent \
+  -e FLUX_AGENT_ADDR=<面板地址> -e FLUX_AGENT_SECRET=<密钥> \
+  ghcr.io/kure29/flux-agent:<版本>
+```
+
+- `--network host`：转发和入站要按需监听任意端口，必须用宿主机网络
+- `--cap-add NET_ADMIN`：入站流量统计和白名单要用 nftables
+- `/etc/flux_agent`：配置、下载的内核和 agent 程序都在这里，删掉容器重建不会丢
+- `--restart unless-stopped`：不能去掉，面板一键升级靠它把容器拉起来
+- 不要和一键脚本安装的 agent 同时运行，二者会抢端口；换成 Docker 前先在原机器上卸载脚本版
+
+**升级**：和脚本安装一样，在 **节点** 页点 **升级**，agent 下载新版本替换数据目录里的程序后自动重启容器；也可以拉取新版本镜像后重新执行安装命令，镜像里的版本会覆盖数据目录里的程序。
+
+**调优**：容器默认改不了宿主机内核参数，要用调优需要把 `--cap-add NET_ADMIN` 换成 `--privileged`；宿主机重启后需要在面板重新应用一次。
+
+**查看日志**：`docker logs -f flux_agent`
 
 ## 节点调优
 
@@ -76,6 +100,7 @@ wget -O install.sh https://github.com/kure29/flyx/releases/latest/download/insta
 安装完成后，服务会自动启动。
 - systemd 查看状态: `systemctl status flux_agent`
 - Alpine/OpenRC 查看状态: `rc-service flux_agent status`
+- Docker 查看状态: `docker ps -f name=flux_agent`
 - 回到面板 **节点** 页，该节点状态应显示为 **在线**
 
 节点离线的排查见 [常见问题](./faq.md#节点显示离线)。
