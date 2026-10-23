@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { LogOut, UserRound } from "lucide-react";
 
 import { Button } from "@/shadcn-bridge/heroui/button";
@@ -241,6 +241,15 @@ export default function AdminLayout({
       setMobileMenuVisible(false);
     }
   }, [isMobile]);
+
+  // The layout now stays mounted across pages: start each page at the top
+  // and with the mobile menu closed, as a fresh layout did.
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+    setMobileMenuVisible(false);
+  }, [location.pathname]);
 
   // 退出登录
   const handleLogout = () => {
@@ -543,19 +552,18 @@ export default function AdminLayout({
         )}
 
         {/* 主内容 */}
-        <main className="flex-1 overflow-y-auto scrollbar-hide">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              animate={{ opacity: 1, y: 0 }}
-              className="h-full"
-              exit={{ opacity: 0, y: -6 }}
-              initial={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+        <main ref={mainRef} className="flex-1 overflow-y-auto scrollbar-hide">
+          {/* Enter animation only: an exit animation would hold the next
+              page back until the old one is gone. */}
+          <motion.div
+            key={location.pathname}
+            animate={{ opacity: 1, y: 0 }}
+            className="h-full"
+            initial={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {children}
+          </motion.div>
         </main>
       </div>
     </div>

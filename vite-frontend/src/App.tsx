@@ -6,7 +6,6 @@ import {
   Navigate,
 } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
-import { AnimatePresence } from "framer-motion";
 
 import IndexPage from "@/pages/index";
 import AdminLayout from "@/layouts/admin";
@@ -177,148 +176,149 @@ function App() {
     };
   }, []);
 
+  // No key and no exit animation: the layout stays mounted across pages
+  // and the next page mounts (and starts loading) right away, instead of
+  // after the old one has animated out.
   return (
-    <AnimatePresence mode="wait">
-      <Routes key={location.pathname} location={location}>
-        <Route element={<LoginRoute />} path="/" />
-        <Route
-          element={
-            <Suspense fallback={<PageLoadingState message="正在加载..." />}>
-              <GithubCallbackPage />
-            </Suspense>
-          }
-          path="/github-callback"
-        />
-        <Route
-          element={
-            <ProtectedRoute skipLayout={true}>
-              <ChangePasswordPage />
-            </ProtectedRoute>
-          }
-          path="/change-password"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-          path="/dashboard"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <MonitorPage />
-            </ProtectedRoute>
-          }
-          path="/monitor"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <ForwardPage />
-            </ProtectedRoute>
-          }
-          path="/forward"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <MySubscriptionsPage />
-            </ProtectedRoute>
-          }
-          path="/my-subscriptions"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <TunnelPage />
-            </ProtectedRoute>
-          }
-          path="/tunnel"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <NodePage />
-            </ProtectedRoute>
-          }
-          path="/node"
-        />
-        <Route
-          element={
-            <ProtectedRoute useSimpleLayout={true}>
-              <UserHubPage />
-            </ProtectedRoute>
-          }
-          path="/user"
-        />
-        <Route
-          element={
-            <ProtectedRoute useSimpleLayout={true}>
-              <UserHubPage />
-            </ProtectedRoute>
-          }
-          path="/group"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-          path="/profile"
-        />
-        <Route
-          element={
-            <ProtectedRoute useSimpleLayout={true}>
-              <UserHubPage />
-            </ProtectedRoute>
-          }
-          path="/limit"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <InboundPage />
-            </ProtectedRoute>
-          }
-          path="/inbound"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <RelayPage />
-            </ProtectedRoute>
-          }
-          path="/relay"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <SubscriptionPage />
-            </ProtectedRoute>
-          }
-          path="/subscription"
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <ConfigPage />
-            </ProtectedRoute>
-          }
-          path="/config"
-        />
-        <Route
-          element={
-            <ProtectedRoute useSimpleLayout={true}>
-              <PanelSharingPage />
-            </ProtectedRoute>
-          }
-          path="/panel-sharing"
-        />
-      </Routes>
-    </AnimatePresence>
+    <Routes location={location}>
+      <Route element={<LoginRoute />} path="/" />
+      <Route
+        element={
+          <Suspense fallback={<PageLoadingState message="正在加载..." />}>
+            <GithubCallbackPage />
+          </Suspense>
+        }
+        path="/github-callback"
+      />
+      <Route
+        element={
+          <ProtectedRoute skipLayout={true}>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+        path="/change-password"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+        path="/dashboard"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <MonitorPage />
+          </ProtectedRoute>
+        }
+        path="/monitor"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <ForwardPage />
+          </ProtectedRoute>
+        }
+        path="/forward"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <MySubscriptionsPage />
+          </ProtectedRoute>
+        }
+        path="/my-subscriptions"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <TunnelPage />
+          </ProtectedRoute>
+        }
+        path="/tunnel"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <NodePage />
+          </ProtectedRoute>
+        }
+        path="/node"
+      />
+      <Route
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <UserHubPage />
+          </ProtectedRoute>
+        }
+        path="/user"
+      />
+      <Route
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <UserHubPage />
+          </ProtectedRoute>
+        }
+        path="/group"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+        path="/profile"
+      />
+      <Route
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <UserHubPage />
+          </ProtectedRoute>
+        }
+        path="/limit"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <InboundPage />
+          </ProtectedRoute>
+        }
+        path="/inbound"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <RelayPage />
+          </ProtectedRoute>
+        }
+        path="/relay"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <SubscriptionPage />
+          </ProtectedRoute>
+        }
+        path="/subscription"
+      />
+      <Route
+        element={
+          <ProtectedRoute>
+            <ConfigPage />
+          </ProtectedRoute>
+        }
+        path="/config"
+      />
+      <Route
+        element={
+          <ProtectedRoute useSimpleLayout={true}>
+            <PanelSharingPage />
+          </ProtectedRoute>
+        }
+        path="/panel-sharing"
+      />
+    </Routes>
   );
 }
 

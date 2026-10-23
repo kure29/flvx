@@ -15,7 +15,6 @@ export const AnimatedPage = ({
   <motion.div
     animate={{ y: 0 }}
     className={className}
-    exit={{ y: -8 }}
     initial={{ y: 16 }}
     transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
   >
