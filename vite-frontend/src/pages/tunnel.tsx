@@ -43,6 +43,11 @@ import {
   previewTunnelDelete,
 } from "@/api";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
   EmptyHint,
@@ -95,15 +100,22 @@ import {
 } from "@/pages/tunnel/delete-modals";
 import { TunnelDiagnosisModal } from "@/pages/tunnel/diagnosis-modal";
 
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "tunnel";
+
 export default function TunnelPage({
   embedded = false,
 }: {
   embedded?: boolean;
 }) {
   const [loading, setLoading] = useState(true);
-  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
-  const [tunnelOrder, setTunnelOrder] = useState<number[]>([]);
-  const [nodes, setNodes] = useState<Node[]>([]);
+  const [tunnels, setTunnels] = useCachedState<Tunnel[]>(PAGE, "tunnels", []);
+  const [tunnelOrder, setTunnelOrder] = useCachedState<number[]>(
+    PAGE,
+    "tunnelOrder",
+    [],
+  );
+  const [nodes, setNodes] = useCachedState<Node[]>(PAGE, "nodes", []);
   const [searchKeyword, setSearchKeyword] = useLocalStorageState(
     "tunnel-search-keyword",
     "",
@@ -256,6 +268,7 @@ export default function TunnelPage({
 
         if (tunnelsRes.code === 0) {
           applyTunnelList(mapTunnelApiItems(tunnelsRes.data || []));
+          markPageCached(PAGE);
         } else {
           toast.error(tunnelsRes.msg || "获取隧道列表失败");
         }
@@ -1437,7 +1450,7 @@ export default function TunnelPage({
   const addAction = { key: "add", label: "新建隧道", onPress: handleAdd };
   const sheetTunnel = tunnels.find((t) => t.id === sheetTunnelId) ?? null;
 
-  if (loading) {
+  if (loading && !pageCached(PAGE)) {
     return <PageLoadingState message="正在加载..." />;
   }
 

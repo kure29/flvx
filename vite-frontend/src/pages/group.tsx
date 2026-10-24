@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { ActionSheet } from "@/components/action-sheet";
 import {
   EmptyHint,
@@ -82,6 +87,9 @@ interface GroupPermission {
 
 type GroupTab = "tunnel" | "user" | "perm";
 
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "group";
+
 export default function GroupPage({
   embedded = false,
 }: {
@@ -95,11 +103,27 @@ export default function GroupPage({
     null,
   );
 
-  const [tunnelGroups, setTunnelGroups] = useState<TunnelGroup[]>([]);
-  const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
-  const [permissions, setPermissions] = useState<GroupPermission[]>([]);
-  const [tunnels, setTunnels] = useState<TunnelItem[]>([]);
-  const [users, setUsers] = useState<UserItem[]>([]);
+  const [tunnelGroups, setTunnelGroups] = useCachedState<TunnelGroup[]>(
+    PAGE,
+    "tunnelGroups",
+    [],
+  );
+  const [userGroups, setUserGroups] = useCachedState<UserGroup[]>(
+    PAGE,
+    "userGroups",
+    [],
+  );
+  const [permissions, setPermissions] = useCachedState<GroupPermission[]>(
+    PAGE,
+    "permissions",
+    [],
+  );
+  const [tunnels, setTunnels] = useCachedState<TunnelItem[]>(
+    PAGE,
+    "tunnels",
+    [],
+  );
+  const [users, setUsers] = useCachedState<UserItem[]>(PAGE, "users", []);
 
   const [selectedUserGroupId, setSelectedUserGroupId] = useState<number | null>(
     null,
@@ -233,6 +257,8 @@ export default function GroupPage({
         permissionRes.code !== 0
       ) {
         toast.error("部分分组数据加载失败");
+      } else {
+        markPageCached(PAGE);
       }
     } catch {
       toast.error("分组数据加载失败");
@@ -529,7 +555,7 @@ export default function GroupPage({
           setSearch("");
         }}
       />
-      {loading ? (
+      {loading && !pageCached(PAGE) ? (
         <PageLoadingState message="正在加载..." />
       ) : (
         <>

@@ -81,6 +81,11 @@ import {
 } from "@/pages/forward/import-format";
 import { buildForwardOrder, FORWARD_ORDER_KEY } from "@/pages/forward/order";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 // import { useMobileBreakpoint } from "@/hooks/useMobileBreakpoint";
 import { saveOrder } from "@/utils/order-storage";
 import { JwtUtil } from "@/utils/jwt";
@@ -146,6 +151,9 @@ import {
   ForwardPageShell,
   getForwardDisplayFlow,
 } from "@/pages/forward/sortable";
+
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "forward";
 
 export default function ForwardPage({
   embedded = false,
@@ -232,11 +240,23 @@ export default function ForwardPage({
     (searchParams.inPort.trim() ? 1 : 0) +
     (searchParams.remoteAddr.trim() ? 1 : 0);
   const [loading, setLoading] = useState(true);
-  const [forwards, setForwards] = useState<Forward[]>([]);
-  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
-  const [allTunnels, setAllTunnels] = useState<Tunnel[]>([]);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [speedLimits, setSpeedLimits] = useState<SpeedLimitApiItem[]>([]);
+  const [forwards, setForwards] = useCachedState<Forward[]>(
+    PAGE,
+    "forwards",
+    [],
+  );
+  const [tunnels, setTunnels] = useCachedState<Tunnel[]>(PAGE, "tunnels", []);
+  const [allTunnels, setAllTunnels] = useCachedState<Tunnel[]>(
+    PAGE,
+    "allTunnels",
+    [],
+  );
+  const [nodes, setNodes] = useCachedState<Node[]>(PAGE, "nodes", []);
+  const [speedLimits, setSpeedLimits] = useCachedState<SpeedLimitApiItem[]>(
+    PAGE,
+    "speedLimits",
+    [],
+  );
   //   const isMobile = useMobileBreakpoint();
   // searchKeyword removed
   // isSearchVisible removed
@@ -246,7 +266,11 @@ export default function ForwardPage({
   // filterTunnelId removed
 
   // 拖拽排序相关状态
-  const [forwardOrder, setForwardOrder] = useState<number[]>([]);
+  const [forwardOrder, setForwardOrder] = useCachedState<number[]>(
+    PAGE,
+    "forwardOrder",
+    [],
+  );
 
   // 模态框状态
   const [modalOpen, setModalOpen] = useState(false);
@@ -344,10 +368,14 @@ export default function ForwardPage({
   });
   const [batchResultModal, setBatchResultModal] =
     useState<BatchResultModalState>(EMPTY_BATCH_RESULT_MODAL_STATE);
-  const [groupOrderMap, setGroupOrderMap] = useState<ForwardGroupOrderMap>({});
+  const [groupOrderMap, setGroupOrderMap] =
+    useCachedState<ForwardGroupOrderMap>(PAGE, "groupOrderMap", {});
   const [collapsedTunnelGroups, setCollapsedTunnelGroups] =
-    useState<ForwardGroupCollapsedMap>({});
-  const [groupPreferenceHydrated, setGroupPreferenceHydrated] = useState(false);
+    useCachedState<ForwardGroupCollapsedMap>(PAGE, "collapsedGroups", {});
+  // A revisit keeps the cached grouping on screen while it reloads.
+  const [groupPreferenceHydrated, setGroupPreferenceHydrated] = useState(() =>
+    pageCached(PAGE),
+  );
 
   const parseNodeIPs = (node?: Node): string[] => {
     if (!node) {
@@ -636,7 +664,7 @@ export default function ForwardPage({
       setGroupPreferenceHydrated(true);
     };
 
-    setGroupPreferenceHydrated(false);
+    if (!pageCached(PAGE)) setGroupPreferenceHydrated(false);
     loadGroupPreferences();
 
     return () => {
@@ -932,16 +960,13 @@ export default function ForwardPage({
     async (lod = true) => {
       setLoading(lod);
       try {
-        const [tunnelsRes, speedLimitsRes] = await Promise.all([
-          userTunnel(),
-          getSpeedLimitList(),
-        ]);
-        const [allTunnelsRes, nodesRes] = await Promise.allSettled([
-          getTunnelList(),
-          getNodeList(),
-        ]);
-
-        await refreshForwardList(false);
+        // One round trip: the lists don't depend on each other.
+        const [[tunnelsRes, speedLimitsRes], [allTunnelsRes, nodesRes]] =
+          await Promise.all([
+            Promise.all([userTunnel(), getSpeedLimitList()]),
+            Promise.allSettled([getTunnelList(), getNodeList()]),
+            refreshForwardList(false),
+          ]);
 
         if (tunnelsRes.code === 0) {
           setTunnels(tunnelsRes.data || []);
@@ -962,6 +987,7 @@ export default function ForwardPage({
         if (speedLimitsRes.code === 0) {
           setSpeedLimits(speedLimitsRes.data || []);
         }
+        markPageCached(PAGE);
       } catch {
         toast.error("加载数据失败");
       } finally {
@@ -2785,7 +2811,7 @@ export default function ForwardPage({
     );
   };
 
-  if (loading || !groupPreferenceHydrated) {
+  if ((loading && !pageCached(PAGE)) || !groupPreferenceHydrated) {
     return <PageLoadingState message="正在加载..." />;
   }
 

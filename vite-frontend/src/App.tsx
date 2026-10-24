@@ -12,6 +12,7 @@ import AdminLayout from "@/layouts/admin";
 import H5Layout from "@/layouts/h5";
 import H5SimpleLayout from "@/layouts/h5-simple";
 import { isLoggedIn } from "@/utils/auth";
+import { getAdminFlag } from "@/utils/session";
 import { siteConfig, updateSiteConfig } from "@/config/site";
 import { useH5Mode } from "@/hooks/useH5Mode";
 import { SESSION_UPDATED_EVENT } from "@/utils/session";
@@ -21,22 +22,68 @@ import { ErrorBoundary } from "@/components/error-boundary";
 
 // Pages load on first visit so the login screen does not wait for all of them.
 const ChangePasswordPage = lazy(() => import("@/pages/change-password"));
-const DashboardPage = lazy(() => import("@/pages/dashboard"));
+// The pages in the main navigation, preloaded once logged in (see
+// preloadPages) so their first visit doesn't wait for the download.
+const loadDashboard = () => import("@/pages/dashboard");
+const loadNodeHub = () => import("@/pages/node-hub");
+const loadInbound = () => import("@/pages/inbound");
+const loadRelay = () => import("@/pages/relay");
+const loadSubscription = () => import("@/pages/subscription");
+const loadUserHub = () => import("@/pages/user-hub");
+const loadConfig = () => import("@/pages/config");
+const loadMySubscriptions = () => import("@/pages/my-subscriptions");
+
+const DashboardPage = lazy(loadDashboard);
 const MonitorPage = lazy(() => import("@/pages/monitor"));
 const ForwardPage = lazy(() => import("@/pages/forward"));
 const TunnelPage = lazy(() => import("@/pages/tunnel"));
 // 用户 hosts the 分组 and 限速 tabs; each tab keeps its address.
-const UserHubPage = lazy(() => import("@/pages/user-hub"));
+const UserHubPage = lazy(loadUserHub);
 // 节点 hosts the 内核 tab.
-const NodePage = lazy(() => import("@/pages/node-hub"));
+const NodePage = lazy(loadNodeHub);
 const ProfilePage = lazy(() => import("@/pages/profile"));
-const InboundPage = lazy(() => import("@/pages/inbound"));
-const RelayPage = lazy(() => import("@/pages/relay"));
-const SubscriptionPage = lazy(() => import("@/pages/subscription"));
-const MySubscriptionsPage = lazy(() => import("@/pages/my-subscriptions"));
-const ConfigPage = lazy(() => import("@/pages/config"));
+const InboundPage = lazy(loadInbound);
+const RelayPage = lazy(loadRelay);
+const SubscriptionPage = lazy(loadSubscription);
+const MySubscriptionsPage = lazy(loadMySubscriptions);
+const ConfigPage = lazy(loadConfig);
 const PanelSharingPage = lazy(() => import("@/pages/panel-sharing"));
 const GithubCallbackPage = lazy(() => import("@/pages/github-callback"));
+
+let pagesPreloaded = false;
+
+/**
+ * Downloads the main pages' code once the browser is idle after login.
+ * The service worker caches them too, but only once it is installed and
+ * after the first visit. Skipped when the user asked to save data.
+ */
+function preloadPages() {
+  const connection = (navigator as { connection?: { saveData?: boolean } })
+    .connection;
+
+  if (pagesPreloaded || connection?.saveData) return;
+  pagesPreloaded = true;
+  const run = () => {
+    const pages = getAdminFlag()
+      ? [
+          loadDashboard,
+          loadNodeHub,
+          loadInbound,
+          loadRelay,
+          loadSubscription,
+          loadUserHub,
+          loadConfig,
+        ]
+      : [loadDashboard, loadMySubscriptions];
+
+    for (const load of pages) void load().catch(() => {});
+  };
+
+  window.setTimeout(() => {
+    if ("requestIdleCallback" in window) window.requestIdleCallback(run);
+    else run();
+  }, 2000);
+}
 
 const ProtectedRoute = ({
   children,
@@ -100,6 +147,10 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const { effectiveMode } = useThemeContext();
+
+  useEffect(() => {
+    if (isLoggedIn()) preloadPages();
+  }, [location.pathname]);
 
   // 全局登录状态监听，当检测到未登录且不在首页时，跳转到首页
   useEffect(() => {

@@ -8,6 +8,11 @@ import { getMySubscriptions, resetMySubscription } from "@/api";
 import { AnimatedPage } from "@/components/animated-page";
 import { EmptyHint, PageHeader } from "@/components/page-kit";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { QrImage, copyText, panelOrigin } from "@/pages/inbound/share";
 import { SubClientGrid } from "@/pages/subscription/client-grid";
 import { SubTrafficStats } from "@/components/lazy-charts";
@@ -220,9 +225,16 @@ function SubscriptionCard({
 }
 
 /** 订阅 for regular users: the subscriptions an admin assigned to them. */
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "my-subscriptions";
+
 export default function MySubscriptionsPage() {
   const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<UserSubscription[]>([]);
+  const [items, setItems] = useCachedState<UserSubscription[]>(
+    PAGE,
+    "items",
+    [],
+  );
   const [openId, setOpenId] = useState<number | null>(null);
   const [qr, setQr] = useState<UserSubscription | null>(null);
   const [resetting, setResetting] = useState<UserSubscription | null>(null);
@@ -237,6 +249,7 @@ export default function MySubscriptionsPage() {
 
         setItems(list);
         setOpenId((prev) => prev ?? list[0]?.id ?? null);
+        markPageCached(PAGE);
       } else {
         toast.error(res.msg || "加载失败");
       }
@@ -275,7 +288,8 @@ export default function MySubscriptionsPage() {
     }
   };
 
-  if (loading) return <PageLoadingState message="正在加载..." />;
+  if (loading && !pageCached(PAGE))
+    return <PageLoadingState message="正在加载..." />;
 
   const several = items.length > 1;
 

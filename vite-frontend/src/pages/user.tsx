@@ -65,6 +65,11 @@ import {
 } from "@/api";
 import { DeleteIcon } from "@/components/icons";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { TrafficLimitField } from "@/components/traffic-limit-field";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 import { removeItemsById, replaceItemById } from "@/utils/list-state";
@@ -263,9 +268,12 @@ function SubscriptionPicker({
   );
 }
 
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "user";
+
 export default function UserPage({ embedded = false }: { embedded?: boolean }) {
   // 状态管理
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useCachedState<User[]>(PAGE, "users", []);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useLocalStorageState(
     "user-search-keyword",
@@ -380,10 +388,22 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
   const [resetTunnelFlowLoading, setResetTunnelFlowLoading] = useState(false);
 
   // 其他数据
-  const [tunnels, setTunnels] = useState<Tunnel[]>([]);
-  const [speedLimits, setSpeedLimits] = useState<SpeedLimit[]>([]);
-  const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
-  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
+  const [tunnels, setTunnels] = useCachedState<Tunnel[]>(PAGE, "tunnels", []);
+  const [speedLimits, setSpeedLimits] = useCachedState<SpeedLimit[]>(
+    PAGE,
+    "speedLimits",
+    [],
+  );
+  const [userGroups, setUserGroups] = useCachedState<UserGroup[]>(
+    PAGE,
+    "userGroups",
+    [],
+  );
+  const [subscriptions, setSubscriptions] = useCachedState<SubscriptionItem[]>(
+    PAGE,
+    "subscriptions",
+    [],
+  );
   const userSubCount = useMemo(() => {
     const m = new Map<number, number>();
 
@@ -453,6 +473,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
 
           setUsers(nextUsers);
           setPagination((prev) => ({ ...prev, total: nextUsers.length }));
+          markPageCached(PAGE);
         } else {
           toast.error(response.msg || "获取用户列表失败");
         }
@@ -1151,7 +1172,7 @@ export default function UserPage({ embedded = false }: { embedded?: boolean }) {
         onSearch={setSearchKeyword}
       />
 
-      {loading ? (
+      {loading && !pageCached(PAGE) ? (
         <PageLoadingState message="正在加载..." />
       ) : users.length === 0 ? (
         searchKeyword.trim() ? (

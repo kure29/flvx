@@ -26,6 +26,11 @@ import {
   deleteSpeedLimit,
 } from "@/api";
 import { PageLoadingState } from "@/components/page-state";
+import {
+  markPageCached,
+  pageCached,
+  useCachedState,
+} from "@/hooks/use-cached-state";
 import { useLocalStorageState } from "@/hooks/use-local-storage-state";
 
 interface SpeedLimitRule {
@@ -44,13 +49,16 @@ interface SpeedLimitForm {
   status: number;
 }
 
+// A revisit shows the last data at once and reloads in the background.
+const PAGE = "limit";
+
 export default function LimitPage({
   embedded = false,
 }: {
   embedded?: boolean;
 }) {
   const [loading, setLoading] = useState(true);
-  const [rules, setRules] = useState<SpeedLimitRule[]>([]);
+  const [rules, setRules] = useCachedState<SpeedLimitRule[]>(PAGE, "rules", []);
   const [searchKeyword, setSearchKeyword] = useLocalStorageState(
     "limit-search-keyword",
     "",
@@ -96,6 +104,7 @@ export default function LimitPage({
 
       if (rulesRes.code === 0) {
         setRules(rulesRes.data || []);
+        markPageCached(PAGE);
       } else {
         toast.error(rulesRes.msg || "获取限速规则失败");
       }
@@ -218,7 +227,7 @@ export default function LimitPage({
     }
   };
 
-  if (loading) {
+  if (loading && !pageCached(PAGE)) {
     return <PageLoadingState message="正在加载..." />;
   }
 
