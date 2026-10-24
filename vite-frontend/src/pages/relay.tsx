@@ -27,7 +27,7 @@ import { useViewMode } from "@/components/view-mode";
 import ForwardPage from "@/pages/forward";
 import { RelayModal } from "@/pages/inbound/relay-modal";
 import TunnelPage from "@/pages/tunnel";
-import { TunnelMonitorView } from "@/pages/node/tunnel-monitor-view";
+import { TunnelMonitorView } from "@/components/lazy-charts";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 

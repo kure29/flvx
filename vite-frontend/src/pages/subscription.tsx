@@ -50,7 +50,7 @@ import { Button } from "@/shadcn-bridge/heroui/button";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import { Input } from "@/shadcn-bridge/heroui/input";
-import { SubTrafficStats } from "@/pages/subscription/traffic-stats";
+import { SubTrafficStats } from "@/components/lazy-charts";
 import {
   Modal,
   ModalBody,

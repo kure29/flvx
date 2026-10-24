@@ -21,7 +21,7 @@ import {
 import { PageEmptyState, PageLoadingState } from "@/components/page-state";
 import { AnnouncementBanner } from "@/pages/dashboard/components/announcement-banner";
 import { AnnouncementModal } from "@/pages/dashboard/components/announcement-modal";
-import { FlowChartCard } from "@/pages/dashboard/components/flow-chart-card";
+import { FlowChartCard } from "@/components/lazy-charts";
 import { MetricCard } from "@/pages/dashboard/components/metric-card";
 import { getAdminFlag, getSessionName } from "@/utils/session";
 import { AdminOverview } from "@/pages/dashboard/admin-overview";

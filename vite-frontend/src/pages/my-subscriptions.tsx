@@ -10,7 +10,7 @@ import { EmptyHint, PageHeader } from "@/components/page-kit";
 import { PageLoadingState } from "@/components/page-state";
 import { QrImage, copyText, panelOrigin } from "@/pages/inbound/share";
 import { SubClientGrid } from "@/pages/subscription/client-grid";
-import { SubTrafficStats } from "@/pages/subscription/traffic-stats";
+import { SubTrafficStats } from "@/components/lazy-charts";
 import { Button } from "@/shadcn-bridge/heroui/button";
 import {
   Modal,

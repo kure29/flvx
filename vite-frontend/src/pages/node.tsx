@@ -44,7 +44,7 @@ import {
 } from "@/api";
 import { LatencyCell, probePoints } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
-import { LatencyTrendModal } from "@/components/latency-trend-modal";
+import { LatencyTrendModal } from "@/components/lazy-charts";
 import { LatencyTargetsModal } from "@/pages/node/latency-targets-modal";
 import { PageLoadingState } from "@/components/page-state";
 import { ActionSheet } from "@/components/action-sheet";

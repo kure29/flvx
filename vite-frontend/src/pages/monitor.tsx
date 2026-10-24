@@ -8,8 +8,7 @@ import { AnimatedPage } from "@/components/animated-page";
 import { PageHeader, PageTabs, PageToolbar } from "@/components/page-kit";
 import { useViewMode } from "@/components/view-mode";
 import { getMonitorNodes } from "@/api";
-import { MonitorView } from "@/pages/node/monitor-view";
-import { TunnelMonitorView } from "@/pages/node/tunnel-monitor-view";
+import { MonitorView, TunnelMonitorView } from "@/components/lazy-charts";
 import { useNodeRealtime } from "@/pages/node/use-node-realtime";
 import { isAdmin } from "@/utils/auth";
 

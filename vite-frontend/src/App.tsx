@@ -17,6 +17,7 @@ import { useH5Mode } from "@/hooks/useH5Mode";
 import { SESSION_UPDATED_EVENT } from "@/utils/session";
 import { useThemeContext } from "@/themes/context";
 import { PageLoadingState } from "@/components/page-state";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 // Pages load on first visit so the login screen does not wait for all of them.
 const ChangePasswordPage = lazy(() => import("@/pages/change-password"));
@@ -48,16 +49,21 @@ const ProtectedRoute = ({
 }) => {
   const isH5 = useH5Mode();
   const authenticated = isLoggedIn();
+  const { pathname } = useLocation();
 
   if (!authenticated) {
     return <Navigate replace to="/" />;
   }
 
   // 如果跳过布局，直接返回子组件
+  // Inside the layout, so the menus still work after a page fails; keyed
+  // by path, so moving to another page clears the error.
   const page = (
-    <Suspense fallback={<PageLoadingState message="正在加载..." />}>
-      {children}
-    </Suspense>
+    <ErrorBoundary key={pathname}>
+      <Suspense fallback={<PageLoadingState message="正在加载..." />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
   );
 
   if (skipLayout) {

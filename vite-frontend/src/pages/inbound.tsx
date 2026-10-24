@@ -44,7 +44,7 @@ import { useVisiblePolling } from "@/hooks/use-visible-polling";
 import { GroupHeader, groupItems, useCollapsed } from "@/pages/inbound/group";
 import { LatencyCell } from "@/components/latency-cell";
 import { RouteModal } from "@/components/route-modal";
-import { LatencyTrendModal } from "@/components/latency-trend-modal";
+import { LatencyTrendModal } from "@/components/lazy-charts";
 import { ActionSheet } from "@/components/action-sheet";
 import { SplitModal } from "@/pages/inbound/split-modal";
 import {
