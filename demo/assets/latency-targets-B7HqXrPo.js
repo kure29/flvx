@@ -1,0 +1,1 @@
+const e=`latency_targets`;function t(e){try{let t=JSON.parse(e||`[]`);return Array.isArray(t)?t:[]}catch{return[]}}export{t as n,e as t};

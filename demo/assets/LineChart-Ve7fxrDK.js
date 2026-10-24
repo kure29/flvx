@@ -1,0 +1,1 @@
+import{Li as e,Pi as t}from"./index-CTln26fn.js";import{O as n,t as r}from"./CartesianChart-BnvIr44v.js";var i=e(t()),a=[`axis`],o=(0,i.forwardRef)((e,t)=>i.createElement(r,{chartName:`LineChart`,defaultTooltipEventType:`axis`,validateTooltipEventTypes:a,tooltipPayloadSearcher:n,categoricalChartProps:e,ref:t}));export{o as t};
