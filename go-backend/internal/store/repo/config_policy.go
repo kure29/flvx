@@ -34,6 +34,9 @@ var sensitiveConfigKeys = map[string]struct{}{
 	// backups, like the other secrets.
 	"notify_telegram_bot_token": {},
 	"notify_webhook_url":        {},
+	// The Gist backup's credentials.
+	"gist_token":    {},
+	"gist_password": {},
 }
 
 var systemManagedConfigKeys = map[string]struct{}{
@@ -43,6 +46,16 @@ var systemManagedConfigKeys = map[string]struct{}{
 	"is_commercial":       {},
 	"machine_fingerprint": {},
 	"node_sub_token":      {},
+	// Gist backup settings and state: set through their own endpoints and
+	// left out of backups, so restoring one keeps the current settings.
+	"gist_token":          {},
+	"gist_password":       {},
+	"gist_id":             {},
+	"gist_interval_hours": {},
+	"gist_last_at":        {},
+	"gist_last_upload":    {},
+	"gist_last_error":     {},
+	"gist_last_hash":      {},
 }
 
 func PolicyForConfig(name string) ConfigAccessPolicy {

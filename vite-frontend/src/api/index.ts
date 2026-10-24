@@ -412,6 +412,46 @@ export const importBackupData = (data: BackupImportPayload) =>
 export const restoreBackupData = (data: BackupImportPayload) =>
   Network.post("/backup/restore", data);
 
+/** Backups uploaded to a private GitHub Gist (see gist_backup.go). */
+export interface GistBackupStatus {
+  configured: boolean;
+  /** The saved token's start and end, e.g. "ghp_••••••••a1b2". */
+  tokenHint: string;
+  encrypted: boolean;
+  /** 0 = automatic upload off. */
+  intervalHours: number;
+  gistUrl: string;
+  /** Last attempt and last upload that made a revision (unix ms). */
+  lastAt: number;
+  lastUpload: number;
+  lastError: string;
+}
+export interface GistBackupVersion {
+  version: string;
+  committedAt: number;
+}
+export const getGistBackupStatus = () =>
+  Network.post<GistBackupStatus>("/backup/gist/status");
+/** An empty token or password keeps the saved one. */
+export const saveGistBackup = (data: {
+  token?: string;
+  clearToken?: boolean;
+  password?: string;
+  clearPassword?: boolean;
+  intervalHours: number;
+}) => Network.post<GistBackupStatus>("/backup/gist/save", data);
+export const uploadGistBackup = () =>
+  Network.post<{
+    result: { uploaded: boolean; message: string };
+    status: GistBackupStatus;
+  }>("/backup/gist/upload", {}, { timeout: 120000 });
+export const getGistBackupVersions = () =>
+  Network.post<GistBackupVersion[]>("/backup/gist/versions");
+export const restoreGistBackup = (data: {
+  version: string;
+  password: string;
+}) => Network.post("/backup/gist/restore", data, { timeout: 120000 });
+
 // 验证码相关接口
 export const checkCaptcha = () => Network.post("/captcha/check");
 export const generateCaptcha = () => Network.post(`/captcha/generate`);

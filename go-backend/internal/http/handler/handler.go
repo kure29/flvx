@@ -205,6 +205,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/backup/export", h.backupExport)
 	mux.HandleFunc("/api/v1/backup/import", h.backupImport)
 	mux.HandleFunc("/api/v1/backup/restore", h.backupImport)
+	mux.HandleFunc("/api/v1/backup/gist/status", h.gistBackupStatus)
+	mux.HandleFunc("/api/v1/backup/gist/save", h.gistBackupSave)
+	mux.HandleFunc("/api/v1/backup/gist/upload", h.gistBackupUpload)
+	mux.HandleFunc("/api/v1/backup/gist/versions", h.gistBackupVersions)
+	mux.HandleFunc("/api/v1/backup/gist/restore", h.gistBackupRestore)
 	mux.HandleFunc("/api/v1/api/v1/backup/export", h.backupExport)
 	mux.HandleFunc("/api/v1/api/v1/backup/import", h.backupImport)
 	mux.HandleFunc("/api/v1/api/v1/backup/restore", h.backupImport)
@@ -548,6 +553,9 @@ func (h *Handler) getConfigs(w http.ResponseWriter, r *http.Request) {
 	delete(cfgMap, "license_key")
 	delete(cfgMap, "license_machine_id")
 	delete(cfgMap, "machine_fingerprint")
+	// The Gist token and password are never sent back, to admins either.
+	delete(cfgMap, gistConfigToken)
+	delete(cfgMap, gistConfigPassword)
 	response.WriteJSON(w, response.OK(cfgMap))
 }
 
@@ -1689,22 +1697,28 @@ func (h *Handler) backupImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result.InboundsImported > 0 || req.BackupData.Inbounds != nil && len(req.BackupData.Inbounds.Kernels) > 0 {
-		// Restored kernels have no applied config yet: push them to the
-		// nodes that are online; the rest get it when they reconnect.
-		go func() {
-			nodeIDs, err := h.repo.ListKernelNodeIDs()
-			if err != nil {
-				return
-			}
-			for _, nodeID := range nodeIDs {
-				h.reconcileNodeKernels(nodeID)
-			}
-		}()
-	}
+	h.reconcileAllKernelsAfterImport(result, &req.BackupData)
 
 	result.AutoBackup = autoBackup
 	response.WriteJSON(w, response.OK(result))
+}
+
+// reconcileAllKernelsAfterImport pushes restored kernels to the nodes that
+// are online (they have no applied config yet); the rest get it when they
+// reconnect.
+func (h *Handler) reconcileAllKernelsAfterImport(result *repo.ImportResult, backup *repo.BackupData) {
+	if result.InboundsImported == 0 && (backup.Inbounds == nil || len(backup.Inbounds.Kernels) == 0) {
+		return
+	}
+	go func() {
+		nodeIDs, err := h.repo.ListKernelNodeIDs()
+		if err != nil {
+			return
+		}
+		for _, nodeID := range nodeIDs {
+			h.reconcileNodeKernels(nodeID)
+		}
+	}()
 }
 
 func (h *Handler) getAnnouncement(w http.ResponseWriter, r *http.Request) {

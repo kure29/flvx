@@ -45,6 +45,11 @@ const NOTIFY_EVENTS = [
     description: "转发用户流量用到 90%、用完或 3 天内到期，共享用户 3 天内到期",
   },
   {
+    key: "backup_failed",
+    label: "Gist 备份失败",
+    description: "自动上传到 GitHub Gist 失败时提醒",
+  },
+  {
     key: "daily_report",
     label: "每日汇总",
     description: "每天定时发一条：服务器在线、出错、流量、共享用户",
