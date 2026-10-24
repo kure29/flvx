@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/shadcn-bridge/heroui/button";
+import { Input } from "@/shadcn-bridge/heroui/input";
 import { Checkbox } from "@/shadcn-bridge/heroui/checkbox";
 import { Chip } from "@/shadcn-bridge/heroui/chip";
 import { Spinner } from "@/shadcn-bridge/heroui/spinner";
@@ -12,7 +13,20 @@ import {
   ModalBody,
   ModalFooter,
 } from "@/shadcn-bridge/heroui/modal";
-import { nodeTune, type NodeTuneStatus } from "@/api";
+import { nodeTune, type NodeTuneLine, type NodeTuneStatus } from "@/api";
+
+const mb = (bytes: number) => `${Math.round((bytes / 1048576) * 10) / 10} MB`;
+
+/** The typed line, or null while it is not a valid one. */
+function parseLine(bw: string, rtt: string): NodeTuneLine | null {
+  const b = Number(bw);
+  const r = Number(rtt);
+
+  if (!Number.isInteger(b) || !Number.isInteger(r)) return null;
+  if (b < 1 || b > 100000 || r < 1 || r > 2000) return null;
+
+  return { bandwidthMbps: b, rttMs: r };
+}
 
 /**
  * 节点调优: shows the node's current network parameters next to the
@@ -31,6 +45,11 @@ export function NodeTuneModal({
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<"" | "apply" | "restore">("");
   const [detail, setDetail] = useState<string | null>(null);
+  // Bandwidth (Mbps) and RTT (ms) as typed; the agent sizes buffers for them.
+  const [bw, setBw] = useState("");
+  const [rtt, setRtt] = useState("");
+  const line = parseLine(bw, rtt);
+  const lineSupported = Boolean(status?.params);
 
   useEffect(() => {
     if (!node) return;
@@ -45,17 +64,43 @@ export function NodeTuneModal({
           return;
         }
         setStatus(res.data);
+        if (res.data.params) {
+          setBw(String(res.data.params.bandwidthMbps));
+          setRtt(String(res.data.params.rttMs));
+        }
         // Everything checked by default, as recommended.
         setChosen(new Set(res.data.groups.map((g) => g.id)));
       })
       .catch(() => setError("读取服务器状态失败"));
   }, [node]);
 
+  // A changed line changes the targets: ask the agent again, after typing
+  // settles.
+  useEffect(() => {
+    if (!node || !line || !status?.params) return;
+    const p = status.params;
+
+    if (p.bandwidthMbps === line.bandwidthMbps && p.rttMs === line.rttMs)
+      return;
+    const timer = window.setTimeout(() => {
+      void nodeTune(node.id, "status", [], line).then((res) => {
+        if (res.code === 0 && res.data) setStatus(res.data);
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [node, line?.bandwidthMbps, line?.rttMs]);
+
   const run = async (action: "apply" | "restore") => {
     if (!node) return;
     setBusy(action);
     try {
-      const res = await nodeTune(node.id, action, [...chosen]);
+      const res = await nodeTune(
+        node.id,
+        action,
+        [...chosen],
+        lineSupported && line ? line : undefined,
+      );
 
       if (res.code !== 0 || !res.data) {
         toast.error(res.msg || "调优失败");
@@ -120,6 +165,59 @@ export function NodeTuneModal({
                   <p className="text-xs text-default-500">
                     勾选的项目写入系统配置并立即生效，重启后保持；取消勾选的会恢复成调优前的值。
                   </p>
+                  {lineSupported ? (
+                    <div className="space-y-1.5 rounded-xl border border-divider px-3 py-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          endContent={
+                            <span className="text-xs text-default-400">
+                              Mbps
+                            </span>
+                          }
+                          inputMode="numeric"
+                          label="带宽"
+                          size="sm"
+                          value={bw}
+                          variant="bordered"
+                          onChange={(e) =>
+                            setBw(e.target.value.replace(/\D/g, ""))
+                          }
+                        />
+                        <Input
+                          endContent={
+                            <span className="text-xs text-default-400">ms</span>
+                          }
+                          inputMode="numeric"
+                          label="主要线路延迟"
+                          size="sm"
+                          value={rtt}
+                          variant="bordered"
+                          onChange={(e) =>
+                            setRtt(e.target.value.replace(/\D/g, ""))
+                          }
+                        />
+                      </div>
+                      {!line ? (
+                        <p className="text-xs text-danger">
+                          带宽填 1–100000 Mbps，延迟填 1–2000 ms
+                        </p>
+                      ) : (
+                        status.sizes && (
+                          <p className="text-xs text-default-500">
+                            按服务器的套餐带宽和到主要用户的延迟（比如跨境约
+                            150ms）计算缓冲区。内存 {status.sizes.ramMb} MB ·
+                            缓冲区上限 {mb(status.sizes.bufMax)}（
+                            {status.sizes.bufReason}）
+                          </p>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-warning-600">
+                      这台服务器的 agent
+                      较旧，缓冲区用固定值；升级后可以按带宽和延迟计算
+                    </p>
+                  )}
                   {status.groups.map((g) => {
                     const supported = g.settings.some((s) => s.supported);
 
@@ -208,7 +306,12 @@ export function NodeTuneModal({
               </Button>
               <Button
                 color="primary"
-                isDisabled={!status || chosen.size === 0 || busy !== ""}
+                isDisabled={
+                  !status ||
+                  chosen.size === 0 ||
+                  busy !== "" ||
+                  (lineSupported && !line)
+                }
                 isLoading={busy === "apply"}
                 onPress={() => run("apply")}
               >

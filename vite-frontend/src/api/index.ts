@@ -227,7 +227,24 @@ export interface NodeTuneGroup {
   applied: boolean;
   settings: NodeTuneSetting[];
 }
+/** The line the buffers are sized for. */
+export interface NodeTuneLine {
+  bandwidthMbps: number;
+  rttMs: number;
+}
+export interface NodeTuneSizes {
+  ramMb: number;
+  bdp: number;
+  bufMax: number;
+  bufDefault: number;
+  /** Why bufMax has its value (2×BDP, memory cap or the 4 MB floor). */
+  bufReason: string;
+  tcpMem: string;
+}
 export interface NodeTuneStatus {
+  /** Missing from agents before line-based sizing. */
+  params?: NodeTuneLine;
+  sizes?: NodeTuneSizes;
   kernel: string;
   congestion: string;
   available: string;
@@ -240,10 +257,11 @@ export const nodeTune = (
   id: number,
   action: "status" | "apply" | "restore",
   groups: string[] = [],
+  line?: NodeTuneLine,
 ) =>
   Network.post<NodeTuneStatus>(
     "/node/tune",
-    { id, action, groups },
+    { id, action, groups, ...line },
     { timeout: 40 * 1000 },
   );
 export const testNodeNftables = (nodeId: number) =>

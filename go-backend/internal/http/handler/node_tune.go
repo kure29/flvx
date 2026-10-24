@@ -23,13 +23,25 @@ func (h *Handler) nodeTune(w http.ResponseWriter, r *http.Request) {
 		ID     int64    `json:"id"`
 		Action string   `json:"action"`
 		Groups []string `json:"groups"`
+		// The line the buffers are sized for; 0 lets the agent use the
+		// last applied values. Older agents ignore them.
+		BandwidthMbps int `json:"bandwidthMbps"`
+		RTTMs         int `json:"rttMs"`
 	}
 	if err := decodeJSON(r.Body, &req); err != nil || req.ID <= 0 {
 		response.WriteJSON(w, response.ErrDefault("请求参数错误"))
 		return
 	}
 
-	command, data := "TuneStatus", map[string]interface{}{}
+	line := map[string]interface{}{}
+	if req.BandwidthMbps != 0 || req.RTTMs != 0 {
+		if req.BandwidthMbps < 1 || req.BandwidthMbps > 100000 || req.RTTMs < 1 || req.RTTMs > 2000 {
+			response.WriteJSON(w, response.ErrDefault("带宽需在 1–100000 Mbps，延迟需在 1–2000 ms"))
+			return
+		}
+		line = map[string]interface{}{"bandwidthMbps": req.BandwidthMbps, "rttMs": req.RTTMs}
+	}
+	command, data := "TuneStatus", line
 	switch req.Action {
 	case "", "status":
 	case "apply":
@@ -37,7 +49,11 @@ func (h *Handler) nodeTune(w http.ResponseWriter, r *http.Request) {
 			response.WriteJSON(w, response.ErrDefault("请至少选择一项"))
 			return
 		}
-		command, data = "TuneApply", map[string]interface{}{"groups": req.Groups}
+		data = map[string]interface{}{"groups": req.Groups}
+		for k, v := range line {
+			data[k] = v
+		}
+		command = "TuneApply"
 	case "restore":
 		command, data = "TuneApply", map[string]interface{}{"restore": true}
 	default:
